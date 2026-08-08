@@ -238,26 +238,31 @@ bool setModulo(const char* nombre, bool activo) {
     else if (!strcmp(nombre, "sensor_hdc"))   mods.sensor_hdc   = activo;
     else if (!strcmp(nombre, "sensor_suelo")) mods.sensor_suelo = activo;
     else if (!strcmp(nombre, "sensor_ph"))    mods.sensor_ph    = activo;
-    else if (!strcmp(nombre, "actuadores"))   mods.actuadores   = activo;
     else if (!strcmp(nombre, "simulacion"))   mods.simulacion   = activo;
+
+    // ── Actuadores y prueba de válvulas son mutuamente excluyentes ──
+    //    Ambos escriben en los mismos cuatro pines. Si corrieran a la
+    //    vez se pisarían y el comportamiento sería errático justo
+    //    cuando más falta hace poder interpretarlo.
+    else if (!strcmp(nombre, "actuadores")) {
+        mods.actuadores = activo;
+        if (activo && mods.test_valvulas) {
+            mods.test_valvulas = false;
+            relesTodosOff();
+            logWarn("TEST", "Barrido detenido: se activaron los ciclos de riego");
+        }
+        if (!activo) relesTodosOff();
+    }
     else if (!strcmp(nombre, "test_valvulas")) {
         mods.test_valvulas = activo;
         if (activo && mods.actuadores) {
-            // Excluyentes: los dos escriben en los mismos pines y se
-            // pisarian el uno al otro, dando un comportamiento erratico
-            // imposible de interpretar durante una prueba.
             mods.actuadores = false;
             logWarn("TEST", "Ciclos de riego desactivados para no interferir");
         }
-        if (!activo) relesTodosOff();
+        relesTodosOff();   // siempre partir de un estado conocido
         logInfoF("TEST", "Barrido de valvulas %s", activo ? "INICIADO" : "detenido");
     }
-    else if (!strcmp(nombre, "actuadores") && activo && mods.test_valvulas) {
-        mods.test_valvulas = false;
-        mods.actuadores = true;
-        relesTodosOff();
-        logWarn("TEST", "Barrido detenido: se activaron los ciclos de riego");
-    }
+
     else if (!strcmp(nombre, "ahorro_wifi")) {
         mods.ahorro_wifi = activo;
         // Se aplica de inmediato sobre la radio, sin reiniciar
@@ -281,8 +286,9 @@ void modulosToJson(JsonObject obj) {
     obj["sensor_suelo"] = mods.sensor_suelo;
     obj["sensor_ph"]    = mods.sensor_ph;
     obj["actuadores"]   = mods.actuadores;
-    obj["simulacion"]   = mods.simulacion;
-    obj["ahorro_wifi"]  = mods.ahorro_wifi;
+    obj["simulacion"]    = mods.simulacion;
+    obj["ahorro_wifi"]   = mods.ahorro_wifi;
+    obj["test_valvulas"] = mods.test_valvulas;
 }
 
 void imprimirModulos() {
@@ -298,6 +304,7 @@ void imprimirModulos() {
     Serial.printf ("| actuadores       | %-18s |\n", mods.actuadores   ? "ON" : "off");
     Serial.printf ("| simulacion       | %-18s |\n", mods.simulacion   ? "ON" : "off");
     Serial.printf ("| ahorro_wifi      | %-18s |\n", mods.ahorro_wifi  ? "ON (~25mA)" : "off (~120mA)");
+    Serial.printf ("| test_valvulas    | %-18s |\n", mods.test_valvulas ? "ON (barrido)" : "off");
     Serial.printf ("| periodo telem.   | %-15lu ms |\n", periodo_telemetria_ms);
     Serial.println("+------------------+--------------------+");
 }
@@ -1076,29 +1083,139 @@ void tarea_sensor_ph(void* pv) {
 }
 
 // ============================================================
+//  TAREA: Prueba de banco — barrido secuencial de válvulas
+// ============================================================
+/*  Enciende una salida, la mantiene TEST_VALVULA_MS, la apaga, pausa y
+ *  pasa a la siguiente. En bucle.
+ *
+ *  Es una prueba de continuidad eléctrica: verifica cableado, módulo de
+ *  relés y alimentación, sin sensores ni lógica de riego de por medio.
+ *  Si un relé no conmuta aquí, el problema es físico y no tiene sentido
+ *  seguir depurando software.
+ *
+ *  Solo se activa una salida a la vez, a propósito: si el circuito no
+ *  aguanta la corriente de dos bobinas simultáneas, esta prueba no lo
+ *  provoca.                                                            */
+void tarea_test_valvulas(void* pv) {
+    for (;;) {
+        if (!mods.test_valvulas) {
+            vTaskDelay(INTERVAL_MODULE_CHECK / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        Serial.println();
+        logInfo("TEST", "===== Barrido de valvulas =====");
+
+        for (uint8_t i = 0; i < 4 && mods.test_valvulas; i++) {
+            relesTodosOff();
+
+            releOn(PINES_RELE[i]);
+            logInfoF("TEST", "[%d/4] GPIO%-2d  %-24s  ON", i + 1,
+                     PINES_RELE[i], NOMBRES_RELE[i]);
+
+            // Espera troceada: permite abortar el barrido en menos de
+            // medio segundo si se apaga el módulo a mitad del ciclo.
+            uint32_t t = 0;
+            while (t < TEST_VALVULA_MS && mods.test_valvulas) {
+                vTaskDelay(250 / portTICK_PERIOD_MS);
+                t += 250;
+            }
+
+            releOff(PINES_RELE[i]);
+            logInfoF("TEST", "[%d/4] GPIO%-2d  %-24s  off", i + 1,
+                     PINES_RELE[i], NOMBRES_RELE[i]);
+
+            t = 0;
+            while (t < TEST_PAUSA_MS && mods.test_valvulas) {
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+                t += 100;
+            }
+        }
+
+        relesTodosOff();
+        if (mods.test_valvulas) logInfo("TEST", "Ciclo completo, reiniciando");
+    }
+}
+
+// ============================================================
+//  TAREA: Consola serie — tercer plano de control
+// ============================================================
+/*  Acepta los mismos comandos JSON que MQTT y HTTP, escritos directamente
+ *  en el monitor serie. Existe para pruebas de banco: permite operar el
+ *  nodo sin WiFi, sin broker y sin la Raspberry encendida.
+ *
+ *  Acepta ademas dos atajos, porque escribir JSON a mano en el monitor
+ *  es incomodo:
+ *      test on / test off   → barrido de valvulas
+ *      estado               → imprime la tabla de modulos               */
+void tarea_consola(void* pv) {
+    String linea;
+    linea.reserve(160);
+
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    Serial.println("[CONSOLA] Lista. Escribe 'ayuda' para ver los comandos.");
+
+    for (;;) {
+        while (Serial.available()) {
+            char c = (char)Serial.read();
+
+            if (c != '\n' && c != '\r') {
+                if (linea.length() < 150) linea += c;
+                continue;
+            }
+            if (linea.length() == 0) continue;
+
+            linea.trim();
+            logInfoF("CONSOLA", "> %s", linea.c_str());
+
+            // ── Atajos ──────────────────────────────────────────
+            if (linea == "ayuda" || linea == "help") {
+                Serial.println("  test on | test off    barrido de valvulas");
+                Serial.println("  estado                tabla de modulos");
+                Serial.println("  reset                 reinicia el nodo");
+                Serial.println("  {\"cmd\":\"...\"}         cualquier comando JSON");
+            }
+            else if (linea == "test on")  { setModulo("test_valvulas", true);  }
+            else if (linea == "test off") { setModulo("test_valvulas", false); }
+            else if (linea == "estado")   { imprimirModulos(); }
+            else if (linea == "reset")    { esp_restart(); }
+            // ── JSON completo ───────────────────────────────────
+            else if (linea.startsWith("{")) {
+                StaticJsonDocument<512> doc;
+                if (deserializeJson(doc, linea) == DeserializationError::Ok) {
+                    String res = procesarComando(doc);
+                    logInfoF("CONSOLA", "-> %s", res.c_str());
+                } else {
+                    logError("CONSOLA", "JSON invalido");
+                }
+            }
+            else {
+                logWarn("CONSOLA", "Comando no reconocido. Escribe 'ayuda'.");
+            }
+
+            linea = "";
+        }
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+    }
+}
+
+// ============================================================
 //  TAREA: Actuadores (ciclos de riego)
 // ============================================================
 void tarea_actuadores(void* pv) {
-    pinMode(PIN_VA1, OUTPUT);  pinMode(PIN_VA2, OUTPUT);
-    pinMode(PIN_VB1, OUTPUT);  pinMode(PIN_VB2, OUTPUT);
-
-    auto escribirTodos = [](int estado) {
-        digitalWrite(PIN_VA1, estado); digitalWrite(PIN_VA2, estado);
-        digitalWrite(PIN_VB1, estado); digitalWrite(PIN_VB2, estado);
-    };
-    escribirTodos(HIGH);   // relés activo-bajo: HIGH = apagado
+    auto encenderTodos = []() { for (uint8_t k = 0; k < 4; k++) releOn(PINES_RELE[k]); };
 
     int i = 0;
     for (;;) {
-        if (!mods.actuadores) {
-            escribirTodos(HIGH);
+        // test_valvulas manda: si esta corriendo, esta tarea no toca nada
+        if (!mods.actuadores || mods.test_valvulas) {
             vTaskDelay(INTERVAL_MODULE_CHECK / portTICK_PERIOD_MS);
             continue;
         }
 
         // El riego forzado por comando gana sobre el ciclo automático
         if (RIEGO_FORZADO) {
-            escribirTodos(LOW);
+            encenderTodos();
             vTaskDelay(500 / portTICK_PERIOD_MS);
             continue;
         }
@@ -1107,9 +1224,9 @@ void tarea_actuadores(void* pv) {
         int tcd = DESCANSO_NOCTURNO ? tiempo_ciclo_descanso_noche : tiempo_ciclo_descanso;
 
         if (i < ciclos_riego) {
-            escribirTodos(LOW);
+            encenderTodos();
             vTaskDelay(tcr / portTICK_PERIOD_MS);
-            escribirTodos(HIGH);
+            relesTodosOff();
             vTaskDelay(tcd / portTICK_PERIOD_MS);
             i++;
         } else {
@@ -1134,6 +1251,14 @@ void setup() {
         return;
     }
 
+    // Los relés se configuran ANTES que nada. Un GPIO recién inicializado
+    // queda en LOW, y con módulos activo-bajo eso cierra el relé: bomba y
+    // electroválvulas arrancarían solas durante el arranque.
+    for (uint8_t i = 0; i < 4; i++) {
+        pinMode(PINES_RELE[i], OUTPUT);
+        releOff(PINES_RELE[i]);
+    }
+
     testESP();
     cargarModulos();
     imprimirModulos();
@@ -1155,6 +1280,10 @@ void setup() {
     xTaskCreate(tarea_sensor_suelo,  "suelo",      2560, NULL, 1, NULL);
     xTaskCreate(tarea_sensor_ph,     "ph",         2560, NULL, 1, NULL);
     xTaskCreate(tarea_actuadores,    "actuadores", 2560, NULL, 2, NULL);
+
+    // ── Pruebas de banco ─────────────────────────────────────
+    xTaskCreate(tarea_test_valvulas, "test-valv",  3072, NULL, 2, NULL);
+    xTaskCreate(tarea_consola,       "consola",    4096, NULL, 1, NULL);
 }
 
 void loop() {
