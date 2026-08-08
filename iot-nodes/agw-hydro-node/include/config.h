@@ -146,10 +146,27 @@
 //     para decidir el voltaje de la flash. Si el modulo de rele lo deja
 //     en ALTO al encender, la placa PUEDE NO ARRANCAR. Si ves que no
 //     bootea al conectar el circuito, mueve VA1 a GPIO25/26/33.
-#define PIN_VA1           12    // Electroválvula A  ⚠️ strapping
-#define PIN_VA2           13    // Motobomba A
-#define PIN_VB1           14    // Electroválvula B
-#define PIN_VB2           27    // Motobomba B
+//  Mapa real del circuito (confirmado en banco):
+//    Salida 1 → Electrovalvula HIDROPONIA  (llenado de los tubos NFT)
+//    Salida 2 → Electrovalvula TIERRA      (riego del cultivo en sustrato)
+//    Salida 3 → MOTOBOMBA                  (impulsa desde el tanque)
+//    Salida 4 → AMBIENTE                   (ventilador + iluminacion)
+#define PIN_SAL1          12    // Valvula hidroponia   ⚠️ strapping MTDI
+#define PIN_SAL2          13    // Valvula tierra
+#define PIN_SAL3          14    // Motobomba
+#define PIN_SAL4          27    // Ventilador y luz
+
+//  Alias por rol, para que el codigo se lea por funcion y no por numero
+#define PIN_VALV_HIDRO    PIN_SAL1
+#define PIN_VALV_TIERRA   PIN_SAL2
+#define PIN_BOMBA         PIN_SAL3
+#define PIN_AMBIENTE      PIN_SAL4
+
+//  Nombres antiguos, conservados para no romper referencias existentes
+#define PIN_VA1           PIN_SAL1
+#define PIN_VA2           PIN_SAL2
+#define PIN_VB1           PIN_SAL3
+#define PIN_VB2           PIN_SAL4
 
 //  ⚠️ Solo ADC1 funciona con el WiFi encendido. GPIO34 y GPIO36 lo son.
 //     Si añades otro sensor analogico usa GPIO32/33/35/39, nunca ADC2

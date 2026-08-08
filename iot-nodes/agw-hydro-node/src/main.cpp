@@ -97,14 +97,47 @@ static Modulos mods = {
 inline void releOn(uint8_t pin)  { digitalWrite(pin, RELE_ACTIVO_BAJO ? LOW  : HIGH); }
 inline void releOff(uint8_t pin) { digitalWrite(pin, RELE_ACTIVO_BAJO ? HIGH : LOW ); }
 
-static const uint8_t PINES_RELE[4]    = { PIN_VA1, PIN_VA2, PIN_VB1, PIN_VB2 };
-static const char*   NOMBRES_RELE[4]  = { "VA1 (electrovalvula A)",
-                                          "VA2 (motobomba A)",
-                                          "VB1 (electrovalvula B)",
-                                          "VB2 (motobomba B)" };
+static const uint8_t PINES_RELE[4]   = { PIN_SAL1, PIN_SAL2, PIN_SAL3, PIN_SAL4 };
+static const char*   NOMBRES_RELE[4] = { "Valvula HIDROPONIA",
+                                         "Valvula TIERRA",
+                                         "MOTOBOMBA",
+                                         "AMBIENTE (ventilador+luz)" };
+//  Alias aceptados por los comandos, en el mismo orden que PINES_RELE
+static const char*   ALIAS_RELE[4]   = { "hidroponia", "tierra", "bomba", "ambiente" };
+
+//  Estado actual de cada salida, para poder consultarlo sin leer el GPIO
+static bool estado_salida[4] = { false, false, false, false };
+
+void salidaSet(uint8_t idx, bool encendida) {
+    if (idx >= 4) return;
+    estado_salida[idx] = encendida;
+    if (encendida) releOn(PINES_RELE[idx]);
+    else           releOff(PINES_RELE[idx]);
+}
 
 void relesTodosOff() {
-    for (uint8_t i = 0; i < 4; i++) releOff(PINES_RELE[i]);
+    for (uint8_t i = 0; i < 4; i++) salidaSet(i, false);
+}
+
+/*  Resuelve "1".."4" o un alias ("bomba", "hidroponia"...) a indice 0..3.
+ *  Devuelve -1 si no se reconoce.                                       */
+int8_t salidaIndice(const char* ref) {
+    if (ref == nullptr || *ref == '\0') return -1;
+    if (ref[0] >= '1' && ref[0] <= '4' && ref[1] == '\0') return ref[0] - '1';
+    for (uint8_t i = 0; i < 4; i++)
+        if (!strcasecmp(ref, ALIAS_RELE[i])) return i;
+    return -1;
+}
+
+void imprimirSalidas() {
+    Serial.println("+-----------------------------------------------+");
+    Serial.println("|  SALIDAS                                      |");
+    Serial.println("+---+--------+----------------------------+-----+");
+    for (uint8_t i = 0; i < 4; i++)
+        Serial.printf("| %d | GPIO%-2d | %-26s | %-3s |\n",
+                      i + 1, PINES_RELE[i], NOMBRES_RELE[i],
+                      estado_salida[i] ? "ON" : "off");
+    Serial.println("+---+--------+----------------------------+-----+");
 }
 
 Preferences prefs;
@@ -381,6 +414,61 @@ String procesarComando(const JsonDocument& doc) {
             return String("modulo ") + modulo + " = " + (activo ? "ON" : "OFF");
         }
         return String("ERROR: modulo desconocido: ") + modulo;
+    }
+
+    // ── Control manual de salidas ────────────────────────────
+    //    Apaga los modos automáticos: si el barrido o los ciclos de riego
+    //    siguieran corriendo, pisarían el estado que se acaba de fijar y
+    //    la prueba manual sería ininterpretable.
+    if (!strcmp(cmd, "set_salidas") || !strcmp(cmd, "salidas")) {
+        mods.test_valvulas = false;
+        mods.actuadores    = false;
+
+        JsonArrayConst lista = doc["on"].as<JsonArrayConst>();
+        for (uint8_t i = 0; i < 4; i++) salidaSet(i, false);
+
+        String encendidas;
+        for (JsonVariantConst v : lista) {
+            int8_t idx = v.is<const char*>() ? salidaIndice(v.as<const char*>())
+                                             : (int8_t)(v.as<int>() - 1);
+            if (idx < 0 || idx > 3) continue;
+            salidaSet(idx, true);
+            if (encendidas.length()) encendidas += ", ";
+            encendidas += NOMBRES_RELE[idx];
+        }
+        imprimirSalidas();
+        return encendidas.length() ? ("encendidas: " + encendidas)
+                                   : String("todas las salidas apagadas");
+    }
+
+    if (!strcmp(cmd, "salidas_off")) {
+        mods.test_valvulas = false;
+        mods.actuadores    = false;
+        RIEGO_FORZADO      = false;
+        relesTodosOff();
+        imprimirSalidas();
+        return "todas las salidas apagadas";
+    }
+
+    if (!strcmp(cmd, "set_salida")) {
+        mods.test_valvulas = false;
+        mods.actuadores    = false;
+
+        const char* ref = doc["salida"] | doc["n"] | "";
+        int8_t idx = salidaIndice(ref);
+        if (idx < 0 && doc["n"].is<int>()) idx = (int8_t)(doc["n"].as<int>() - 1);
+        if (idx < 0 || idx > 3)
+            return String("ERROR: salida desconocida: ") + ref;
+
+        bool activo = doc["activo"] | false;
+        salidaSet(idx, activo);
+        imprimirSalidas();
+        return String(NOMBRES_RELE[idx]) + (activo ? " = ON" : " = off");
+    }
+
+    if (!strcmp(cmd, "get_salidas")) {
+        imprimirSalidas();
+        return "salidas impresas en serie";
     }
 
     // ── Consultar módulos ────────────────────────────────────
@@ -1109,8 +1197,8 @@ void tarea_test_valvulas(void* pv) {
         for (uint8_t i = 0; i < 4 && mods.test_valvulas; i++) {
             relesTodosOff();
 
-            releOn(PINES_RELE[i]);
-            logInfoF("TEST", "[%d/4] GPIO%-2d  %-24s  ON", i + 1,
+            salidaSet(i, true);
+            logInfoF("TEST", "[%d/4] GPIO%-2d  %-26s  ON", i + 1,
                      PINES_RELE[i], NOMBRES_RELE[i]);
 
             // Espera troceada: permite abortar el barrido en menos de
@@ -1121,8 +1209,8 @@ void tarea_test_valvulas(void* pv) {
                 t += 250;
             }
 
-            releOff(PINES_RELE[i]);
-            logInfoF("TEST", "[%d/4] GPIO%-2d  %-24s  off", i + 1,
+            salidaSet(i, false);
+            logInfoF("TEST", "[%d/4] GPIO%-2d  %-26s  off", i + 1,
                      PINES_RELE[i], NOMBRES_RELE[i]);
 
             t = 0;
@@ -1170,15 +1258,63 @@ void tarea_consola(void* pv) {
 
             // ── Atajos ──────────────────────────────────────────
             if (linea == "ayuda" || linea == "help") {
-                Serial.println("  test on | test off    barrido de valvulas");
-                Serial.println("  estado                tabla de modulos");
-                Serial.println("  reset                 reinicia el nodo");
-                Serial.println("  {\"cmd\":\"...\"}         cualquier comando JSON");
+                Serial.println();
+                Serial.println("  SALIDAS   1=hidroponia  2=tierra  3=bomba  4=ambiente");
+                Serial.println("    on 1 3 4        enciende esas y apaga el resto");
+                Serial.println("    on bomba        tambien acepta el nombre");
+                Serial.println("    off             apaga todas");
+                Serial.println("    off 3           apaga solo esa");
+                Serial.println("    salidas         tabla de salidas");
+                Serial.println();
+                Serial.println("  PRUEBAS");
+                Serial.println("    test on | test off   barrido secuencial");
+                Serial.println("    estado               tabla de modulos");
+                Serial.println("    reset                reinicia el nodo");
+                Serial.println("    {\"cmd\":\"...\"}        cualquier comando JSON");
+                Serial.println();
             }
             else if (linea == "test on")  { setModulo("test_valvulas", true);  }
             else if (linea == "test off") { setModulo("test_valvulas", false); }
             else if (linea == "estado")   { imprimirModulos(); }
+            else if (linea == "salidas")  { imprimirSalidas(); }
             else if (linea == "reset")    { esp_restart(); }
+
+            // ── on / off con lista de salidas ───────────────────
+            //    "off" a secas apaga todo; "off 3" solo esa.
+            //    "on 1 3 4" enciende esas tres y apaga las demas.
+            else if (linea == "off") {
+                mods.test_valvulas = false;
+                mods.actuadores    = false;
+                RIEGO_FORZADO      = false;
+                relesTodosOff();
+                imprimirSalidas();
+            }
+            else if (linea.startsWith("on ") || linea.startsWith("off ")) {
+                bool encender = linea.startsWith("on ");
+                mods.test_valvulas = false;
+                mods.actuadores    = false;
+
+                // "on" parte de todo apagado; "off N" solo toca lo indicado
+                if (encender) relesTodosOff();
+
+                int desde = encender ? 3 : 4;   // saltar "on " u "off "
+                int reconocidas = 0;
+                while (desde < (int)linea.length()) {
+                    int fin = linea.indexOf(' ', desde);
+                    if (fin < 0) fin = linea.length();
+                    String tok = linea.substring(desde, fin);
+                    tok.trim();
+                    if (tok.length()) {
+                        int8_t idx = salidaIndice(tok.c_str());
+                        if (idx >= 0) { salidaSet(idx, encender); reconocidas++; }
+                        else logWarn("CONSOLA", (String("salida desconocida: ") + tok).c_str());
+                    }
+                    desde = fin + 1;
+                }
+                if (reconocidas == 0)
+                    logWarn("CONSOLA", "Usa numeros 1-4 o nombres: hidroponia tierra bomba ambiente");
+                imprimirSalidas();
+            }
             // ── JSON completo ───────────────────────────────────
             else if (linea.startsWith("{")) {
                 StaticJsonDocument<512> doc;
