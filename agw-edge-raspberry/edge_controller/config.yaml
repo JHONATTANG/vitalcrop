@@ -1,0 +1,43 @@
+device:
+  gateway_id: "FOG_RPI_HIERBABUENA_01"   # = gateways.gateway_id en Neon
+  location: "Cultivo Indoor Hierbabuena"
+  firmware_version: "1.0.0"
+
+mqtt:
+  # Broker Mosquitto local. Puerto 1883 — el mismo que MQTT_PORT del
+  # firmware (iot-nodes/agw-hydro-node/include/config.h).
+  broker_host: "127.0.0.1"
+  broker_port: 1883
+  username: ""            # allow_anonymous true en Fases 2-5
+  password: ""
+  keepalive: 60
+  qos: 1                  # "at least once" — comprometido en el anteproyecto
+  reconnect_interval: 5
+  max_reconnect_delay: 60
+
+cloud:
+  # ⚠️ No hay API desplegada. Durante la Fase 3 apuntar a la IP LAN del PC
+  # de desarrollo, con uvicorn levantado con --host 0.0.0.0
+  enabled: false
+  api_base_url: "http://192.168.20.10:8000"
+  api_key: "CAMBIAR"                           # override: AGW_CLOUD_API_KEY
+  telemetry_endpoint: "/api/telemetria"        # contrato real (MCD §4.2)
+  health_endpoint: "/api/health"
+  commands_endpoint: "/api/commands/pending"   # aún no existe (deuda 7.10)
+  poll_interval_seconds: 5
+  push_timeout_seconds: 10
+  retry_max: 3
+  batch_size: 50
+
+storage:
+  db_path: "/var/lib/agw/buffer.db"
+  max_buffered_records: 50000    # ~5 meses a 1 lectura cada 5 min
+
+rules:
+  enabled: true
+  rules_file: "./rules/rules.yaml"
+
+health:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8080

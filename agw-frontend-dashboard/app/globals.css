@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary:     #0A0F1E;
+  --bg-secondary:   #111827;
+  --bg-card:        #1A2235;
+  --border:         #1F2D45;
+  --accent-green:   #10B981;
+  --accent-blue:    #3B82F6;
+  --accent-yellow:  #F59E0B;
+  --accent-red:     #EF4444;
+  --text-primary:   #F1F5F9;
+  --text-secondary: #94A3B8;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+/* Scrollbar */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1F2D45; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #2D3F5E; }
+
+/* Glassmorphism card base */
+.glass {
+  backdrop-filter: blur(8px);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, #1A2235 25%, #243050 50%, #1A2235 75%);
+  background-size: 700px 100%;
+  animation: shimmer 1.5s infinite linear;
+}

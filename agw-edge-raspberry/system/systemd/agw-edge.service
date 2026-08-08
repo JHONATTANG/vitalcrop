@@ -1,0 +1,37 @@
+[Unit]
+Description=AGW Edge Gateway Controller — VitalCrop
+Documentation=https://github.com/vitalcrop/agw-edge-raspberry
+After=network-online.target mosquitto.service
+Wants=network-online.target
+Requires=mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/agw/edge_controller
+
+# Entorno de ejecución
+Environment="PYTHONUNBUFFERED=1"
+Environment="AGW_ENV=production"
+EnvironmentFile=-/opt/agw/.env
+
+ExecStart=/opt/agw/venv/bin/python main.py
+
+# Reinicio automático con backoff
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# Logs al journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agw-edge
+
+# Límites de recursos
+LimitNOFILE=65536
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

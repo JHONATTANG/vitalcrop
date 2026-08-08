@@ -1,0 +1,153 @@
+"""
+AGW Edge Gateway — Configuration Loader
+Carga config.yaml y lo expone como dataclasses validados con Pydantic
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Optional
+
+import yaml
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings
+
+
+# ─────────────────────────────────────────────────────────────────
+# Sub-modelos
+# ─────────────────────────────────────────────────────────────────
+
+class DeviceConfig(BaseModel):
+    gateway_id: str
+    location: str
+    firmware_version: str = "1.0.0"
+
+
+class MQTTConfig(BaseModel):
+    # Puerto 1883: el mismo que MQTT_PORT del firmware ESP32.
+    broker_host: str = "127.0.0.1"
+    broker_port: int = 1883
+    username: str = ""
+    password: str = ""
+    keepalive: int = 60
+    qos: int = 1
+    reconnect_interval: int = 5
+    max_reconnect_delay: int = 60
+
+
+class CloudConfig(BaseModel):
+    # enabled=False → todo se acumula en el buffer local sin tocar la red.
+    enabled: bool = True
+    api_base_url: str
+    api_key: str
+    telemetry_endpoint: str = "/api/telemetria"
+    health_endpoint: str = "/api/health"
+    commands_endpoint: str = "/api/commands/pending"
+    poll_interval_seconds: int = 5
+    push_timeout_seconds: int = 10
+    retry_max: int = 3
+    batch_size: int = 50
+
+
+class StorageConfig(BaseModel):
+    db_path: str = "/var/lib/agw/buffer.db"
+    max_buffered_records: int = 50000
+
+
+class RulesConfig(BaseModel):
+    enabled: bool = True
+    rules_file: str = "./rules/rules.yaml"
+
+
+class HealthConfig(BaseModel):
+    enabled: bool = True
+    host: str = "0.0.0.0"
+    port: int = 8080
+
+
+# ─────────────────────────────────────────────────────────────────
+# Config raíz
+# ─────────────────────────────────────────────────────────────────
+
+class AppConfig(BaseModel):
+    device: DeviceConfig
+    mqtt: MQTTConfig
+    cloud: CloudConfig
+    storage: StorageConfig
+    rules: RulesConfig
+    health: HealthConfig
+
+
+# ─────────────────────────────────────────────────────────────────
+# Loader
+# ─────────────────────────────────────────────────────────────────
+
+_CONFIG_PATH = Path(__file__).parent / "config.yaml"
+
+# El .env vive un nivel arriba de edge_controller/ (raíz del proyecto edge).
+# En la Raspberry: /opt/agw-edge/.env con chmod 600.
+_ENV_PATH = Path(__file__).parent.parent / ".env"
+
+
+def _load_dotenv(path: Path = _ENV_PATH) -> None:
+    """
+    Carga el .env sin depender de python-dotenv.
+
+    systemd puede inyectar las variables con EnvironmentFile=, y en ese caso
+    ya están en el entorno. Se usa setdefault para que el entorno real
+    siempre gane sobre el archivo.
+    """
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
+_load_dotenv()
+
+
+def load_config(config_path: Optional[Path] = None) -> AppConfig:
+    """Carga y valida config.yaml. Permite overrides desde variables de entorno."""
+    path = config_path or _CONFIG_PATH
+    with open(path, "r") as f:
+        raw = yaml.safe_load(f)
+
+    # ── Overrides desde el entorno (agw-edge-raspberry/.env) ─────
+    # El entorno gana sobre el YAML: así los secretos viven en .env
+    # (chmod 600) y no en un archivo de configuración versionable.
+    _apply_env(raw, "AGW_CLOUD_API_KEY",       "cloud",   "api_key")
+    _apply_env(raw, "AGW_CLOUD_BASE_URL",      "cloud",   "api_base_url")
+    _apply_env(raw, "AGW_CLOUD_TELEMETRY_ENDPOINT", "cloud", "telemetry_endpoint")
+    _apply_env(raw, "AGW_CLOUD_ENABLED",       "cloud",   "enabled", cast=_as_bool)
+    _apply_env(raw, "AGW_GATEWAY_ID",          "device",  "gateway_id")
+    _apply_env(raw, "AGW_GATEWAY_LOCATION",    "device",  "location")
+    _apply_env(raw, "AGW_MQTT_HOST",           "mqtt",    "broker_host")
+    _apply_env(raw, "AGW_MQTT_PORT",           "mqtt",    "broker_port", cast=int)
+    _apply_env(raw, "AGW_MQTT_USERNAME",       "mqtt",    "username")
+    _apply_env(raw, "AGW_MQTT_PASSWORD",       "mqtt",    "password")
+    _apply_env(raw, "AGW_DB_PATH",             "storage", "db_path")
+    _apply_env(raw, "AGW_MAX_BUFFERED_RECORDS", "storage", "max_buffered_records",
+               cast=int)
+    _apply_env(raw, "AGW_HEALTH_PORT",         "health",  "port", cast=int)
+    _apply_env(raw, "AGW_RULES_FILE",          "rules",   "rules_file")
+
+    return AppConfig(**raw)
+
+
+def _as_bool(value: str) -> bool:
+    return value.strip().lower() in ("1", "true", "yes", "on", "si", "sí")
+
+
+def _apply_env(raw: dict, env_var: str, section: str, key: str, cast=str) -> None:
+    """Sobrescribe raw[section][key] si la variable de entorno existe."""
+    value = os.getenv(env_var)
+    if value is None or value == "":
+        return
+    raw.setdefault(section, {})[key] = cast(value)

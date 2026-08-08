@@ -1,0 +1,167 @@
+# ═══════════════════════════════════════════════════════════════
+#  Reglas de decisión autónoma del Edge Gateway — VitalCrop AGW
+# ═══════════════════════════════════════════════════════════════
+#  Estas reglas son lo que mantiene el cultivo vivo SIN internet.
+#  Se evalúan en la Raspberry contra cada trama de telemetría, antes
+#  de intentar cualquier comunicación con la nube.
+#
+#  Sensores disponibles (nombres del firmware, MCD §4.1):
+#     temp    — temperatura del aire  (°C)   HDC1080
+#     hum     — humedad relativa      (%)    HDC1080
+#     hsuelo  — humedad de sustrato   (%)    capacitivo GPIO36
+#     ph      — pH de la solución            RETIRADO del alcance (MCD §6.4)
+#
+#  device_type: "*" aplica a cualquier nodo. El prototipo tiene uno solo.
+#
+#  ⚠️ Las reglas que publican en `cultivo/indoor/hierbabuena/cmd` envían
+#     comandos REALES al ESP32. Los payloads deben respetar el contrato
+#     de comandos del firmware o serán ignorados silenciosamente.
+# ═══════════════════════════════════════════════════════════════
+
+rules:
+
+  # ── Humedad de sustrato baja → RIEGO AUTOMÁTICO ────────────────
+  # La única regla que actúa sobre el hardware. Es el núcleo de la
+  # autonomía de borde: si se cae internet, el riego sigue ocurriendo.
+  - id: "suelo_seco_riego"
+    name: "Sustrato seco — activar riego"
+    device_type: "*"
+    enabled: true
+    condition:
+      sensor: "hsuelo"
+      operator: "<"
+      threshold: 30.0
+    actions:
+      - type: "alert"
+        severity: "WARNING"
+        message: "Humedad de sustrato bajo 30% — riego activado por el edge"
+      - type: "mqtt_publish"
+        topic: "cultivo/indoor/hierbabuena/cmd"
+        payload:
+          cmd: "set_riego"
+          encendido: true
+
+  # ── Sustrato saturado → CORTAR RIEGO ──────────────────────────
+  # Evita encharcamiento y pudrición de raíz.
+  - id: "suelo_saturado_corte"
+    name: "Sustrato saturado — cortar riego"
+    device_type: "*"
+    enabled: true
+    condition:
+      sensor: "hsuelo"
+      operator: ">"
+      threshold: 90.0
+    actions:
+      - type: "alert"
+        severity: "WARNING"
+        message: "Humedad de sustrato sobre 90% — riego cortado por el edge"
+      - type: "mqtt_publish"
+        topic: "cultivo/indoor/hierbabuena/cmd"
+        payload:
+          cmd: "set_riego"
+          encendido: false
+
+  # ── Temperatura alta ──────────────────────────────────────────
+  # Rango de la hierbabuena: 18–28 °C. Sobre 32 °C hay estrés térmico.
+  - id: "temp_alta"
+    name: "Temperatura alta — estrés térmico"
+    device_type: "*"
+    enabled: true
+    condition:
+      sensor: "temp"
+      operator: ">"
+      threshold: 32.0
+    actions:
+      - type: "alert"
+        severity: "WARNING"
+        message: "Temperatura sobre 32 C — revisar ventilacion del invernadero"
+
+  # ── Temperatura baja ──────────────────────────────────────────
+  - id: "temp_baja"
+    name: "Temperatura baja — riesgo de detencion del crecimiento"
+    device_type: "*"
+    enabled: true
+    condition:
+      sensor: "temp"
+      operator: "<"
+      threshold: 12.0
+    actions:
+      - type: "alert"
+        severity: "WARNING"
+        message: "Temperatura bajo 12 C — crecimiento detenido"
+
+  # ── Humedad relativa baja ─────────────────────────────────────
+  # Bajo 40% aumenta la transpiración y el estrés hídrico.
+  - id: "humedad_baja"
+    name: "Humedad relativa baja"
+    device_type: "*"
+    enabled: true
+    condition:
+      sensor: "hum"
+      operator: "<"
+      threshold: 40.0
+    actions:
+      - type: "alert"
+        severity: "INFO"
+        message: "Humedad relativa bajo 40% — mayor demanda hidrica"
+
+  # ── Humedad relativa alta ─────────────────────────────────────
+  # Sobre 85% favorece hongos (oídio, botrytis).
+  - id: "humedad_alta"
+    name: "Humedad relativa alta — riesgo fungico"
+    device_type: "*"
+    enabled: true
+    condition:
+      sensor: "hum"
+      operator: ">"
+      threshold: 85.0
+    actions:
+      - type: "alert"
+        severity: "WARNING"
+        message: "Humedad relativa sobre 85% — riesgo de hongos, ventilar"
+
+  # ── Enlace inalámbrico degradado ──────────────────────────────
+  # No es agronómica: es una métrica de telecomunicaciones (MCD §9).
+  # Bajo -80 dBm sube la pérdida de paquetes y la latencia.
+  - id: "rssi_debil"
+    name: "Señal WiFi debil del nodo"
+    device_type: "*"
+    enabled: true
+    condition:
+      sensor: "rssi"
+      operator: "<"
+      threshold: -80.0
+    actions:
+      - type: "alert"
+        severity: "WARNING"
+        message: "RSSI bajo -80 dBm — reubicar nodo o revisar antena del AP"
+
+  # ── pH: DESACTIVADAS (MCD §6.4) ───────────────────────────────
+  # Se conservan a propósito. Reactivar el pH es cambiar enabled a true
+  # y conectar la sonda: eso demuestra la modularidad que propone el
+  # proyecto, en lugar de borrar el camino.
+  - id: "ph_alto"
+    name: "pH alto en solucion nutritiva"
+    device_type: "*"
+    enabled: false
+    condition:
+      sensor: "ph"
+      operator: ">"
+      threshold: 7.5
+    actions:
+      - type: "alert"
+        severity: "CRITICAL"
+        message: "pH sobre 7.5 — absorcion de micronutrientes comprometida"
+
+  - id: "ph_bajo"
+    name: "pH bajo en solucion nutritiva"
+    device_type: "*"
+    enabled: false
+    condition:
+      sensor: "ph"
+      operator: "<"
+      threshold: 5.5
+    actions:
+      - type: "alert"
+        severity: "CRITICAL"
+        message: "pH bajo 5.5 — riesgo de toxicidad por metales"

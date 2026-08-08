@@ -1,0 +1,74 @@
+# ============================================================
+# .gitignore raíz — VitalCrop AGW
+# ⚠️ El proyecto contiene credenciales de PRODUCCIÓN en archivos .env
+#    Este archivo es la primera línea de defensa. No lo debilites.
+# ============================================================
+
+# ── SECRETOS — nunca versionar ────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ── Node / Next.js ────────────────────────────────────────
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── PlatformIO / ESP32 ────────────────────────────────────
+.pio/
+.pioenvs/
+.piolibdeps/
+*.bin
+*.elf
+*.map
+
+# ── Bases de datos locales (buffer del edge) ──────────────
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ── Logs y temporales ─────────────────────────────────────
+*.log
+logs/
+tmp/
+*.bak
+*.swp
+*.swo
+
+# ── IDE ───────────────────────────────────────────────────
+.vscode/
+.idea/
+
+# ── OS ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Diagnósticos generados ────────────────────────────────
+agw_diagnostico.txt
+
+# ── Repositorio independiente ─────────────────────────────
+# agw-cloud-api tiene su propio .git con historia y remote propio:
+#   https://github.com/JHONATTANG/agw-cloud-api
+# Se excluye para no crearlo como submódulo accidental. Sus cambios
+# se versionan allí, no aquí.
+agw-cloud-api/

@@ -1,0 +1,11 @@
+# Mosquitto ACL — AGW Edge Gateway
+# Formato: user <username> / topic <permission> <topic-pattern>
+
+# ── ESP32 nodes (SOIL / HYDRO) ──────────────────────────────────
+user esp32_node
+topic readwrite agw/node/#
+topic read agw/gateway/commands/#
+
+# ── Edge Controller (full access) ───────────────────────────────
+user edge_controller
+topic readwrite #
