@@ -11,7 +11,7 @@
 // ------------------------------------------------------------
 #define DEVICE_ID         "IoT-node-26.001"
 #define DEVICE_TYPE       "hydro"
-#define FIRMWARE_VERSION  "1.2.0"
+#define FIRMWARE_VERSION  "2.0.0"
 
 // ------------------------------------------------------------
 //  Red WiFi
@@ -98,7 +98,9 @@
 #define DEFAULT_MOD_SENSOR_HDC   false   // HDC1080 (temp + humedad)
 #define DEFAULT_MOD_SENSOR_SUELO false   // Humedad de sustrato (GPIO36)
 #define DEFAULT_MOD_SENSOR_PH    false   // pH (GPIO34) — retirado del alcance
-#define DEFAULT_MOD_ACTUADORES   false   // Ciclos de riego
+#define DEFAULT_MOD_RIEGO_HIDRO  false   // Ciclos de riego de hidroponia
+#define DEFAULT_MOD_RIEGO_TIERRA false   // Riego de tierra por calendario
+#define DEFAULT_MOD_AMBIENTE     false   // Luz + ventilador por fotoperiodo
 #define DEFAULT_MOD_SIMULACION   false   // Valores sintéticos sin hardware
 
 // ------------------------------------------------------------
@@ -121,6 +123,86 @@
 
 // Namespace de NVS donde se persisten los flags
 #define NVS_NAMESPACE  "agw"
+
+// ============================================================
+//  PROGRAMA DE CULTIVO
+// ============================================================
+//  Todos estos valores los empuja la Raspberry por MQTT/HTTP y el nodo
+//  los guarda en NVS. Los define aquí son solo el arranque de fábrica:
+//  lo que vale es lo último que envió el gateway.
+//
+//  REPARTO DE RESPONSABILIDADES
+//  La Pi lleva el calendario y decide CUANDO toca cada cosa. El ESP32
+//  guarda el plan y lo EJECUTA, incluso si la Pi desaparece. Asi el
+//  cultivo sobrevive a una caida del gateway, que es justo lo que exige
+//  la continuidad operativa del proyecto.
+//
+//  El ESP32 no tiene reloj de tiempo real: la Pi le envia la hora al
+//  conectar y la resincroniza periodicamente. Mientras no la tenga, el
+//  nodo entra en MODO DEGRADADO (ver mas abajo).
+
+// ------------------------------------------------------------
+//  Fotoperiodo — rige la luz Y el modo dia/noche del riego
+// ------------------------------------------------------------
+#define PROG_HORA_LUZ_ON        6    // 06:00 enciende luz y ventilador
+#define PROG_HORA_LUZ_OFF      20    // 20:00 apaga  → 14 h luz / 10 h oscuridad
+
+// ------------------------------------------------------------
+//  Riego de hidroponía — ciclos intermitentes
+// ------------------------------------------------------------
+//  De dia el cultivo transpira y consume, asi que se riega mas seguido.
+//  De noche la demanda cae: ciclos espaciados bastan para mantener la
+//  lamina de agua sin desperdiciar bombeo ni oxigenar de mas la raiz.
+#define PROG_HIDRO_RIEGO_DIA_S      900   // 15 min bombeando
+#define PROG_HIDRO_DESCANSO_DIA_S   900   // 15 min parada
+#define PROG_HIDRO_RIEGO_NOCHE_S    600   // 10 min bombeando
+#define PROG_HIDRO_DESCANSO_NOCHE_S 7200  //  2 h  parada
+
+// ------------------------------------------------------------
+//  Riego de tierra — por calendario, corte por sensor
+// ------------------------------------------------------------
+#define PROG_TIERRA_CADA_DIAS        15   // Periodicidad
+#define PROG_TIERRA_HORA             7    // A las 07:00, con luz ya encendida
+
+//  Umbral de CORTE: mucho mas sensible que NIVEL_DELTA_MIN.
+//  Reportar "hay agua" puede esperar a que el sensor este bien mojado;
+//  CORTAR el llenado no: hay que actuar en cuanto el agua asoma, o se
+//  encharca. Por eso son dos constantes distintas y no una.
+#define PROG_TIERRA_DELTA_CORTE     100   // cuentas de ADC
+
+//  Corte de seguridad por tiempo. Si el sensor se averia y nunca
+//  detecta, la valvula no puede quedarse abierta indefinidamente.
+#define PROG_TIERRA_MAX_S           600   // 10 min como maximo absoluto
+
+// ------------------------------------------------------------
+//  Telemetría
+// ------------------------------------------------------------
+#define PROG_TELEMETRIA_S            60   // 1 min por defecto, ajustable
+#define PROG_TELEMETRIA_MIN_S         5   // Suelo: por debajo satura la red
+#define PROG_TELEMETRIA_MAX_S      3600   // Techo: 1 hora
+
+// ------------------------------------------------------------
+//  Contacto con el gateway
+// ------------------------------------------------------------
+//  Si pasan mas de PROG_SIN_GATEWAY_S sin recibir nada de la Pi, el
+//  nodo se declara HUERFANO: sigue ejecutando el ultimo plan conocido
+//  pero lo hace constar en el status, para que quede registrado que
+//  esos datos se generaron sin supervision del gateway.
+#define PROG_SIN_GATEWAY_S          900   // 15 min
+
+// ------------------------------------------------------------
+//  Nivel de log por el puerto serie
+// ------------------------------------------------------------
+//  0 = silencio total   (produccion: el nodo va sin cable serie)
+//  1 = solo errores
+//  2 = errores y avisos
+//  3 = informativo      (por defecto, para banco)
+//  4 = depuracion
+//
+//  Se cambia en caliente con {"cmd":"set_log","nivel":N} y persiste en
+//  NVS. En produccion conviene 1: los errores siguen quedando en el
+//  buffer serie por si alguien conecta un cable a diagnosticar.
+#define LOG_NIVEL_DEF                 3
 
 // ------------------------------------------------------------
 //  Sistema de alertas — umbrales por defecto

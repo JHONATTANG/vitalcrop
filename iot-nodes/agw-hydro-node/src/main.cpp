@@ -62,6 +62,8 @@
 #include <PubSubClient.h>
 #undef MQTT_KEEPALIVE
 #include <Preferences.h>
+#include <time.h>
+#include <sys/time.h>   // settimeofday()
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "config.h"
@@ -76,7 +78,9 @@ struct Modulos {
     bool sensor_hdc;
     bool sensor_suelo;
     bool sensor_ph;
-    bool actuadores;
+    bool riego_hidro;
+    bool riego_tierra;
+    bool ambiente;
     bool simulacion;
     bool ahorro_wifi;
     bool test_valvulas;
@@ -90,7 +94,9 @@ static Modulos mods = {
     DEFAULT_MOD_SENSOR_HDC,
     DEFAULT_MOD_SENSOR_SUELO,
     DEFAULT_MOD_SENSOR_PH,
-    DEFAULT_MOD_ACTUADORES,
+    DEFAULT_MOD_RIEGO_HIDRO,
+    DEFAULT_MOD_RIEGO_TIERRA,
+    DEFAULT_MOD_AMBIENTE,
     DEFAULT_MOD_SIMULACION,
     DEFAULT_MOD_AHORRO_WIFI,
     DEFAULT_MOD_TEST_VALVULAS,
@@ -194,6 +200,50 @@ float tds_mv_cero = TDS_MV_CERO_DEF;  // offset del cero, en mV
 float tds_ppm   = 0.0f;
 float tds_mv    = 0.0f;
 
+// ============================================================
+//  PROGRAMA DE CULTIVO — lo empuja la Raspberry, vive en NVS
+// ============================================================
+/*  REPARTO DE RESPONSABILIDADES
+ *  La Pi lleva el calendario y decide CUANDO toca cada cosa. El ESP32
+ *  guarda el plan y lo EJECUTA, incluso si la Pi desaparece. Asi el
+ *  cultivo sobrevive a una caida del gateway.                          */
+struct Programa {
+    uint8_t  hora_luz_on;
+    uint8_t  hora_luz_off;
+    uint32_t hidro_riego_dia_s;
+    uint32_t hidro_descanso_dia_s;
+    uint32_t hidro_riego_noche_s;
+    uint32_t hidro_descanso_noche_s;
+    uint16_t tierra_cada_dias;
+    uint8_t  tierra_hora;
+    uint32_t telemetria_s;
+};
+
+static Programa prog = {
+    PROG_HORA_LUZ_ON,            PROG_HORA_LUZ_OFF,
+    PROG_HIDRO_RIEGO_DIA_S,      PROG_HIDRO_DESCANSO_DIA_S,
+    PROG_HIDRO_RIEGO_NOCHE_S,    PROG_HIDRO_DESCANSO_NOCHE_S,
+    PROG_TIERRA_CADA_DIAS,       PROG_TIERRA_HORA,
+    PROG_TELEMETRIA_S
+};
+
+// --- Reloj: el ESP32 no tiene RTC, la hora la envia la Pi ---
+volatile bool   hora_valida     = false;
+volatile time_t ultimo_contacto = 0;   // epoch del ultimo mensaje del gateway
+
+// --- Riego de tierra: calendario acordado con la Pi ---
+volatile time_t proximo_riego_tierra = 0;   // epoch, 0 = sin programar
+volatile time_t ultimo_riego_tierra  = 0;
+
+// --- Estado de ejecucion, se reporta en el status ---
+volatile bool regando_hidro  = false;
+volatile bool regando_tierra = false;
+volatile bool luz_encendida  = false;
+volatile bool huerfano       = false;   // sin noticias del gateway
+
+// --- Nivel de log (0=silencio … 4=depuracion) ---
+volatile uint8_t log_nivel = LOG_NIVEL_DEF;
+
 // --- Actuadores ---
 volatile int  ESTADO_ACTUADORES           = HIGH;
 int           tiempo_ciclo_riego          = 2000;
@@ -227,15 +277,93 @@ volatile uint32_t t_fuera_ph     = 0;
 // ============================================================
 //  LOGGER
 // ============================================================
-void logInfo(const char* tag, const char* msg)  { Serial.printf("[%8lu][INFO ] %-10s %s\n", millis(), tag, msg); }
-void logWarn(const char* tag, const char* msg)  { Serial.printf("[%8lu][WARN ] %-10s %s\n", millis(), tag, msg); }
-void logError(const char* tag, const char* msg) { Serial.printf("[%8lu][ERROR] %-10s %s\n", millis(), tag, msg); }
+/*  Los logs pasan por un filtro de nivel para poder dejar el nodo mudo
+ *  en produccion. Un ESP32 instalado en un invernadero no tiene nadie
+ *  mirando el puerto serie, y escribir en un UART sin receptor consume
+ *  CPU y bloquea la tarea mientras se vacia el buffer.                 */
+#define LOG_SILENCIO 0
+#define LOG_ERROR    1
+#define LOG_WARN     2
+#define LOG_INFO     3
+#define LOG_DEBUG    4
+
+void logError(const char* tag, const char* msg) {
+    if (log_nivel >= LOG_ERROR)
+        Serial.printf("[%8lu][ERROR] %-10s %s\n", millis(), tag, msg);
+}
+void logWarn(const char* tag, const char* msg) {
+    if (log_nivel >= LOG_WARN)
+        Serial.printf("[%8lu][WARN ] %-10s %s\n", millis(), tag, msg);
+}
+void logInfo(const char* tag, const char* msg) {
+    if (log_nivel >= LOG_INFO)
+        Serial.printf("[%8lu][INFO ] %-10s %s\n", millis(), tag, msg);
+}
 void logInfoF(const char* tag, const char* fmt, ...) {
+    if (log_nivel < LOG_INFO) return;
     char buf[320];
     va_list args; va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args); va_end(args);
     Serial.printf("[%8lu][INFO ] %-10s %s\n", millis(), tag, buf);
 }
+void logWarnF(const char* tag, const char* fmt, ...) {
+    if (log_nivel < LOG_WARN) return;
+    char buf[320];
+    va_list args; va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args); va_end(args);
+    Serial.printf("[%8lu][WARN ] %-10s %s\n", millis(), tag, buf);
+}
+
+// ============================================================
+//  RELOJ — la hora la provee la Raspberry
+// ============================================================
+/*  El ESP32 no tiene RTC con bateria: al arrancar no sabe que hora es.
+ *  La Pi le envia el epoch al conectar y lo resincroniza periodicamente.
+ *  Entre sincronizaciones el nodo mantiene la cuenta con su propio
+ *  oscilador, que deriva unos segundos al dia — irrelevante para
+ *  decidir si son las 6 de la mañana.                                  */
+
+void fijarHora(time_t epoch) {
+    struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
+    settimeofday(&tv, nullptr);
+    hora_valida = true;
+    ultimo_contacto = epoch;
+
+    struct tm t;
+    localtime_r(&epoch, &t);
+    logInfoF("RELOJ", "Hora fijada: %04d-%02d-%02d %02d:%02d:%02d",
+             t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
+             t.tm_hour, t.tm_min, t.tm_sec);
+}
+
+time_t ahora() { return hora_valida ? time(nullptr) : 0; }
+
+int horaDelDia() {
+    if (!hora_valida) return -1;
+    time_t t = time(nullptr);
+    struct tm tm_now;
+    localtime_r(&t, &tm_now);
+    return tm_now.tm_hour;
+}
+
+/*  Ventana de luz. Soporta que cruce medianoche (p.ej. 20 → 6), aunque
+ *  el fotoperiodo actual de 14 h no lo necesite.                       */
+bool esDeDia() {
+    int h = horaDelDia();
+    if (h < 0) return true;   // sin hora: se asume dia, ver MODO DEGRADADO
+    if (prog.hora_luz_on <= prog.hora_luz_off)
+        return h >= prog.hora_luz_on && h < prog.hora_luz_off;
+    return h >= prog.hora_luz_on || h < prog.hora_luz_off;
+}
+
+/*  MODO DEGRADADO
+ *  Sin hora valida no se pueden respetar horarios. En vez de detener el
+ *  cultivo, el nodo asume permanentemente "de dia": riega con la cadencia
+ *  diurna y mantiene la luz encendida. Es la opcion conservadora — un
+ *  cultivo con exceso de luz y riego sobrevive; uno sin riego, no.
+ *  El estado se reporta para que quede constancia de que esos datos se
+ *  produjeron sin referencia horaria.                                  */
+bool modoDegradado() { return !hora_valida; }
 
 // ============================================================
 //  PERSISTENCIA DE MÓDULOS EN NVS
@@ -254,7 +382,9 @@ void cargarModulos() {
     mods.sensor_hdc   = prefs.getBool("sensor_hdc",  DEFAULT_MOD_SENSOR_HDC);
     mods.sensor_suelo = prefs.getBool("sensor_sue",  DEFAULT_MOD_SENSOR_SUELO);
     mods.sensor_ph    = prefs.getBool("sensor_ph",   DEFAULT_MOD_SENSOR_PH);
-    mods.actuadores   = prefs.getBool("actuadores",  DEFAULT_MOD_ACTUADORES);
+    mods.riego_hidro  = prefs.getBool("r_hidro",    DEFAULT_MOD_RIEGO_HIDRO);
+    mods.riego_tierra = prefs.getBool("r_tierra",   DEFAULT_MOD_RIEGO_TIERRA);
+    mods.ambiente     = prefs.getBool("ambiente",   DEFAULT_MOD_AMBIENTE);
     mods.simulacion   = prefs.getBool("simulacion",  DEFAULT_MOD_SIMULACION);
     mods.ahorro_wifi  = prefs.getBool("ahorro_wifi", DEFAULT_MOD_AHORRO_WIFI);
     // test_valvulas NO se lee de NVS a proposito: es una prueba de banco.
@@ -262,11 +392,99 @@ void cargarModulos() {
     // haciendo barridos solas. Siempre arranca apagado.
     mods.test_valvulas = false;
     mods.sensor_ec    = prefs.getBool("sensor_ec",  DEFAULT_MOD_SENSOR_EC);
-    periodo_telemetria_ms = prefs.getUInt("periodo", INTERVAL_TELEMETRY);
+    periodo_telemetria_ms = prefs.getUInt("periodo", PROG_TELEMETRIA_S * 1000UL);
     nivel_adc_seco = prefs.getInt("niv_seco", NIVEL_ADC_SECO_DEF);
     tds_k       = prefs.getFloat("tds_k",    TDS_K_DEF);
     tds_mv_cero = prefs.getFloat("tds_cero", TDS_MV_CERO_DEF);
     prefs.end();
+}
+
+// ============================================================
+//  PROGRAMA — persistencia y validación
+// ============================================================
+/*  Todo valor que llega del gateway se acota antes de guardarse. Un
+ *  parametro corrupto —un bug en la Pi, un JSON mal formado, un byte
+ *  perdido en la red— no puede traducirse en una bomba encendida seis
+ *  horas seguidas. El nodo es el ultimo responsable de su propio
+ *  hardware, aunque obedezca al gateway.                              */
+uint32_t acotar(uint32_t valor, uint32_t minimo, uint32_t maximo) {
+    if (valor < minimo) return minimo;
+    if (valor > maximo) return maximo;
+    return valor;
+}
+
+void guardarPrograma() {
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putUChar("p_luz_on",   prog.hora_luz_on);
+    prefs.putUChar("p_luz_off",  prog.hora_luz_off);
+    prefs.putUInt ("p_hrd",      prog.hidro_riego_dia_s);
+    prefs.putUInt ("p_hdd",      prog.hidro_descanso_dia_s);
+    prefs.putUInt ("p_hrn",      prog.hidro_riego_noche_s);
+    prefs.putUInt ("p_hdn",      prog.hidro_descanso_noche_s);
+    prefs.putUShort("p_t_dias",  prog.tierra_cada_dias);
+    prefs.putUChar("p_t_hora",   prog.tierra_hora);
+    prefs.putUInt ("p_telem",    prog.telemetria_s);
+    prefs.putULong("p_prox_tie", (uint32_t)proximo_riego_tierra);
+    prefs.putULong("p_ult_tie",  (uint32_t)ultimo_riego_tierra);
+    prefs.putUChar("p_log",      log_nivel);
+    prefs.end();
+}
+
+void cargarPrograma() {
+    prefs.begin(NVS_NAMESPACE, true);
+    prog.hora_luz_on            = prefs.getUChar ("p_luz_on",  PROG_HORA_LUZ_ON);
+    prog.hora_luz_off           = prefs.getUChar ("p_luz_off", PROG_HORA_LUZ_OFF);
+    prog.hidro_riego_dia_s      = prefs.getUInt  ("p_hrd",     PROG_HIDRO_RIEGO_DIA_S);
+    prog.hidro_descanso_dia_s   = prefs.getUInt  ("p_hdd",     PROG_HIDRO_DESCANSO_DIA_S);
+    prog.hidro_riego_noche_s    = prefs.getUInt  ("p_hrn",     PROG_HIDRO_RIEGO_NOCHE_S);
+    prog.hidro_descanso_noche_s = prefs.getUInt  ("p_hdn",     PROG_HIDRO_DESCANSO_NOCHE_S);
+    prog.tierra_cada_dias       = prefs.getUShort("p_t_dias",  PROG_TIERRA_CADA_DIAS);
+    prog.tierra_hora            = prefs.getUChar ("p_t_hora",  PROG_TIERRA_HORA);
+    prog.telemetria_s           = prefs.getUInt  ("p_telem",   PROG_TELEMETRIA_S);
+    proximo_riego_tierra        = (time_t)prefs.getULong("p_prox_tie", 0);
+    ultimo_riego_tierra         = (time_t)prefs.getULong("p_ult_tie",  0);
+    log_nivel                   = prefs.getUChar ("p_log",     LOG_NIVEL_DEF);
+    prefs.end();
+}
+
+void imprimirPrograma() {
+    Serial.println();
+    Serial.println("+-------------------------------------------------------------+");
+    Serial.println("|  PROGRAMA DE CULTIVO                                        |");
+    Serial.println("+-------------------------------------------------------------+");
+    Serial.printf ("  Fotoperiodo    luz de %02d:00 a %02d:00  (%d h de luz)\n",
+                   prog.hora_luz_on, prog.hora_luz_off,
+                   (prog.hora_luz_off - prog.hora_luz_on + 24) % 24);
+    Serial.printf ("  Hidroponia     dia:   %lu s riego / %lu s descanso\n",
+                   prog.hidro_riego_dia_s, prog.hidro_descanso_dia_s);
+    Serial.printf ("                 noche: %lu s riego / %lu s descanso\n",
+                   prog.hidro_riego_noche_s, prog.hidro_descanso_noche_s);
+    Serial.printf ("  Tierra         cada %u dias a las %02d:00  (corte: delta>%d)\n",
+                   prog.tierra_cada_dias, prog.tierra_hora, PROG_TIERRA_DELTA_CORTE);
+    Serial.printf ("  Telemetria     cada %lu s\n", prog.telemetria_s);
+    Serial.printf ("  Nivel de log   %u\n", log_nivel);
+    Serial.println("+-------------------------------------------------------------+");
+    if (hora_valida) {
+        time_t t = time(nullptr);
+        struct tm tm_now; localtime_r(&t, &tm_now);
+        Serial.printf ("  Hora del nodo  %04d-%02d-%02d %02d:%02d:%02d  (%s)\n",
+                       tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday,
+                       tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec,
+                       esDeDia() ? "DIA" : "NOCHE");
+        if (proximo_riego_tierra > 0) {
+            struct tm tp; localtime_r((const time_t*)&proximo_riego_tierra, &tp);
+            Serial.printf ("  Proximo riego de tierra: %04d-%02d-%02d %02d:00\n",
+                           tp.tm_year + 1900, tp.tm_mon + 1, tp.tm_mday, tp.tm_hour);
+        } else {
+            Serial.println("  Riego de tierra SIN PROGRAMAR (la Pi debe enviar la fecha)");
+        }
+    } else {
+        Serial.println("  SIN HORA VALIDA — modo degradado: se asume dia permanente");
+        Serial.println("  La Raspberry debe enviar {\"cmd\":\"set_hora\",\"epoch\":...}");
+    }
+    Serial.printf ("  Contacto con el gateway: %s\n",
+                   huerfano ? "HUERFANO (sin noticias)" : "ok");
+    Serial.println();
 }
 
 void guardarCalibracion() {
@@ -286,7 +504,9 @@ void guardarModulos() {
     prefs.putBool("sensor_hdc",  mods.sensor_hdc);
     prefs.putBool("sensor_sue",  mods.sensor_suelo);
     prefs.putBool("sensor_ph",   mods.sensor_ph);
-    prefs.putBool("actuadores",  mods.actuadores);
+    prefs.putBool("r_hidro",     mods.riego_hidro);
+    prefs.putBool("r_tierra",    mods.riego_tierra);
+    prefs.putBool("ambiente",    mods.ambiente);
     prefs.putBool("simulacion",  mods.simulacion);
     prefs.putBool("ahorro_wifi", mods.ahorro_wifi);
     prefs.putBool("sensor_ec",   mods.sensor_ec);
@@ -300,7 +520,8 @@ void resetModulos() {
     prefs.end();
     mods = { DEFAULT_MOD_TELEMETRIA, DEFAULT_MOD_STATUS, DEFAULT_MOD_ALERTAS,
              DEFAULT_MOD_SENSOR_HDC, DEFAULT_MOD_SENSOR_SUELO, DEFAULT_MOD_SENSOR_PH,
-             DEFAULT_MOD_ACTUADORES, DEFAULT_MOD_SIMULACION,
+             DEFAULT_MOD_RIEGO_HIDRO, DEFAULT_MOD_RIEGO_TIERRA,
+             DEFAULT_MOD_AMBIENTE, DEFAULT_MOD_SIMULACION,
              DEFAULT_MOD_AHORRO_WIFI };
     periodo_telemetria_ms = INTERVAL_TELEMETRY;
     logWarn("MODULOS", "Restaurados a valores por defecto");
@@ -322,20 +543,22 @@ bool setModulo(const char* nombre, bool activo) {
     //    Ambos escriben en los mismos cuatro pines. Si corrieran a la
     //    vez se pisarían y el comportamiento sería errático justo
     //    cuando más falta hace poder interpretarlo.
-    else if (!strcmp(nombre, "actuadores")) {
-        mods.actuadores = activo;
+    else if (!strcmp(nombre, "riego_hidro") || !strcmp(nombre, "riego_tierra")
+          || !strcmp(nombre, "ambiente")) {
+        if (!strcmp(nombre, "riego_hidro"))  mods.riego_hidro  = activo;
+        if (!strcmp(nombre, "riego_tierra")) mods.riego_tierra = activo;
+        if (!strcmp(nombre, "ambiente"))     mods.ambiente     = activo;
         if (activo && mods.test_valvulas) {
             mods.test_valvulas = false;
             relesTodosOff();
-            logWarn("TEST", "Barrido detenido: se activaron los ciclos de riego");
+            logWarn("TEST", "Barrido detenido: se activo un modo automatico");
         }
-        if (!activo) relesTodosOff();
     }
     else if (!strcmp(nombre, "test_valvulas")) {
         mods.test_valvulas = activo;
-        if (activo && mods.actuadores) {
-            mods.actuadores = false;
-            logWarn("TEST", "Ciclos de riego desactivados para no interferir");
+        if (activo && (mods.riego_hidro || mods.riego_tierra || mods.ambiente)) {
+            mods.riego_hidro = mods.riego_tierra = mods.ambiente = false;
+            logWarn("TEST", "Modos automaticos desactivados para no interferir");
         }
         relesTodosOff();   // siempre partir de un estado conocido
         logInfoF("TEST", "Barrido de valvulas %s", activo ? "INICIADO" : "detenido");
@@ -363,7 +586,9 @@ void modulosToJson(JsonObject obj) {
     obj["sensor_hdc"]   = mods.sensor_hdc;
     obj["sensor_suelo"] = mods.sensor_suelo;
     obj["sensor_ph"]    = mods.sensor_ph;
-    obj["actuadores"]   = mods.actuadores;
+    obj["riego_hidro"]  = mods.riego_hidro;
+    obj["riego_tierra"] = mods.riego_tierra;
+    obj["ambiente"]     = mods.ambiente;
     obj["simulacion"]    = mods.simulacion;
     obj["ahorro_wifi"]   = mods.ahorro_wifi;
     obj["test_valvulas"] = mods.test_valvulas;
@@ -692,14 +917,45 @@ bool mqttPublish(const char* topic, const char* payload, bool retain = false) {
     return ok;
 }
 
+/*  El status es el espejo del nodo en la Raspberry: con él, la Pi puede
+ *  catalogar qué modos están activos, qué está ejecutándose ahora mismo
+ *  y si el nodo sigue bajo su supervisión. Es lo que alimenta la vista
+ *  de la aplicación web.                                                */
 void publicarStatus() {
-    StaticJsonDocument<256> st;
+    StaticJsonDocument<640> st;
     st["id"]      = DEVICE_ID;
     st["online"]  = true;
     st["uptime"]  = millis();
     st["periodo"] = periodo_telemetria_ms;
     st["fw"]      = FIRMWARE_VERSION;
-    char buf[256];
+    st["rssi"]    = WiFi.RSSI();
+    st["heap"]    = ESP.getFreeHeap();
+
+    // Reloj y supervisión
+    st["hora_valida"] = hora_valida;
+    st["epoch"]       = (uint32_t)ahora();
+    st["degradado"]   = modoDegradado();
+    st["huerfano"]    = huerfano;
+    st["es_dia"]      = esDeDia();
+
+    // Qué está ocurriendo AHORA en el hardware
+    JsonObject ej = st.createNestedObject("ejecutando");
+    ej["riego_hidro"]  = regando_hidro;
+    ej["riego_tierra"] = regando_tierra;
+    ej["luz"]          = luz_encendida;
+    ej["manual"]       = RIEGO_FORZADO;
+
+    // Qué modos automáticos están habilitados
+    JsonObject md = st.createNestedObject("modos");
+    md["riego_hidro"]  = mods.riego_hidro;
+    md["riego_tierra"] = mods.riego_tierra;
+    md["ambiente"]     = mods.ambiente;
+    md["ahorro_wifi"]  = mods.ahorro_wifi;
+
+    st["prox_riego_tierra"] = (uint32_t)proximo_riego_tierra;
+    st["ult_riego_tierra"]  = (uint32_t)ultimo_riego_tierra;
+
+    char buf[640];
     serializeJson(st, buf);
     mqttPublish(TOPIC_STATUS, buf, false);
 }
@@ -723,13 +979,71 @@ String procesarComando(const JsonDocument& doc) {
         return String("ERROR: modulo desconocido: ") + modulo;
     }
 
+    // ── Reloj: la Pi envía la hora ───────────────────────────
+    if (!strcmp(cmd, "set_hora")) {
+        uint32_t epoch = doc["epoch"] | 0UL;
+        // 1.7e9 ≈ 2023. Por debajo es una hora sin sentido: mejor
+        // seguir en modo degradado que ejecutar horarios equivocados.
+        if (epoch < 1700000000UL) return "ERROR: epoch invalido";
+        fijarHora((time_t)epoch);
+        return String("hora fijada: ") + epoch;
+    }
+
+    // ── Programa de cultivo ──────────────────────────────────
+    //  Se acepta parcial: la Pi puede enviar solo lo que cambia.
+    if (!strcmp(cmd, "set_programa")) {
+        if (doc.containsKey("hora_luz_on"))
+            prog.hora_luz_on  = acotar(doc["hora_luz_on"]  | 6, 0, 23);
+        if (doc.containsKey("hora_luz_off"))
+            prog.hora_luz_off = acotar(doc["hora_luz_off"] | 20, 0, 23);
+        if (doc.containsKey("hidro_riego_dia_s"))
+            prog.hidro_riego_dia_s = acotar(doc["hidro_riego_dia_s"] | 900, 10, 21600);
+        if (doc.containsKey("hidro_descanso_dia_s"))
+            prog.hidro_descanso_dia_s = acotar(doc["hidro_descanso_dia_s"] | 900, 10, 86400);
+        if (doc.containsKey("hidro_riego_noche_s"))
+            prog.hidro_riego_noche_s = acotar(doc["hidro_riego_noche_s"] | 600, 10, 21600);
+        if (doc.containsKey("hidro_descanso_noche_s"))
+            prog.hidro_descanso_noche_s = acotar(doc["hidro_descanso_noche_s"] | 7200, 10, 86400);
+        if (doc.containsKey("tierra_cada_dias"))
+            prog.tierra_cada_dias = acotar(doc["tierra_cada_dias"] | 15, 1, 365);
+        if (doc.containsKey("tierra_hora"))
+            prog.tierra_hora = acotar(doc["tierra_hora"] | 7, 0, 23);
+        if (doc.containsKey("telemetria_s")) {
+            prog.telemetria_s = acotar(doc["telemetria_s"] | 60,
+                                       PROG_TELEMETRIA_MIN_S, PROG_TELEMETRIA_MAX_S);
+            periodo_telemetria_ms = prog.telemetria_s * 1000UL;
+        }
+        if (doc.containsKey("proximo_riego_tierra"))
+            proximo_riego_tierra = (time_t)(doc["proximo_riego_tierra"] | 0UL);
+
+        guardarPrograma();
+        imprimirPrograma();
+        return "programa actualizado";
+    }
+
+    if (!strcmp(cmd, "get_programa")) {
+        imprimirPrograma();
+        return "programa impreso en serie";
+    }
+
+    // ── Nivel de log ─────────────────────────────────────────
+    if (!strcmp(cmd, "set_log")) {
+        log_nivel = acotar(doc["nivel"] | LOG_NIVEL_DEF, 0, 4);
+        guardarPrograma();
+        // Este mensaje se emite siempre, aunque se acabe de silenciar:
+        // confirmar el cambio es lo último útil que puede decir el nodo.
+        Serial.printf("[LOG] Nivel = %u%s\n", log_nivel,
+                      log_nivel == 0 ? "  (silencio total)" : "");
+        return String("log nivel = ") + log_nivel;
+    }
+
     // ── Control manual de salidas ────────────────────────────
     //    Apaga los modos automáticos: si el barrido o los ciclos de riego
     //    siguieran corriendo, pisarían el estado que se acaba de fijar y
     //    la prueba manual sería ininterpretable.
     if (!strcmp(cmd, "set_salidas") || !strcmp(cmd, "salidas")) {
         mods.test_valvulas = false;
-        mods.actuadores    = false;
+        mods.riego_hidro = mods.riego_tierra = mods.ambiente = false;
 
         JsonArrayConst lista = doc["on"].as<JsonArrayConst>();
         for (uint8_t i = 0; i < 4; i++) salidaSet(i, false);
@@ -750,7 +1064,7 @@ String procesarComando(const JsonDocument& doc) {
 
     if (!strcmp(cmd, "salidas_off")) {
         mods.test_valvulas = false;
-        mods.actuadores    = false;
+        mods.riego_hidro = mods.riego_tierra = mods.ambiente = false;
         RIEGO_FORZADO      = false;
         relesTodosOff();
         imprimirSalidas();
@@ -759,7 +1073,7 @@ String procesarComando(const JsonDocument& doc) {
 
     if (!strcmp(cmd, "set_salida")) {
         mods.test_valvulas = false;
-        mods.actuadores    = false;
+        mods.riego_hidro = mods.riego_tierra = mods.ambiente = false;
 
         const char* ref = doc["salida"] | doc["n"] | "";
         int8_t idx = salidaIndice(ref);
@@ -836,10 +1150,6 @@ String procesarComando(const JsonDocument& doc) {
         bool enc = doc["encendido"] | false;
         RIEGO_FORZADO = enc;
         ESTADO_ACTUADORES = enc ? LOW : HIGH;   // relés activo-bajo
-        if (mods.actuadores) {
-            digitalWrite(PIN_VA1, ESTADO_ACTUADORES);
-            digitalWrite(PIN_VA2, ESTADO_ACTUADORES);
-        }
         logInfoF("CMD", "Riego forzado: %s", enc ? "ON" : "OFF");
         return String("riego = ") + (enc ? "ON" : "OFF");
     }
@@ -864,6 +1174,10 @@ String procesarComando(const JsonDocument& doc) {
 //  MQTT — callback de comandos entrantes
 // ============================================================
 void mqttCallback(char* topic, byte* raw, unsigned int length) {
+    // Cualquier mensaje del gateway cuenta como señal de vida suya
+    if (hora_valida) ultimo_contacto = time(nullptr);
+    huerfano = false;
+
     String msg;
     msg.reserve(length + 1);
     for (unsigned int i = 0; i < length; i++) msg += (char)raw[i];
@@ -1253,6 +1567,20 @@ void tarea_status(void* pv) {
             vTaskDelay(INTERVAL_MODULE_CHECK / portTICK_PERIOD_MS);
             continue;
         }
+        // ¿Seguimos bajo supervisión del gateway? Si lleva demasiado
+        // sin hablarnos, el nodo se declara huérfano: sigue ejecutando
+        // el último plan, pero lo hace constar para que quede registrado
+        // que esos datos se generaron sin supervisión.
+        if (hora_valida && ultimo_contacto > 0) {
+            bool antes = huerfano;
+            huerfano = (time(nullptr) - ultimo_contacto) > PROG_SIN_GATEWAY_S;
+            if (huerfano && !antes)
+                logWarn("GATEWAY", "Sin noticias de la Raspberry. Modo huerfano: "
+                                   "se mantiene el ultimo plan conocido.");
+            if (!huerfano && antes)
+                logInfo("GATEWAY", "Contacto restablecido");
+        }
+
         publicarStatus();
         logInfo("STATUS", "Heartbeat publicado");
 
@@ -1744,6 +2072,8 @@ void tarea_consola(void* pv) {
                 Serial.println("  PRUEBAS");
                 Serial.println("    test on | test off   barrido secuencial");
                 Serial.println("    estado               tabla de modulos");
+                Serial.println("    programa             plan de cultivo y hora");
+                Serial.println("    log <0-4>            0=silencio 3=info 4=debug");
                 Serial.println("    reset                reinicia el nodo");
                 Serial.println("    {\"cmd\":\"...\"}        cualquier comando JSON");
                 Serial.println();
@@ -1751,6 +2081,12 @@ void tarea_consola(void* pv) {
             else if (linea == "test on")  { setModulo("test_valvulas", true);  }
             else if (linea == "test off") { setModulo("test_valvulas", false); }
             else if (linea == "estado")   { imprimirModulos(); }
+            else if (linea == "programa") { imprimirPrograma(); }
+            else if (linea.startsWith("log ")) {
+                StaticJsonDocument<64> d;
+                d["cmd"] = "set_log"; d["nivel"] = linea.substring(4).toInt();
+                Serial.println(procesarComando(d));
+            }
             else if (linea == "salidas")  { imprimirSalidas(); }
             else if (linea == "reset")    { esp_restart(); }
 
@@ -1844,7 +2180,7 @@ void tarea_consola(void* pv) {
             //    "on 1 3 4" enciende esas tres y apaga las demas.
             else if (linea == "off") {
                 mods.test_valvulas = false;
-                mods.actuadores    = false;
+                mods.riego_hidro = mods.riego_tierra = mods.ambiente = false;
                 RIEGO_FORZADO      = false;
                 relesTodosOff();
                 imprimirSalidas();
@@ -1852,7 +2188,7 @@ void tarea_consola(void* pv) {
             else if (linea.startsWith("on ") || linea.startsWith("off ")) {
                 bool encender = linea.startsWith("on ");
                 mods.test_valvulas = false;
-                mods.actuadores    = false;
+                mods.riego_hidro = mods.riego_tierra = mods.ambiente = false;
 
                 // "on" parte de todo apagado; "off N" solo toca lo indicado
                 if (encender) relesTodosOff();
@@ -1907,36 +2243,156 @@ void tarea_consola(void* pv) {
 // ============================================================
 //  TAREA: Actuadores (ciclos de riego)
 // ============================================================
-void tarea_actuadores(void* pv) {
-    auto encenderTodos = []() { for (uint8_t k = 0; k < 4; k++) releOn(PINES_RELE[k]); };
+/*  Espera troceada que se interrumpe si el módulo se apaga. Sin esto,
+ *  detener el riego a mitad de un descanso de 2 horas exigiría esperar
+ *  esas 2 horas — inaceptable para una orden manual.
+ *  Devuelve false si hubo que abortar.                                 */
+bool esperarSegundos(uint32_t segundos, volatile bool* seguir_activo) {
+    uint32_t transcurrido = 0;
+    const uint32_t PASO = 500;
+    while (transcurrido < segundos * 1000UL) {
+        if (seguir_activo && !(*seguir_activo)) return false;
+        if (mods.test_valvulas) return false;   // la prueba de banco manda
+        vTaskDelay(PASO / portTICK_PERIOD_MS);
+        transcurrido += PASO;
+    }
+    return true;
+}
 
-    int i = 0;
+// ============================================================
+//  TAREA: Riego de hidroponía — ciclos intermitentes
+// ============================================================
+/*  Bombea durante N segundos y descansa M, con parámetros distintos
+ *  para el día y la noche. De día la planta transpira y consume, así
+ *  que se riega más seguido; de noche la demanda cae y ciclos
+ *  espaciados bastan para mantener la lámina sin bombear de más.
+ *
+ *  Los cuatro tiempos los define la Raspberry y viven en NVS.          */
+void tarea_riego_hidro(void* pv) {
     for (;;) {
-        // test_valvulas manda: si esta corriendo, esta tarea no toca nada
-        if (!mods.actuadores || mods.test_valvulas) {
+        if (!mods.riego_hidro || mods.test_valvulas || RIEGO_FORZADO) {
+            if (regando_hidro && !RIEGO_FORZADO) {
+                salidaSet(0, false);   // válvula hidroponía
+                salidaSet(2, false);   // motobomba
+                regando_hidro = false;
+            }
             vTaskDelay(INTERVAL_MODULE_CHECK / portTICK_PERIOD_MS);
             continue;
         }
 
-        // El riego forzado por comando gana sobre el ciclo automático
-        if (RIEGO_FORZADO) {
-            encenderTodos();
+        bool dia = esDeDia();
+        uint32_t t_riego    = dia ? prog.hidro_riego_dia_s    : prog.hidro_riego_noche_s;
+        uint32_t t_descanso = dia ? prog.hidro_descanso_dia_s : prog.hidro_descanso_noche_s;
+
+        // Bomba y válvula juntas: sin presión no sube agua a los tubos
+        salidaSet(2, true);
+        salidaSet(0, true);
+        regando_hidro = true;
+        logInfoF("HIDRO", "Riego ON  (%s, %lu s)", dia ? "dia" : "noche", t_riego);
+
+        esperarSegundos(t_riego, &mods.riego_hidro);
+
+        salidaSet(0, false);
+        salidaSet(2, false);
+        regando_hidro = false;
+        logInfoF("HIDRO", "Riego OFF (descanso %lu s)", t_descanso);
+
+        esperarSegundos(t_descanso, &mods.riego_hidro);
+    }
+}
+
+// ============================================================
+//  TAREA: Riego de tierra — por calendario, corte por sensor
+// ============================================================
+/*  Cada N días abre la válvula de tierra y la cierra en cuanto el sensor
+ *  de nivel acusa la llegada del agua. El umbral de corte es mucho más
+ *  sensible que el de "hay agua": reportar estado puede esperar a que el
+ *  sensor esté bien mojado, pero cortar el llenado no — si se espera, se
+ *  encharca.
+ *
+ *  Hay además un corte por tiempo. Si el sensor se avería y nunca
+ *  detecta, la válvula no puede quedarse abierta indefinidamente: en un
+ *  cultivo real eso significa inundar el invernadero.                  */
+void tarea_riego_tierra(void* pv) {
+    for (;;) {
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+        if (!mods.riego_tierra || mods.test_valvulas || RIEGO_FORZADO) continue;
+        if (!hora_valida || proximo_riego_tierra == 0) continue;
+        if (time(nullptr) < proximo_riego_tierra) continue;
+
+        // --- Toca regar ---
+        int referencia = leerNivelRaw();
+        logInfoF("TIERRA", "Iniciando riego. Referencia del sensor: %d", referencia);
+
+        salidaSet(1, true);            // válvula de tierra
+        regando_tierra = true;
+        uint32_t transcurrido = 0;
+        bool corte_por_sensor = false;
+
+        while (transcurrido < PROG_TIERRA_MAX_S * 1000UL) {
             vTaskDelay(500 / portTICK_PERIOD_MS);
+            transcurrido += 500;
+
+            if (!mods.riego_tierra || mods.test_valvulas) break;
+
+            int actual = leerNivelRaw();
+            if (abs(referencia - actual) >= PROG_TIERRA_DELTA_CORTE) {
+                corte_por_sensor = true;
+                logInfoF("TIERRA", "Agua detectada: %d -> %d (delta %d). Cortando.",
+                         referencia, actual, abs(referencia - actual));
+                break;
+            }
+        }
+
+        salidaSet(1, false);
+        regando_tierra = false;
+
+        if (!corte_por_sensor)
+            logWarnF("TIERRA", "Corte por TIEMPO tras %lu s sin deteccion. "
+                               "Revisar el sensor de nivel.", transcurrido / 1000);
+
+        ultimo_riego_tierra  = time(nullptr);
+        proximo_riego_tierra = ultimo_riego_tierra +
+                               (time_t)prog.tierra_cada_dias * 86400L;
+        guardarPrograma();
+
+        struct tm t;
+        localtime_r((const time_t*)&proximo_riego_tierra, &t);
+        logInfoF("TIERRA", "Riego completado en %lu s. Proximo: %04d-%02d-%02d %02d:00",
+                 transcurrido / 1000, t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour);
+    }
+}
+
+// ============================================================
+//  TAREA: Ambiente — luz e iluminación por fotoperiodo
+// ============================================================
+/*  Luz y ventilador comparten salida: la lámpara genera calor y el
+ *  ventilador debe disiparlo mientras esté encendida.                  */
+void tarea_ambiente(void* pv) {
+    bool estado_previo = false;
+    bool primera_vez = true;
+
+    for (;;) {
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+
+        if (!mods.ambiente || mods.test_valvulas || RIEGO_FORZADO) {
+            if (luz_encendida && !RIEGO_FORZADO) {
+                salidaSet(3, false);
+                luz_encendida = false;
+            }
             continue;
         }
 
-        int tcr = DESCANSO_NOCTURNO ? tiempo_ciclo_riego_noche    : tiempo_ciclo_riego;
-        int tcd = DESCANSO_NOCTURNO ? tiempo_ciclo_descanso_noche : tiempo_ciclo_descanso;
-
-        if (i < ciclos_riego) {
-            encenderTodos();
-            vTaskDelay(tcr / portTICK_PERIOD_MS);
-            relesTodosOff();
-            vTaskDelay(tcd / portTICK_PERIOD_MS);
-            i++;
-        } else {
-            i = 0;
-            vTaskDelay(tiempo_descanso_ciclos / portTICK_PERIOD_MS);
+        bool debe_estar = esDeDia();
+        if (debe_estar != estado_previo || primera_vez) {
+            salidaSet(3, debe_estar);
+            luz_encendida = debe_estar;
+            estado_previo = debe_estar;
+            primera_vez = false;
+            logInfoF("AMBIENTE", "Luz y ventilador %s%s",
+                     debe_estar ? "ON" : "OFF",
+                     modoDegradado() ? "  (sin hora: modo degradado)" : "");
         }
     }
 }
@@ -1970,7 +2426,9 @@ void setup() {
 
     testESP();
     cargarModulos();
+    cargarPrograma();
     imprimirModulos();
+    imprimirPrograma();
 
     Serial.println("Control:  POST /modulo  {\"modulo\":\"telemetria\",\"activo\":true}");
     Serial.println("          POST /cmd     {\"cmd\":\"get_status\"}");
@@ -1989,7 +2447,9 @@ void setup() {
     xTaskCreate(tarea_sensor_suelo,  "suelo",      2560, NULL, 1, NULL);
     xTaskCreate(tarea_sensor_ph,     "ph",         2560, NULL, 1, NULL);
     xTaskCreate(tarea_sensor_ec,     "ec",         2560, NULL, 1, NULL);
-    xTaskCreate(tarea_actuadores,    "actuadores", 2560, NULL, 2, NULL);
+    xTaskCreate(tarea_riego_hidro,   "riego-hid",  3072, NULL, 2, NULL);
+    xTaskCreate(tarea_riego_tierra,  "riego-tie",  3072, NULL, 2, NULL);
+    xTaskCreate(tarea_ambiente,      "ambiente",   2560, NULL, 2, NULL);
 
     // ── Pruebas de banco ─────────────────────────────────────
     xTaskCreate(tarea_test_valvulas, "test-valv",  3072, NULL, 2, NULL);
