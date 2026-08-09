@@ -189,7 +189,8 @@ int   nivel_adc_seco  = NIVEL_ADC_SECO_DEF;
 bool  hay_agua        = false;
 
 // --- TDS: ajuste fino y ultimos valores medidos ---
-float tds_k     = TDS_K_DEF;   // 1.0 = curva del fabricante sin corregir
+float tds_k     = TDS_K_DEF;      // 1.0 = curva del fabricante sin corregir
+float tds_mv_cero = TDS_MV_CERO_DEF;  // offset del cero, en mV
 float tds_ppm   = 0.0f;
 float tds_mv    = 0.0f;
 
@@ -263,14 +264,16 @@ void cargarModulos() {
     mods.sensor_ec    = prefs.getBool("sensor_ec",  DEFAULT_MOD_SENSOR_EC);
     periodo_telemetria_ms = prefs.getUInt("periodo", INTERVAL_TELEMETRY);
     nivel_adc_seco = prefs.getInt("niv_seco", NIVEL_ADC_SECO_DEF);
-    tds_k = prefs.getFloat("tds_k", TDS_K_DEF);
+    tds_k       = prefs.getFloat("tds_k",    TDS_K_DEF);
+    tds_mv_cero = prefs.getFloat("tds_cero", TDS_MV_CERO_DEF);
     prefs.end();
 }
 
 void guardarCalibracion() {
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putInt("niv_seco", nivel_adc_seco);
-    prefs.putFloat("tds_k", tds_k);
+    prefs.putFloat("tds_k",    tds_k);
+    prefs.putFloat("tds_cero", tds_mv_cero);
     prefs.end();
     logInfo("CAL", "Calibracion guardada en NVS");
 }
@@ -459,7 +462,12 @@ float leerTDSmV() {
  *  Devuelve TDS en ppm; la conductividad se obtiene dividiendo por el
  *  factor TDS/EC.                                                       */
 float tdsDesdeVoltaje(float mv, float tempC) {
-    float v = mv / 1000.0f;
+    // Restar el cero ANTES de la curva: el polinomio del fabricante
+    // asume que 0 V equivale a 0 ppm, y nuestro modulo entrega un offset
+    // constante que de otro modo se propaga a todas las lecturas.
+    float mv_util = mv - tds_mv_cero;
+    if (mv_util < 0.0f) mv_util = 0.0f;
+    float v = mv_util / 1000.0f;
     float coef = 1.0f + TDS_COEF_TEMP * (tempC - TDS_TEMP_REF);
     if (coef < 0.1f) coef = 0.1f;          // evitar division absurda
     float vc = v / coef;                    // voltaje compensado a 25 °C
@@ -629,8 +637,12 @@ void imprimirSensores() {
     Serial.printf ("  Nivel: referencia seco=%d, umbral de caida=%d, actual=%d (delta %d)\n",
                    nivel_adc_seco, NIVEL_DELTA_MIN, suelo_raw,
                    nivel_adc_seco - suelo_raw);
-    Serial.printf ("  TDS:   curva del fabricante · factor %.1f · ajuste k=%.3f\n",
-                   TDS_FACTOR, tds_k);
+    Serial.printf ("  TDS:   curva del fabricante · factor %.1f · k=%.3f · cero=%.0f mV\n",
+                   TDS_FACTOR, tds_k, tds_mv_cero);
+    if (tds_mv > TDS_MV_TECHO)
+        Serial.printf ("         AVISO: %.0f mV supera el techo util del ADC (%.0f mV).\n"
+                       "         Por encima la curva del fabricante pierde validez.\n",
+                       tds_mv, TDS_MV_TECHO);
     Serial.printf ("         compensado a %.0f C usando %s\n", TDS_TEMP_REF,
                    hdcPresente ? "el HDC1080 (temp. del AIRE, no del agua)"
                                : "un valor fijo de 25 C");
@@ -1644,9 +1656,10 @@ void tarea_monitor(void* pv) {
         float t_ref = (hdcPresente && temperatura_HDC > 0.0f)
                     ? temperatura_HDC : TDS_TEMP_FALLBACK;
         float ppm   = tdsDesdeVoltaje(mv_ec, t_ref);
-        Serial.printf(" %-4s | tds: %4.0f mV -> %5.0f ppm (%5.0f uS/cm) | ",
+        Serial.printf(" %-4s | tds: %4.0f mV%s -> %5.0f ppm (%5.0f uS/cm) | ",
                       hayAgua(nivel) ? "AGUA" : "seco",
-                      mv_ec, ppm, ppmAMicroSiemens(ppm));
+                      mv_ec, mv_ec > TDS_MV_TECHO ? "!" : " ",
+                      ppm, ppmAMicroSiemens(ppm));
 
         // Intentar levantar el HDC1080 aquí mismo si aún no responde: el
         // sensor puede conectarse en caliente durante una prueba de banco.
@@ -1725,6 +1738,7 @@ void tarea_consola(void* pv) {
                 Serial.println();
                 Serial.println("  CALIBRACION");
                 Serial.println("    cal nivel        fija la referencia en SECO");
+                Serial.println("    cal cero         sonda AL AIRE y seca: fija el offset");
                 Serial.println("    cal tds <ppm>    ajuste fino contra una referencia");
                 Serial.println();
                 Serial.println("  PRUEBAS");
@@ -1786,6 +1800,19 @@ void tarea_consola(void* pv) {
             // Ajuste fino del TDS. NO es una calibracion de dos puntos:
             // el modulo ya trae la curva del fabricante. Esto solo corrige
             // una desviacion sistematica contra una referencia conocida.
+            // 'cal cero' — sonda AL AIRE y SECA. Fija el offset del modulo.
+            else if (linea == "cal cero") {
+                float mv = leerTDSmV();
+                if (mv > 500.0f) {
+                    Serial.printf("[CAL] %.0f mV es demasiado alto para un cero.\n", mv);
+                    Serial.println("      Seca la sonda y asegurate de que esta al aire.");
+                } else {
+                    tds_mv_cero = mv;
+                    guardarCalibracion();
+                    Serial.printf("[CAL] Cero fijado en %.0f mV.\n", tds_mv_cero);
+                    Serial.println("      Al aire la lectura deberia dar ahora ~0 ppm.");
+                }
+            }
             else if (linea.startsWith("cal tds ")) {
                 float ref = linea.substring(8).toFloat();
                 if (ref <= 0.0f) {

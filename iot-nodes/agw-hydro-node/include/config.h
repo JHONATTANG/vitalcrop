@@ -264,6 +264,19 @@
 #define TDS_MUESTRAS            32   // Se toma la MEDIANA, no la media
 #define TDS_K_DEF             1.0f   // Ajuste fino contra una referencia
 
+//  Offset del cero, en mV. Medido en banco: con la sonda al aire y seca
+//  el modulo entrega 142 mV constantes, no 0. Parte es offset del
+//  amplificador y parte es el suelo del ADC: con atenuacion de 11 dB el
+//  ESP32 no resuelve por debajo de ~150 mV y aplana todo ahi.
+//
+//  Sin restarlo, agua destilada marcaria 68 ppm en vez de 0.
+//  Se recalibra con `cal cero` teniendo la sonda al aire y SECA.
+#define TDS_MV_CERO_DEF     142.0f
+
+//  Techo util del ADC con 11 dB. Por encima la lectura se comprime y la
+//  curva del fabricante deja de ser valida.
+#define TDS_MV_TECHO       2400.0f
+
 //  Temperatura de respaldo cuando el HDC1080 no está disponible.
 //  ⚠️ El HDC1080 mide temperatura del AIRE, no de la solucion. Es una
 //     aproximacion aceptable en un cultivo indoor donde ambos estan en

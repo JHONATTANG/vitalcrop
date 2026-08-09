@@ -22,8 +22,16 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-# Variables de sensor que el firmware puede enviar
-SENSOR_KEYS = ("temp", "hum", "hsuelo", "ph")
+# Variables de sensor que el firmware puede enviar.
+#   temp/hum   HDC1080
+#   hsuelo     reflejo numérico del detector de nivel (0 o 100)
+#   agua       booleano del detector de nivel — es el dato real
+#   ec / tds   conductividad en µS/cm y sólidos disueltos en ppm
+#   ph         retirado del alcance (MCD §6.4), se conserva la ruta
+SENSOR_KEYS = ("temp", "hum", "hsuelo", "agua", "ec", "tds", "ph")
+
+# Sensores booleanos: no deben pasar por float() ni por los rangos
+BOOL_KEYS = ("agua",)
 
 # Mapeo sensor interno → columna de la nube
 CLOUD_SENSOR_MAP = {
@@ -60,10 +68,22 @@ def normalize_telemetry(raw: dict, gateway_id: str) -> dict:
     t_rx, t_rx_iso = _now()
     sensores_in = raw.get("sensores") or {}
 
-    sensores: dict[str, float | None] = {}
+    sensores: dict[str, Any] = {}
     for key in SENSOR_KEYS:
         value = sensores_in.get(key)
-        sensores[key] = float(value) if isinstance(value, (int, float)) else None
+        if value is None:
+            sensores[key] = None
+        elif key in BOOL_KEYS:
+            sensores[key] = bool(value)
+        elif isinstance(value, bool):
+            # Un booleano llegando a un campo numérico es un error de
+            # contrato; mejor descartarlo que convertirlo en 0.0 y que
+            # dispare reglas de "valor bajo".
+            sensores[key] = None
+        elif isinstance(value, (int, float)):
+            sensores[key] = float(value)
+        else:
+            sensores[key] = None
 
     return {
         "kind":        "telemetria",

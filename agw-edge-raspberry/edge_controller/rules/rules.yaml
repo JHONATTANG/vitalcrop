@@ -20,46 +20,66 @@
 
 rules:
 
-  # ── Humedad de sustrato baja → RIEGO AUTOMÁTICO ────────────────
+  # ── NIVEL DE AGUA ALCANZADO → CORTAR LLENADO ──────────────────
   # La única regla que actúa sobre el hardware. Es el núcleo de la
-  # autonomía de borde: si se cae internet, el riego sigue ocurriendo.
-  - id: "suelo_seco_riego"
-    name: "Sustrato seco — activar riego"
+  # autonomía de borde: si se cae internet, el corte sigue ocurriendo.
+  #
+  # ⚠️ Usa `agua`, el booleano del detector de nivel, NO `hsuelo`.
+  #    El sensor resistivo está fijado a la altura de "lleno" y solo
+  #    puede responder sí o no; `hsuelo` vale 0 o 100 como reflejo de
+  #    ese booleano, no como porcentaje de humedad.
+  #
+  #    La regla anterior disparaba con `hsuelo < 30`, que se cumple
+  #    SIEMPRE que no hay agua. Durante una prueba de banco activó el
+  #    riego real sin que nadie lo pidiera. Quedó obsoleta al cambiar
+  #    la semántica del sensor y no se actualizó con ella.
+  - id: "nivel_alcanzado_corte"
+    name: "Nivel de agua alcanzado — cortar llenado"
     device_type: "*"
     enabled: true
     condition:
-      sensor: "hsuelo"
-      operator: "<"
-      threshold: 30.0
+      sensor: "agua"
+      operator: "=="
+      threshold: 1          # true
     actions:
       - type: "alert"
-        severity: "WARNING"
-        message: "Humedad de sustrato bajo 30% — riego activado por el edge"
-      - type: "mqtt_publish"
-        topic: "cultivo/indoor/hierbabuena/cmd"
-        payload:
-          cmd: "set_riego"
-          encendido: true
-
-  # ── Sustrato saturado → CORTAR RIEGO ──────────────────────────
-  # Evita encharcamiento y pudrición de raíz.
-  - id: "suelo_saturado_corte"
-    name: "Sustrato saturado — cortar riego"
-    device_type: "*"
-    enabled: true
-    condition:
-      sensor: "hsuelo"
-      operator: ">"
-      threshold: 90.0
-    actions:
-      - type: "alert"
-        severity: "WARNING"
-        message: "Humedad de sustrato sobre 90% — riego cortado por el edge"
+        severity: "INFO"
+        message: "Nivel de agua alcanzado en tierra — llenado detenido por el edge"
       - type: "mqtt_publish"
         topic: "cultivo/indoor/hierbabuena/cmd"
         payload:
           cmd: "set_riego"
           encendido: false
+
+  # ── Conductividad fuera de rango ──────────────────────────────
+  # Rango orientativo para solución nutritiva de hoja: 1200-2000 uS/cm.
+  # No actúa sobre el hardware: corregir la EC exige dosificar, y eso
+  # todavía no está automatizado.
+  - id: "ec_baja"
+    name: "Conductividad baja — solucion diluida"
+    device_type: "*"
+    enabled: true
+    condition:
+      sensor: "ec"
+      operator: "<"
+      threshold: 800.0
+    actions:
+      - type: "alert"
+        severity: "WARNING"
+        message: "EC bajo 800 uS/cm — solucion nutritiva diluida"
+
+  - id: "ec_alta"
+    name: "Conductividad alta — riesgo de quemado"
+    device_type: "*"
+    enabled: true
+    condition:
+      sensor: "ec"
+      operator: ">"
+      threshold: 2500.0
+    actions:
+      - type: "alert"
+        severity: "CRITICAL"
+        message: "EC sobre 2500 uS/cm — riesgo de quemado por sales, diluir"
 
   # ── Temperatura alta ──────────────────────────────────────────
   # Rango de la hierbabuena: 18–28 °C. Sobre 32 °C hay estrés térmico.
