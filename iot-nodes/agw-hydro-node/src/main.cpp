@@ -249,6 +249,14 @@ volatile bool huerfano       = false;   // sin noticias del gateway
 // --- Nivel de log (0=silencio … 4=depuracion) ---
 volatile uint8_t log_nivel = LOG_NIVEL_DEF;
 
+// --- Estado de los enclavamientos de seguridad ---
+//  Las variables viven aqui, con el resto del estado global; las
+//  funciones que las evaluan estan mas abajo, donde ya tienen a mano
+//  hayAgua() y las lecturas de sensores.
+volatile uint32_t bomba_encendida_desde = 0;   // millis(), 0 = apagada
+volatile uint32_t fin_ultimo_riego      = 0;   // millis()
+volatile bool     luz_cortada_por_calor = false;
+
 // --- Riego manual: gana sobre los ciclos automaticos ---
 //  Los tiempos de ciclo ya no viven aqui: los define el struct Programa,
 //  que empuja la Raspberry y persiste en NVS.
@@ -891,10 +899,6 @@ void imprimirSensores() {
  *  ordenes del gateway. Son el ultimo filtro entre una configuracion
  *  equivocada y un invernadero inundado: el nodo desobedece si la orden
  *  es peligrosa, aunque venga de la Raspberry.                         */
-
-volatile uint32_t bomba_encendida_desde = 0;   // millis(), 0 = apagada
-volatile uint32_t fin_ultimo_riego      = 0;   // millis()
-volatile bool     luz_cortada_por_calor = false;
 
 /*  ¿Lleva la bomba demasiado tiempo seguido? Trabajar en seco si el
  *  tanque se vacia quema el motor en minutos.                          */
