@@ -51,6 +51,7 @@
 #include <WebServer.h>
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
 #include <ClosedCube_HDC1080.h>
 #include <PubSubClient.h>
 #include <Preferences.h>
@@ -72,6 +73,7 @@ struct Modulos {
     bool simulacion;
     bool ahorro_wifi;
     bool test_valvulas;
+    bool sensor_ec;
 };
 
 static Modulos mods = {
@@ -84,7 +86,8 @@ static Modulos mods = {
     DEFAULT_MOD_ACTUADORES,
     DEFAULT_MOD_SIMULACION,
     DEFAULT_MOD_AHORRO_WIFI,
-    DEFAULT_MOD_TEST_VALVULAS
+    DEFAULT_MOD_TEST_VALVULAS,
+    DEFAULT_MOD_SENSOR_EC
 };
 
 // ============================================================
@@ -158,12 +161,29 @@ WebServer httpServer(HTTP_CONTROL_PORT);
 
 ClosedCube_HDC1080 hdc1080;
 bool hdcIniciado = false;
+bool hdcPresente = false;
 
 // --- Lecturas ---
 float temperatura_HDC = 0.0f;
 float humedad_HDC     = 0.0f;
 float humedad_suelo   = 0.0f;
 float ph_g            = 0.0f;
+
+// --- Conductividad eléctrica ---
+float ec_us_cm        = 0.0f;
+
+// --- Valores crudos, imprescindibles para calibrar ---
+int   suelo_raw       = 0;
+int   ec_raw          = 0;
+int   ph_raw          = 0;
+
+// --- Nivel de agua en tierra: detector de umbral, no medidor ---
+int   nivel_adc_seco  = NIVEL_ADC_SECO_DEF;
+bool  hay_agua        = false;
+
+// --- Calibración de EC: dos puntos con solución patrón ---
+int   ec_adc_p1 = EC_ADC_P1_DEF;   int ec_us_p1 = EC_US_P1_DEF;
+int   ec_adc_p2 = EC_ADC_P2_DEF;   int ec_us_p2 = EC_US_P2_DEF;
 
 // --- Actuadores ---
 volatile int  ESTADO_ACTUADORES           = HIGH;
@@ -232,8 +252,25 @@ void cargarModulos() {
     // Si sobreviviera al reinicio, un corte de luz dejaria las valvulas
     // haciendo barridos solas. Siempre arranca apagado.
     mods.test_valvulas = false;
+    mods.sensor_ec    = prefs.getBool("sensor_ec",  DEFAULT_MOD_SENSOR_EC);
     periodo_telemetria_ms = prefs.getUInt("periodo", INTERVAL_TELEMETRY);
+    nivel_adc_seco = prefs.getInt("niv_seco", NIVEL_ADC_SECO_DEF);
+    ec_adc_p1 = prefs.getInt("ec_adc1", EC_ADC_P1_DEF);
+    ec_us_p1  = prefs.getInt("ec_us1",  EC_US_P1_DEF);
+    ec_adc_p2 = prefs.getInt("ec_adc2", EC_ADC_P2_DEF);
+    ec_us_p2  = prefs.getInt("ec_us2",  EC_US_P2_DEF);
     prefs.end();
+}
+
+void guardarCalibracion() {
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putInt("niv_seco", nivel_adc_seco);
+    prefs.putInt("ec_adc1",  ec_adc_p1);
+    prefs.putInt("ec_us1",   ec_us_p1);
+    prefs.putInt("ec_adc2",  ec_adc_p2);
+    prefs.putInt("ec_us2",   ec_us_p2);
+    prefs.end();
+    logInfo("CAL", "Calibracion guardada en NVS");
 }
 
 void guardarModulos() {
@@ -247,6 +284,7 @@ void guardarModulos() {
     prefs.putBool("actuadores",  mods.actuadores);
     prefs.putBool("simulacion",  mods.simulacion);
     prefs.putBool("ahorro_wifi", mods.ahorro_wifi);
+    prefs.putBool("sensor_ec",   mods.sensor_ec);
     prefs.putUInt("periodo",     periodo_telemetria_ms);
     prefs.end();
 }
@@ -271,6 +309,8 @@ bool setModulo(const char* nombre, bool activo) {
     else if (!strcmp(nombre, "sensor_hdc"))   mods.sensor_hdc   = activo;
     else if (!strcmp(nombre, "sensor_suelo")) mods.sensor_suelo = activo;
     else if (!strcmp(nombre, "sensor_ph"))    mods.sensor_ph    = activo;
+    else if (!strcmp(nombre, "sensor_ec"))    mods.sensor_ec    = activo;
+    else if (!strcmp(nombre, "sensor_nivel")) mods.sensor_suelo = activo;
     else if (!strcmp(nombre, "simulacion"))   mods.simulacion   = activo;
 
     // ── Actuadores y prueba de válvulas son mutuamente excluyentes ──
@@ -322,6 +362,7 @@ void modulosToJson(JsonObject obj) {
     obj["simulacion"]    = mods.simulacion;
     obj["ahorro_wifi"]   = mods.ahorro_wifi;
     obj["test_valvulas"] = mods.test_valvulas;
+    obj["sensor_ec"]     = mods.sensor_ec;
 }
 
 void imprimirModulos() {
@@ -340,6 +381,121 @@ void imprimirModulos() {
     Serial.printf ("| test_valvulas    | %-18s |\n", mods.test_valvulas ? "ON (barrido)" : "off");
     Serial.printf ("| periodo telem.   | %-15lu ms |\n", periodo_telemetria_ms);
     Serial.println("+------------------+--------------------+");
+}
+
+// ============================================================
+//  SENSORES — diagnóstico y calibración
+// ============================================================
+
+/*  Lectura promediada de un pin analógico.
+ *  El ADC del ESP32 es notoriamente ruidoso: una sola muestra puede
+ *  variar ±100 cuentas. Promediar estabiliza lo bastante para calibrar.  */
+int leerADC(uint8_t pin) {
+    uint32_t suma = 0;
+    for (uint8_t i = 0; i < ADC_MUESTRAS; i++) {
+        suma += analogRead(pin);
+        delayMicroseconds(200);
+    }
+    return (int)(suma / ADC_MUESTRAS);
+}
+
+/*  Detección de nivel de agua. No devuelve porcentaje a propósito: el
+ *  sensor está fijo a la altura de "lleno", así que la única pregunta
+ *  útil es si el agua ya lo alcanzó.
+ *
+ *  Al mojarse cae la resistencia y el ADC baja. Se exige una caída
+ *  mínima respecto a la referencia en seco para no disparar por ruido
+ *  o por humedad ambiental.                                             */
+bool hayAgua(int raw) {
+    return (nivel_adc_seco - raw) >= NIVEL_DELTA_MIN;
+}
+
+/*  Conversión de cuentas de ADC a µS/cm por interpolación lineal entre
+ *  los dos puntos de calibración. Fuera del rango calibrado extrapola,
+ *  con la imprecisión que eso implica: por eso conviene que los patrones
+ *  acoten el rango real de trabajo.                                     */
+float ecRawAMicroSiemens(int raw) {
+    if (ec_adc_p2 == ec_adc_p1) return 0.0f;   // sin calibrar
+    float pendiente = (float)(ec_us_p2 - ec_us_p1) /
+                      (float)(ec_adc_p2 - ec_adc_p1);
+    float v = ec_us_p1 + pendiente * (float)(raw - ec_adc_p1);
+    return v < 0.0f ? 0.0f : v;
+}
+
+/*  Recorre el bus I2C y lista lo que responda. Es la primera prueba que
+ *  hay que hacer ante un sensor mudo: separa un problema de cableado de
+ *  uno de software.                                                     */
+void escanearI2C() {
+    Serial.println();
+    Serial.printf("Escaneando I2C  (SDA=GPIO%d  SCL=GPIO%d)\n",
+                  PIN_I2C_SDA, PIN_I2C_SCL);
+    uint8_t encontrados = 0;
+    for (uint8_t dir = 1; dir < 127; dir++) {
+        Wire.beginTransmission(dir);
+        if (Wire.endTransmission() == 0) {
+            Serial.printf("  0x%02X  responde", dir);
+            if (dir == HDC1080_ADDR) Serial.print("   <- HDC1080 esperado aqui");
+            Serial.println();
+            encontrados++;
+        }
+    }
+    if (encontrados == 0) {
+        Serial.println("  NADA EN EL BUS.");
+        Serial.println("  Revisa: alimentacion 3.3V, GND comun, SDA/SCL sin cruzar,");
+        Serial.println("  y resistencias de pull-up (muchos modulos ya las traen).");
+    } else {
+        Serial.printf("  %u dispositivo(s)\n", encontrados);
+    }
+    Serial.println();
+}
+
+/*  Verifica que el HDC1080 es realmente un HDC1080 leyendo sus IDs de
+ *  fabricante y dispositivo. Que una direccion responda no garantiza que
+ *  sea el chip correcto.                                                */
+bool verificarHDC1080() {
+    Wire.beginTransmission(HDC1080_ADDR);
+    if (Wire.endTransmission() != 0) {
+        logError("HDC1080", "No responde en 0x40");
+        return false;
+    }
+    uint16_t fab = hdc1080.readManufacturerId();   // 0x5449 = Texas Instruments
+    uint16_t dev = hdc1080.readDeviceId();         // 0x1050 = HDC1080
+    logInfoF("HDC1080", "Fabricante=0x%04X  Dispositivo=0x%04X", fab, dev);
+    if (fab == 0x5449 && dev == 0x1050) {
+        logInfo("HDC1080", "Identificado correctamente");
+        return true;
+    }
+    logWarn("HDC1080", "IDs inesperados: responde algo, pero no parece un HDC1080");
+    return false;
+}
+
+void imprimirSensores() {
+    Serial.println();
+    Serial.println("+-----------------+--------+------+-----------+------------------+");
+    Serial.println("| Sensor          | Pin    | Mod  | Crudo     | Valor            |");
+    Serial.println("+-----------------+--------+------+-----------+------------------+");
+    Serial.printf ("| HDC1080 temp    | I2C21  | %-4s | %-9s | %.2f C\n",
+                   mods.sensor_hdc ? "ON" : "off",
+                   hdcPresente ? "0x40 ok" : "SIN CHIP", temperatura_HDC);
+    Serial.printf ("| HDC1080 humedad | I2C22  | %-4s | %-9s | %.2f %%\n",
+                   mods.sensor_hdc ? "ON" : "off",
+                   hdcPresente ? "0x40 ok" : "SIN CHIP", humedad_HDC);
+    Serial.printf ("| Nivel agua      | GPIO36 | %-4s | ADC %-5d | %s\n",
+                   mods.sensor_suelo ? "ON" : "off", suelo_raw,
+                   hay_agua ? "HAY AGUA" : "seco");
+    Serial.printf ("| Conductividad   | GPIO33 | %-4s | ADC %-5d | %.0f uS/cm\n",
+                   mods.sensor_ec ? "ON" : "off", ec_raw, ec_us_cm);
+    Serial.printf ("| pH (retirado)   | GPIO34 | %-4s | ADC %-5d | %.2f\n",
+                   mods.sensor_ph ? "ON" : "off", ph_raw, ph_g);
+    Serial.println("+-----------------+--------+------+-----------+------------------+");
+    Serial.printf ("  Nivel: referencia seco=%d, umbral de caida=%d, actual=%d (delta %d)\n",
+                   nivel_adc_seco, NIVEL_DELTA_MIN, suelo_raw,
+                   nivel_adc_seco - suelo_raw);
+    Serial.printf ("  EC:    P1 ADC %d = %d uS/cm   |   P2 ADC %d = %d uS/cm\n",
+                   ec_adc_p1, ec_us_p1, ec_adc_p2, ec_us_p2);
+    if (ec_adc_p1 == EC_ADC_P1_DEF && ec_adc_p2 == EC_ADC_P2_DEF)
+        Serial.println("  AVISO: EC sin calibrar. El valor en uS/cm no es fiable.");
+    Serial.println();
 }
 
 // ============================================================
@@ -907,6 +1063,10 @@ void tarea_telemetria(void* pv) {
         }
         if (mods.sensor_suelo || mods.simulacion) {
             s["hsuelo"] = round(hs * 100) / 100.0;
+            s["agua"]   = hay_agua;          // detector de nivel, no porcentaje
+        }
+        if (mods.sensor_ec || mods.simulacion) {
+            s["ec"] = round(ec_us_cm * 10) / 10.0;   // uS/cm
         }
         if (mods.sensor_ph || mods.simulacion) {
             s["ph"] = round(ph * 100) / 100.0;
@@ -1066,18 +1226,31 @@ void tarea_sensor_hdc(void* pv) {
         if (!mods.sensor_hdc) continue;
 
         if (!hdcIniciado) {
-            hdc1080.begin(0x40);
+            hdc1080.begin(HDC1080_ADDR);
+            vTaskDelay(200 / portTICK_PERIOD_MS);
+            hdcPresente = verificarHDC1080();
             hdcIniciado = true;
-            logInfo("HDC1080", "Inicializado en 0x40");
-            vTaskDelay(500 / portTICK_PERIOD_MS);
+            if (!hdcPresente) {
+                logError("HDC1080", "No inicializado. Usa 'i2c' para escanear el bus.");
+                // Reintentar mas tarde en vez de rendirse: el sensor puede
+                // conectarse en caliente durante una prueba de banco.
+                vTaskDelay(5000 / portTICK_PERIOD_MS);
+                hdcIniciado = false;
+                continue;
+            }
         }
 
         float temp = hdc1080.readTemperature();
         float hum  = hdc1080.readHumidity();
 
-        // Sin sensor en el bus, el HDC1080 devuelve NaN o valores absurdos
-        if (isnan(temp) || temp < -40 || temp > 100) {
-            logWarn("HDC1080", "Lectura invalida — sensor desconectado?");
+        // Sin sensor en el bus el HDC1080 devuelve NaN o valores absurdos.
+        // 125 C y 100 % son los topes del chip: por encima es lectura basura.
+        if (isnan(temp) || temp < -40.0f || temp > 125.0f ||
+            isnan(hum)  || hum  <   0.0f || hum  > 100.0f) {
+            logWarn("HDC1080", "Lectura invalida — revisa cableado I2C");
+            hdcPresente = false;
+            hdcIniciado = false;
+            vTaskDelay(3000 / portTICK_PERIOD_MS);
             continue;
         }
 
@@ -1086,7 +1259,7 @@ void tarea_sensor_hdc(void* pv) {
             humedad_HDC     = hum;
             xSemaphoreGive(xMutexDatos);
         }
-        logInfoF("HDC1080", "temp=%.2f C  hum=%.2f %%", temp, hum);
+        logInfoF("HDC1080", "temp=%.2f C   hum=%.2f %%", temp, hum);
     }
 }
 
@@ -1095,6 +1268,8 @@ void tarea_sensor_hdc(void* pv) {
 // ============================================================
 void tarea_sensor_suelo(void* pv) {
     pinMode(PIN_SENSOR_WATER, INPUT);
+    bool agua_previa = false;
+
     for (;;) {
         vTaskDelay(INTERVAL_SENSOR / portTICK_PERIOD_MS);
 
@@ -1109,16 +1284,58 @@ void tarea_sensor_suelo(void* pv) {
 
         if (!mods.sensor_suelo) continue;
 
-        // Calibración provisional: 3800 = seco al aire, 1200 = en agua.
-        // Debe recalibrarse con el sustrato real en la Fase 4.
-        int raw = analogRead(PIN_SENSOR_WATER);
-        int pct = constrain(map(raw, 3800, 1200, 0, 100), 0, 100);
+        int raw = leerADC(PIN_SENSOR_WATER);
+        bool agua = hayAgua(raw);
 
         if (xSemaphoreTake(xMutexDatos, portMAX_DELAY) == pdTRUE) {
-            humedad_suelo = pct;
+            suelo_raw = raw;
+            hay_agua  = agua;
+            // Se publica como 0/100 y no como porcentaje interpolado: el
+            // sensor es un detector de umbral, y fingir una escala continua
+            // que no tiene daría una falsa sensación de precisión.
+            humedad_suelo = agua ? 100.0f : 0.0f;
             xSemaphoreGive(xMutexDatos);
         }
-        logInfoF("SUELO", "raw=%d -> %d %%", raw, pct);
+
+        // Solo se registra el cambio de estado, no cada lectura: con
+        // muestreo cada 5 s el log sería ilegible.
+        if (agua != agua_previa) {
+            logInfoF("NIVEL", "%s   raw=%d  (seco=%d  delta=%d)",
+                     agua ? ">>> AGUA DETECTADA — cortar llenado" : "sin agua",
+                     raw, nivel_adc_seco, nivel_adc_seco - raw);
+            agua_previa = agua;
+        }
+    }
+}
+
+// ============================================================
+//  TAREA: Conductividad eléctrica
+// ============================================================
+void tarea_sensor_ec(void* pv) {
+    pinMode(PIN_EC_SENSOR, INPUT);
+    for (;;) {
+        vTaskDelay(INTERVAL_SENSOR / portTICK_PERIOD_MS);
+
+        if (mods.simulacion) {
+            if (xSemaphoreTake(xMutexDatos, portMAX_DELAY) == pdTRUE) {
+                if (ec_us_cm == 0.0f) ec_us_cm = 1600.0f;
+                ec_us_cm = paseo(ec_us_cm, 40.0f, 800.0f, 2600.0f);
+                xSemaphoreGive(xMutexDatos);
+            }
+            continue;
+        }
+
+        if (!mods.sensor_ec) continue;
+
+        int raw = leerADC(PIN_EC_SENSOR);
+        float us = ecRawAMicroSiemens(raw);
+
+        if (xSemaphoreTake(xMutexDatos, portMAX_DELAY) == pdTRUE) {
+            ec_raw   = raw;
+            ec_us_cm = us;
+            xSemaphoreGive(xMutexDatos);
+        }
+        logInfoF("EC", "raw=%-5d -> %.0f uS/cm", raw, us);
     }
 }
 
@@ -1161,6 +1378,7 @@ void tarea_sensor_ph(void* pv) {
         float v_esp  = avg * (3.3f / 4095.0f);
         float v_real = (0.97f * v_esp) + 0.197f;
         float ph     = constrain(-5.70f * v_real + 21.93f, 0.0f, 14.0f);
+        ph_raw = (int)avg;
 
         if (xSemaphoreTake(xMutexDatos, portMAX_DELAY) == pdTRUE) {
             ph_g = ph;
@@ -1226,6 +1444,46 @@ void tarea_test_valvulas(void* pv) {
 }
 
 // ============================================================
+//  TAREA: Monitor continuo de sensores
+// ============================================================
+/*  Imprime los valores crudos una vez por segundo, en una sola línea.
+ *  Es la herramienta de calibración: permite meter la sonda en agua, o
+ *  cambiar de solución patrón, y ver el número moverse en tiempo real
+ *  sin tener que pedir la tabla una y otra vez.
+ *
+ *  Lee los pines directamente y no depende de los módulos de sensores,
+ *  para poder diagnosticar hardware aunque todo lo demás esté apagado.  */
+volatile bool monitor_activo = false;
+
+void tarea_monitor(void* pv) {
+    for (;;) {
+        if (!monitor_activo) {
+            vTaskDelay(300 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        int nivel = leerADC(PIN_SENSOR_WATER);
+        int ec    = leerADC(PIN_EC_SENSOR);
+
+        Serial.printf("[MON] nivel=%-5d %-9s | ec=%-5d (%.0f uS) | ",
+                      nivel, hayAgua(nivel) ? "AGUA" : "seco",
+                      ec, ecRawAMicroSiemens(ec));
+
+        if (hdcPresente) {
+            float t = hdc1080.readTemperature();
+            float h = hdc1080.readHumidity();
+            if (!isnan(t) && t > -40.0f && t < 125.0f)
+                 Serial.printf("hdc=%.2fC %.1f%%\n", t, h);
+            else Serial.println("hdc=ERROR");
+        } else {
+            Serial.println("hdc=no detectado");
+        }
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+// ============================================================
 //  TAREA: Consola serie — tercer plano de control
 // ============================================================
 /*  Acepta los mismos comandos JSON que MQTT y HTTP, escritos directamente
@@ -1266,6 +1524,17 @@ void tarea_consola(void* pv) {
                 Serial.println("    off 3           apaga solo esa");
                 Serial.println("    salidas         tabla de salidas");
                 Serial.println();
+                Serial.println("  SENSORES");
+                Serial.println("    sensores on|off  enciende/apaga los tres");
+                Serial.println("    sensores         tabla con crudos y valores");
+                Serial.println("    mon on | mon off monitor continuo (para calibrar)");
+                Serial.println("    i2c              escanea el bus I2C");
+                Serial.println();
+                Serial.println("  CALIBRACION");
+                Serial.println("    cal nivel        fija la referencia en SECO");
+                Serial.println("    cal ec1 1413     punto bajo, sonda en el patron");
+                Serial.println("    cal ec2 12880    punto alto");
+                Serial.println();
                 Serial.println("  PRUEBAS");
                 Serial.println("    test on | test off   barrido secuencial");
                 Serial.println("    estado               tabla de modulos");
@@ -1278,6 +1547,65 @@ void tarea_consola(void* pv) {
             else if (linea == "estado")   { imprimirModulos(); }
             else if (linea == "salidas")  { imprimirSalidas(); }
             else if (linea == "reset")    { esp_restart(); }
+
+            // ── Sensores ────────────────────────────────────────
+            else if (linea == "sensores") { imprimirSensores(); }
+            else if (linea == "i2c")      { escanearI2C(); }
+            else if (linea == "mon on")   {
+                monitor_activo = true;
+                Serial.println("[MON] Monitor continuo ON — 'mon off' para parar");
+            }
+            else if (linea == "mon off")  {
+                monitor_activo = false;
+                Serial.println("[MON] Monitor detenido");
+            }
+            // Enciende los tres sensores de golpe, que es lo habitual al
+            // empezar una sesion de pruebas.
+            else if (linea == "sensores on") {
+                setModulo("sensor_hdc",   true);
+                setModulo("sensor_suelo", true);
+                setModulo("sensor_ec",    true);
+                imprimirModulos();
+            }
+            else if (linea == "sensores off") {
+                setModulo("sensor_hdc",   false);
+                setModulo("sensor_suelo", false);
+                setModulo("sensor_ec",    false);
+                imprimirModulos();
+            }
+
+            // ── Calibración ─────────────────────────────────────
+            //  'cal nivel'        captura la referencia en seco
+            //  'cal ec1 1413'     punto bajo, con la sonda en el patron
+            //  'cal ec2 12880'    punto alto
+            else if (linea == "cal nivel") {
+                nivel_adc_seco = leerADC(PIN_SENSOR_WATER);
+                guardarCalibracion();
+                Serial.printf("[CAL] Referencia en SECO = %d cuentas.\n", nivel_adc_seco);
+                Serial.printf("      Se dara agua por detectada al bajar de %d.\n",
+                              nivel_adc_seco - NIVEL_DELTA_MIN);
+            }
+            else if (linea.startsWith("cal ec1 ") || linea.startsWith("cal ec2 ")) {
+                bool punto1 = linea.startsWith("cal ec1 ");
+                int  us     = linea.substring(8).toInt();
+                if (us <= 0) {
+                    Serial.println("[CAL] Indica los uS/cm del patron. Ej: cal ec1 1413");
+                } else {
+                    int raw = leerADC(PIN_EC_SENSOR);
+                    if (punto1) { ec_adc_p1 = raw; ec_us_p1 = us; }
+                    else        { ec_adc_p2 = raw; ec_us_p2 = us; }
+                    guardarCalibracion();
+                    Serial.printf("[CAL] Punto %d: ADC %d = %d uS/cm\n",
+                                  punto1 ? 1 : 2, raw, us);
+                    if (ec_adc_p1 != ec_adc_p2)
+                        Serial.printf("      Pendiente: %.2f uS/cm por cuenta\n",
+                                      (float)(ec_us_p2 - ec_us_p1) /
+                                      (float)(ec_adc_p2 - ec_adc_p1));
+                    else
+                        Serial.println("      AVISO: los dos puntos dan el mismo ADC.");
+                }
+            }
+            else if (linea == "cal") { imprimirSensores(); }
 
             // ── on / off con lista de salidas ───────────────────
             //    "off" a secas apaga todo; "off 3" solo esa.
@@ -1395,6 +1723,10 @@ void setup() {
         releOff(PINES_RELE[i]);
     }
 
+    // Bus I2C con pines explicitos: la libreria del HDC1080 llamaria a
+    // Wire.begin() sin argumentos y usaria los de la placa por defecto.
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ);
+
     testESP();
     cargarModulos();
     imprimirModulos();
@@ -1415,11 +1747,13 @@ void setup() {
     xTaskCreate(tarea_sensor_hdc,    "hdc1080",    3072, NULL, 1, NULL);
     xTaskCreate(tarea_sensor_suelo,  "suelo",      2560, NULL, 1, NULL);
     xTaskCreate(tarea_sensor_ph,     "ph",         2560, NULL, 1, NULL);
+    xTaskCreate(tarea_sensor_ec,     "ec",         2560, NULL, 1, NULL);
     xTaskCreate(tarea_actuadores,    "actuadores", 2560, NULL, 2, NULL);
 
     // ── Pruebas de banco ─────────────────────────────────────
     xTaskCreate(tarea_test_valvulas, "test-valv",  3072, NULL, 2, NULL);
     xTaskCreate(tarea_consola,       "consola",    4096, NULL, 1, NULL);
+    xTaskCreate(tarea_monitor,       "monitor",    4096, NULL, 1, NULL);
 }
 
 void loop() {

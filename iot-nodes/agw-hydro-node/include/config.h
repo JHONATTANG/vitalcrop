@@ -171,13 +171,52 @@
 //  ⚠️ Solo ADC1 funciona con el WiFi encendido. GPIO34 y GPIO36 lo son.
 //     Si añades otro sensor analogico usa GPIO32/33/35/39, nunca ADC2
 //     (GPIO 0,2,4,12-15,25-27): devuelven basura con la radio activa.
-#define PIN_SENSOR_WATER  36    // Humedad de sustrato (ADC1_CH0, solo entrada)
-#define PIN_PH_SENSOR     34    // pH               (ADC1_CH6, solo entrada)
+#define PIN_SENSOR_WATER  36    // Nivel de agua en tierra, resistivo (ADC1_CH0)
+#define PIN_EC_SENSOR     33    // Conductividad electrica             (ADC1_CH5)
+#define PIN_PH_SENSOR     34    // pH — retirado del alcance           (ADC1_CH6)
 
 //  Bus I2C del HDC1080. Antes se usaban los de Wire por defecto de forma
 //  implicita; declararlos evita sorpresas al cambiar de placa.
 #define PIN_I2C_SDA       21
 #define PIN_I2C_SCL       22
+#define I2C_FREQ          100000UL   // 100 kHz: el HDC1080 no necesita mas
+#define HDC1080_ADDR      0x40       // Fija en el chip, no configurable
+
+// ------------------------------------------------------------
+//  Sensor de NIVEL DE AGUA en tierra (resistivo)
+// ------------------------------------------------------------
+//  No mide porcentaje de humedad: un resistivo barato no tiene la
+//  precisión ni la estabilidad para eso, y además se corroe.
+//
+//  Se usa como DETECTOR DE UMBRAL en una posición física fija. El
+//  sensor está colocado a la altura de agua que se considera "lleno".
+//  Mientras está seco el ADC da un valor alto y estable; en cuanto el
+//  agua lo toca, la resistencia cae y el valor se desploma. Ese salto
+//  es la señal de "nivel alcanzado, corta el llenado".
+//
+//  Calibración: con el sustrato SIN agua, ejecutar `cal nivel`. Eso
+//  captura la referencia en seco. Cualquier caída mayor que
+//  NIVEL_DELTA_MIN respecto a esa referencia se interpreta como agua.
+#define NIVEL_ADC_SECO_DEF   3000   // Referencia en seco (se recalibra)
+#define NIVEL_DELTA_MIN       400   // Caída mínima para dar agua por detectada
+#define ADC_MUESTRAS           16   // Promedio para bajar el ruido del ADC
+
+// ------------------------------------------------------------
+//  Sensor de conductividad eléctrica (EC)
+// ------------------------------------------------------------
+//  Calibración de dos puntos con soluciones patrón. Lo habitual:
+//      1413 µS/cm  y  12880 µS/cm (12.88 mS/cm)
+//  Procedimiento:
+//      cal ec1 <uS>   con la sonda en la solución baja
+//      cal ec2 <uS>   con la sonda en la solución alta
+//  Entre medida y medida hay que enjuagar la sonda con agua destilada.
+//
+//  Sin calibrar, el firmware publica solo el valor crudo del ADC.
+#define EC_ADC_P1_DEF        1000   // Lectura ADC en el punto 1
+#define EC_US_P1_DEF         1413   // µS/cm del punto 1
+#define EC_ADC_P2_DEF        2500   // Lectura ADC en el punto 2
+#define EC_US_P2_DEF        12880   // µS/cm del punto 2
+#define DEFAULT_MOD_SENSOR_EC  false
 
 // ------------------------------------------------------------
 //  Polaridad de los módulos de relé
