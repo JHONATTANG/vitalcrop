@@ -53,7 +53,14 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <ClosedCube_HDC1080.h>
+
+// PubSubClient define su propio MQTT_KEEPALIVE de 15 s. El nuestro es de
+// 20 s por el vigilante de estaciones fantasma del AP (config.h). Sin este
+// undef el compilador avisa de redefinicion y el orden de los includes
+// decidiria cual gana, que es justo el tipo de ambiguedad que no queremos
+// en un parametro del que depende la deteccion de nodos caidos.
 #include <PubSubClient.h>
+#undef MQTT_KEEPALIVE
 #include <Preferences.h>
 #include "esp_system.h"
 #include "nvs_flash.h"
@@ -1796,10 +1803,8 @@ void tarea_consola(void* pv) {
                     } else {
                         tds_k = ref / bruto;
                         guardarCalibracion();
-                        Serial.printf("[CAL] %.0f mV -> %.0f ppm sin corregir
-", mv, bruto);
-                        Serial.printf("      Referencia %.0f ppm  =>  k = %.4f
-", ref, tds_k);
+                        Serial.printf("[CAL] %.0f mV -> %.0f ppm sin corregir\n", mv, bruto);
+                        Serial.printf("      Referencia %.0f ppm  =>  k = %.4f\n", ref, tds_k);
                         if (tds_k < 0.5f || tds_k > 2.0f)
                             Serial.println("      AVISO: correccion mayor del 100 %. Revisa la referencia.");
                     }
@@ -1853,8 +1858,17 @@ void tarea_consola(void* pv) {
                     logError("CONSOLA", "JSON invalido");
                 }
             }
+            // ── Marcador de prueba ──────────────────────────────
+            //  Cualquier texto que no sea un comando se registra como
+            //  etiqueta en el log. Sirve para anotar qué se está midiendo
+            //  ("sal", "vinagre", "grifo") y poder separar despues los
+            //  tramos de cada muestra sin adivinar por la hora.
             else {
-                logWarn("CONSOLA", "Comando no reconocido. Escribe 'ayuda'.");
+                Serial.println();
+                Serial.printf("========== MARCA: %s ==========\n", linea.c_str());
+                Serial.printf("   t=%lu ms   (escribe 'ayuda' si buscabas un comando)\n",
+                              millis());
+                Serial.println();
             }
 
             linea = "";

@@ -237,7 +237,7 @@
 //  ni por el ruido del ADC (que ronda las +-50 cuentas tras promediar).
 #define NIVEL_DELTA_MIN       800   // Caída mínima para dar agua por detectada
 #define ADC_MUESTRAS           16   // Promedio para bajar el ruido del ADC
-#define MON_INTERVAL_MS      5000UL // Cadencia del monitor continuo
+#define MON_INTERVAL_MS      3000UL // Cadencia del monitor continuo
 #define ADC_BITS             4095.0f
 #define ADC_VREF                3.3f
 
