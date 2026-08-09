@@ -171,9 +171,39 @@
 //  ⚠️ Solo ADC1 funciona con el WiFi encendido. GPIO34 y GPIO36 lo son.
 //     Si añades otro sensor analogico usa GPIO32/33/35/39, nunca ADC2
 //     (GPIO 0,2,4,12-15,25-27): devuelven basura con la radio activa.
-#define PIN_SENSOR_WATER  36    // Nivel de agua en tierra, resistivo (ADC1_CH0)
 #define PIN_EC_SENSOR     33    // Conductividad electrica             (ADC1_CH5)
 #define PIN_PH_SENSOR     34    // pH — retirado del alcance           (ADC1_CH6)
+
+// ------------------------------------------------------------
+//  Sensor de nivel de agua — CUIDADO CON EL PIN
+// ------------------------------------------------------------
+//  Cableado actual: GPIO4.
+//
+//  ⚠️ GPIO4 pertenece a ADC2, y ADC2 QUEDA INUTILIZABLE mientras el
+//     WiFi esta activo: el controlador de radio se apodera de ese
+//     bloque del conversor. analogRead() devuelve ceros o basura.
+//     Por eso las lecturas salian 0 con ruido de +-45 cuentas.
+//
+//  Dos salidas:
+//
+//  A) RECOMENDADA — mover el cable a un pin de ADC1:
+//        GPIO32  libre, ADC1_CH4, entrada/salida completa
+//        GPIO36  libre, ADC1_CH0, solo entrada
+//     Cambiar aqui el numero y recompilar. Lectura analogica real,
+//     con variacion visible para calibrar.
+//
+//  B) SIN TOCAR EL CABLE — leer GPIO4 como entrada DIGITAL.
+//     Para un detector de nivel es suficiente: la unica pregunta es
+//     si el agua llego o no. Se pierde la lectura analogica, y el
+//     umbral queda fijado por el hardware del chip (~1.4 V), sin
+//     posibilidad de ajustarlo por software.
+//     Activar con NIVEL_MODO_DIGITAL en true.
+#define PIN_SENSOR_WATER    4
+#define NIVEL_MODO_DIGITAL  true   // true = digitalRead, false = analogRead
+
+//  Con modulos resistivos la salida suele estar en alto en seco y caer
+//  al mojarse. Si observas lo contrario, invierte este valor.
+#define NIVEL_DIGITAL_SECO_ALTO  true
 
 //  Bus I2C del HDC1080. Antes se usaban los de Wire por defecto de forma
 //  implicita; declararlos evita sorpresas al cambiar de placa.
@@ -200,6 +230,9 @@
 #define NIVEL_ADC_SECO_DEF   3000   // Referencia en seco (se recalibra)
 #define NIVEL_DELTA_MIN       400   // Caída mínima para dar agua por detectada
 #define ADC_MUESTRAS           16   // Promedio para bajar el ruido del ADC
+#define MON_INTERVAL_MS      5000UL // Cadencia del monitor continuo
+#define ADC_BITS             4095.0f
+#define ADC_VREF                3.3f
 
 // ------------------------------------------------------------
 //  Sensor de conductividad eléctrica (EC)

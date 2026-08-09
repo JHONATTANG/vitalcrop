@@ -399,14 +399,29 @@ int leerADC(uint8_t pin) {
     return (int)(suma / ADC_MUESTRAS);
 }
 
+/*  Lectura del sensor de nivel. Encapsula la diferencia entre los dos
+ *  modos para que el resto del código no tenga que saber cuál está en uso.
+ *
+ *  En modo digital se devuelve 0 o 4095 para que la misma variable
+ *  `suelo_raw` sirva en ambos casos y las tablas no cambien de formato. */
+int leerNivelRaw() {
+    if (NIVEL_MODO_DIGITAL) {
+        int nivel = digitalRead(PIN_SENSOR_WATER);
+        bool seco = NIVEL_DIGITAL_SECO_ALTO ? (nivel == HIGH) : (nivel == LOW);
+        return seco ? 4095 : 0;
+    }
+    return leerADC(PIN_SENSOR_WATER);
+}
+
 /*  Detección de nivel de agua. No devuelve porcentaje a propósito: el
  *  sensor está fijo a la altura de "lleno", así que la única pregunta
  *  útil es si el agua ya lo alcanzó.
  *
- *  Al mojarse cae la resistencia y el ADC baja. Se exige una caída
+ *  Al mojarse cae la resistencia y la lectura baja. Se exige una caída
  *  mínima respecto a la referencia en seco para no disparar por ruido
  *  o por humedad ambiental.                                             */
 bool hayAgua(int raw) {
+    if (NIVEL_MODO_DIGITAL) return raw < 2048;   // 0 = mojado, 4095 = seco
     return (nivel_adc_seco - raw) >= NIVEL_DELTA_MIN;
 }
 
@@ -488,6 +503,8 @@ void imprimirSensores() {
     Serial.printf ("| pH (retirado)   | GPIO34 | %-4s | ADC %-5d | %.2f\n",
                    mods.sensor_ph ? "ON" : "off", ph_raw, ph_g);
     Serial.println("+-----------------+--------+------+-----------+------------------+");
+    if (mods.simulacion)
+        Serial.println("  >> SIMULACION ACTIVA: los valores son sinteticos, no del hardware <<");
     Serial.printf ("  Nivel: referencia seco=%d, umbral de caida=%d, actual=%d (delta %d)\n",
                    nivel_adc_seco, NIVEL_DELTA_MIN, suelo_raw,
                    nivel_adc_seco - suelo_raw);
@@ -1267,7 +1284,9 @@ void tarea_sensor_hdc(void* pv) {
 //  TAREA: Humedad de sustrato
 // ============================================================
 void tarea_sensor_suelo(void* pv) {
-    pinMode(PIN_SENSOR_WATER, INPUT);
+    // En modo digital conviene el pull-up interno: deja la entrada en un
+    // estado conocido cuando la sonda esta al aire, en vez de flotando.
+    pinMode(PIN_SENSOR_WATER, NIVEL_MODO_DIGITAL ? INPUT_PULLUP : INPUT);
     bool agua_previa = false;
 
     for (;;) {
@@ -1284,7 +1303,7 @@ void tarea_sensor_suelo(void* pv) {
 
         if (!mods.sensor_suelo) continue;
 
-        int raw = leerADC(PIN_SENSOR_WATER);
+        int raw = leerNivelRaw();
         bool agua = hayAgua(raw);
 
         if (xSemaphoreTake(xMutexDatos, portMAX_DELAY) == pdTRUE) {
@@ -1456,30 +1475,67 @@ void tarea_test_valvulas(void* pv) {
 volatile bool monitor_activo = false;
 
 void tarea_monitor(void* pv) {
+    bool aviso_sim_dado = false;
+
     for (;;) {
         if (!monitor_activo) {
+            aviso_sim_dado = false;
             vTaskDelay(300 / portTICK_PERIOD_MS);
             continue;
         }
 
-        int nivel = leerADC(PIN_SENSOR_WATER);
+        // La simulación enmascara por completo los sensores reales: las
+        // tareas toman su rama y ni siquiera inicializan el hardware.
+        // Avisarlo aquí evita horas de diagnóstico sobre datos inventados.
+        if (mods.simulacion && !aviso_sim_dado) {
+            Serial.println();
+            Serial.println("  ##############################################");
+            Serial.println("  #  SIMULACION ACTIVA                         #");
+            Serial.println("  #  La telemetria son valores sinteticos.     #");
+            Serial.println("  #  Los sensores reales NO se estan leyendo.  #");
+            Serial.println("  #  Apagala con:  sim off                     #");
+            Serial.println("  ##############################################");
+            Serial.println();
+            aviso_sim_dado = true;
+        }
+
+        // El monitor lee el hardware SIEMPRE, aunque los módulos estén
+        // apagados: es una herramienta de diagnóstico, no de operación.
+        int nivel = leerNivelRaw();
         int ec    = leerADC(PIN_EC_SENSOR);
 
-        Serial.printf("[MON] nivel=%-5d %-9s | ec=%-5d (%.0f uS) | ",
-                      nivel, hayAgua(nivel) ? "AGUA" : "seco",
-                      ec, ecRawAMicroSiemens(ec));
+        Serial.printf("[MON] nivel: %-5d", nivel);
+        if (!NIVEL_MODO_DIGITAL)
+            Serial.printf(" (%.2fV)", nivel * ADC_VREF / ADC_BITS);
+        else
+            Serial.printf(" (digital)");
+        Serial.printf(" %-4s | ec: %-5d (%.2fV -> %.0f uS/cm) | ",
+                      hayAgua(nivel) ? "AGUA" : "seco",
+                      ec, ec * ADC_VREF / ADC_BITS, ecRawAMicroSiemens(ec));
+
+        // Intentar levantar el HDC1080 aquí mismo si aún no responde: el
+        // sensor puede conectarse en caliente durante una prueba de banco.
+        if (!hdcPresente) {
+            Wire.beginTransmission(HDC1080_ADDR);
+            if (Wire.endTransmission() == 0) {
+                hdc1080.begin(HDC1080_ADDR);
+                delay(100);
+                hdcPresente = true;
+                hdcIniciado = true;
+            }
+        }
 
         if (hdcPresente) {
             float t = hdc1080.readTemperature();
             float h = hdc1080.readHumidity();
             if (!isnan(t) && t > -40.0f && t < 125.0f)
-                 Serial.printf("hdc=%.2fC %.1f%%\n", t, h);
-            else Serial.println("hdc=ERROR");
+                 Serial.printf("hdc: %.2f C  %.1f %%\n", t, h);
+            else { Serial.println("hdc: ERROR de lectura"); hdcPresente = false; }
         } else {
-            Serial.println("hdc=no detectado");
+            Serial.println("hdc: NO RESPONDE en 0x40  (usa 'i2c')");
         }
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(MON_INTERVAL_MS / portTICK_PERIOD_MS);
     }
 }
 
@@ -1529,6 +1585,7 @@ void tarea_consola(void* pv) {
                 Serial.println("    sensores         tabla con crudos y valores");
                 Serial.println("    mon on | mon off monitor continuo (para calibrar)");
                 Serial.println("    i2c              escanea el bus I2C");
+                Serial.println("    sim on | sim off valores sinteticos (enmascara el hardware)");
                 Serial.println();
                 Serial.println("  CALIBRACION");
                 Serial.println("    cal nivel        fija la referencia en SECO");
@@ -1550,6 +1607,8 @@ void tarea_consola(void* pv) {
 
             // ── Sensores ────────────────────────────────────────
             else if (linea == "sensores") { imprimirSensores(); }
+            else if (linea == "sim on")   { setModulo("simulacion", true);  imprimirModulos(); }
+            else if (linea == "sim off")  { setModulo("simulacion", false); imprimirModulos(); }
             else if (linea == "i2c")      { escanearI2C(); }
             else if (linea == "mon on")   {
                 monitor_activo = true;
@@ -1579,7 +1638,7 @@ void tarea_consola(void* pv) {
             //  'cal ec1 1413'     punto bajo, con la sonda en el patron
             //  'cal ec2 12880'    punto alto
             else if (linea == "cal nivel") {
-                nivel_adc_seco = leerADC(PIN_SENSOR_WATER);
+                nivel_adc_seco = leerNivelRaw();
                 guardarCalibracion();
                 Serial.printf("[CAL] Referencia en SECO = %d cuentas.\n", nivel_adc_seco);
                 Serial.printf("      Se dara agua por detectada al bajar de %d.\n",
