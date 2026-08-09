@@ -159,6 +159,43 @@ class LocalDB:
         )
         await self._db.commit()
 
+    async def get_ultimo_riego_tierra(self) -> "datetime | None":
+        """
+        Fecha del último riego de tierra registrado.
+
+        El gateway lleva el calendario de los 15 días; el nodo tiene
+        además su propio contador por si nunca recibe la fecha. Si no hay
+        historial se devuelve None y NodeSync programa el primero para el
+        día siguiente: arrancar regando nada más encender el sistema
+        sería una sorpresa desagradable.
+        """
+        from datetime import datetime
+
+        async with self._db.execute(
+            """
+            SELECT MAX(created_at) AS ts
+            FROM local_alerts
+            WHERE alert_type = 'RIEGO_TIERRA'
+            """
+        ) as cursor:
+            row = await cursor.fetchone()
+
+        ts = row["ts"] if row else None
+        return datetime.fromtimestamp(ts) if ts else None
+
+    async def registrar_riego_tierra(self, node_id: str, detalle: dict) -> None:
+        """Deja constancia de un riego de tierra para el cálculo del próximo."""
+        await self.save_alert(
+            {
+                "rule_id": "riego_tierra",
+                "node_id": node_id,
+                "alert_type": "RIEGO_TIERRA",
+                "severity": "INFO",
+                "message": "Riego de tierra ejecutado",
+                "sensor_data": detalle,
+            }
+        )
+
     async def get_all_node_statuses(self) -> list[dict]:
         """Retorna todos los nodos registrados con su último estado."""
         async with self._db.execute(

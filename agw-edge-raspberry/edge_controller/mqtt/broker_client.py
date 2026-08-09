@@ -46,6 +46,10 @@ class MQTTClient:
             payload = payload.encode()
         await self._publish_queue.put((topic, payload))
 
+    def set_node_sync(self, node_sync) -> None:
+        """Inyecta el sincronizador para que el handler pueda avisarle."""
+        self._handler.node_sync = node_sync
+
     def is_connected(self) -> bool:
         return self._connected.is_set()
 

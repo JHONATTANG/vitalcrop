@@ -47,6 +47,7 @@ class MessageHandler:
         self.local_db = local_db
         self.telemetry_syncer = telemetry_syncer
         self.gateway_id = config.device.gateway_id
+        self.node_sync = None   # lo inyecta MQTTClient.set_node_sync()
 
         # Cache de deduplicación: clave → epoch del último envío
         self._alert_seen: dict[str, float] = {}
@@ -213,6 +214,15 @@ class MessageHandler:
                 uptime_ms=st["uptime_ms"],
                 fw=st["fw"],
             )
+
+        # Avisar al sincronizador: es donde se detecta que el nodo
+        # perdio la hora y se le repone antes de que el fotoperiodo
+        # empiece a fallar en silencio.
+        if self.node_sync is not None:
+            try:
+                await self.node_sync.al_recibir_status({**raw, **st})
+            except Exception as exc:
+                log.warning("Fallo al notificar a node_sync", error=str(exc))
 
         await self.local_db.save_node_status(
             {
