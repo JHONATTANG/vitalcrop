@@ -198,8 +198,8 @@
 //     umbral queda fijado por el hardware del chip (~1.4 V), sin
 //     posibilidad de ajustarlo por software.
 //     Activar con NIVEL_MODO_DIGITAL en true.
-#define PIN_SENSOR_WATER    4
-#define NIVEL_MODO_DIGITAL  true   // true = digitalRead, false = analogRead
+#define PIN_SENSOR_WATER    32   
+#define NIVEL_MODO_DIGITAL  false   // true = digitalRead, false = analogRead
 
 //  Con modulos resistivos la salida suele estar en alto en seco y caer
 //  al mojarse. Si observas lo contrario, invierte este valor.
@@ -228,27 +228,49 @@
 //  captura la referencia en seco. Cualquier caída mayor que
 //  NIVEL_DELTA_MIN respecto a esa referencia se interpreta como agua.
 #define NIVEL_ADC_SECO_DEF   3000   // Referencia en seco (se recalibra)
-#define NIVEL_DELTA_MIN       400   // Caída mínima para dar agua por detectada
+//  Medido en banco el 2026-08-09 con el sensor real:
+//      seco al aire  ~4095 cuentas (3.30 V, saturado)
+//      en agua       ~2500 cuentas (2.01 V)
+//      excursion     ~1600 cuentas
+//  Un umbral de 800 cae en el punto medio de esa excursion: exige que
+//  el agua moje el sensor de verdad, y no dispara por humedad ambiental
+//  ni por el ruido del ADC (que ronda las +-50 cuentas tras promediar).
+#define NIVEL_DELTA_MIN       800   // Caída mínima para dar agua por detectada
 #define ADC_MUESTRAS           16   // Promedio para bajar el ruido del ADC
 #define MON_INTERVAL_MS      5000UL // Cadencia del monitor continuo
 #define ADC_BITS             4095.0f
 #define ADC_VREF                3.3f
 
 // ------------------------------------------------------------
-//  Sensor de conductividad eléctrica (EC)
+//  Sensor TDS analógico (sólidos disueltos totales)
 // ------------------------------------------------------------
-//  Calibración de dos puntos con soluciones patrón. Lo habitual:
-//      1413 µS/cm  y  12880 µS/cm (12.88 mS/cm)
-//  Procedimiento:
-//      cal ec1 <uS>   con la sonda en la solución baja
-//      cal ec2 <uS>   con la sonda en la solución alta
-//  Entre medida y medida hay que enjuagar la sonda con agua destilada.
+//  Hardware: modulo medidor TDS analogico tipo Gravity.
 //
-//  Sin calibrar, el firmware publica solo el valor crudo del ADC.
-#define EC_ADC_P1_DEF        1000   // Lectura ADC en el punto 1
-#define EC_US_P1_DEF         1413   // µS/cm del punto 1
-#define EC_ADC_P2_DEF        2500   // Lectura ADC en el punto 2
-#define EC_US_P2_DEF        12880   // µS/cm del punto 2
+//  Estos modulos NO se calibran con dos puntos: el fabricante
+//  caracteriza la sonda y publica una curva polinomica que convierte
+//  voltaje a ppm directamente. Intentar una recta de dos puntos sobre
+//  cuentas de ADC crudas ignora esa curva y da peores resultados.
+//
+//      TDS(ppm) = (133.42·V³ − 255.86·V² + 857.39·V) · 0.5
+//
+//  donde V es el voltaje compensado en temperatura. El 0.5 es el factor
+//  de conversion TDS/EC habitual (algunos fabricantes usan 0.7).
+//
+//  La conductividad depende de la temperatura ~2 %/°C. Sin compensar,
+//  la misma disolucion leeria distinto en un dia frio que en uno calido.
+#define TDS_FACTOR            0.5f   // ppm por uS/cm. Cambiar a 0.7 si aplica
+#define TDS_COEF_TEMP         0.02f  // 2 % por grado
+#define TDS_TEMP_REF          25.0f  // Temperatura de referencia
+#define TDS_MUESTRAS            32   // Se toma la MEDIANA, no la media
+#define TDS_K_DEF             1.0f   // Ajuste fino contra una referencia
+
+//  Temperatura de respaldo cuando el HDC1080 no está disponible.
+//  ⚠️ El HDC1080 mide temperatura del AIRE, no de la solucion. Es una
+//     aproximacion aceptable en un cultivo indoor donde ambos estan en
+//     equilibrio, pero debe declararse como limitacion al reportar
+//     resultados. Lo correcto seria una sonda DS18B20 sumergida.
+#define TDS_TEMP_FALLBACK     25.0f
+
 #define DEFAULT_MOD_SENSOR_EC  false
 
 // ------------------------------------------------------------

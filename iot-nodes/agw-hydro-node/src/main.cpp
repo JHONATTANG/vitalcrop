@@ -181,9 +181,10 @@ int   ph_raw          = 0;
 int   nivel_adc_seco  = NIVEL_ADC_SECO_DEF;
 bool  hay_agua        = false;
 
-// --- Calibración de EC: dos puntos con solución patrón ---
-int   ec_adc_p1 = EC_ADC_P1_DEF;   int ec_us_p1 = EC_US_P1_DEF;
-int   ec_adc_p2 = EC_ADC_P2_DEF;   int ec_us_p2 = EC_US_P2_DEF;
+// --- TDS: ajuste fino y ultimos valores medidos ---
+float tds_k     = TDS_K_DEF;   // 1.0 = curva del fabricante sin corregir
+float tds_ppm   = 0.0f;
+float tds_mv    = 0.0f;
 
 // --- Actuadores ---
 volatile int  ESTADO_ACTUADORES           = HIGH;
@@ -255,20 +256,14 @@ void cargarModulos() {
     mods.sensor_ec    = prefs.getBool("sensor_ec",  DEFAULT_MOD_SENSOR_EC);
     periodo_telemetria_ms = prefs.getUInt("periodo", INTERVAL_TELEMETRY);
     nivel_adc_seco = prefs.getInt("niv_seco", NIVEL_ADC_SECO_DEF);
-    ec_adc_p1 = prefs.getInt("ec_adc1", EC_ADC_P1_DEF);
-    ec_us_p1  = prefs.getInt("ec_us1",  EC_US_P1_DEF);
-    ec_adc_p2 = prefs.getInt("ec_adc2", EC_ADC_P2_DEF);
-    ec_us_p2  = prefs.getInt("ec_us2",  EC_US_P2_DEF);
+    tds_k = prefs.getFloat("tds_k", TDS_K_DEF);
     prefs.end();
 }
 
 void guardarCalibracion() {
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putInt("niv_seco", nivel_adc_seco);
-    prefs.putInt("ec_adc1",  ec_adc_p1);
-    prefs.putInt("ec_us1",   ec_us_p1);
-    prefs.putInt("ec_adc2",  ec_adc_p2);
-    prefs.putInt("ec_us2",   ec_us_p2);
+    prefs.putFloat("tds_k", tds_k);
     prefs.end();
     logInfo("CAL", "Calibracion guardada en NVS");
 }
@@ -425,16 +420,51 @@ bool hayAgua(int raw) {
     return (nivel_adc_seco - raw) >= NIVEL_DELTA_MIN;
 }
 
-/*  Conversión de cuentas de ADC a µS/cm por interpolación lineal entre
- *  los dos puntos de calibración. Fuera del rango calibrado extrapola,
- *  con la imprecisión que eso implica: por eso conviene que los patrones
- *  acoten el rango real de trabajo.                                     */
-float ecRawAMicroSiemens(int raw) {
-    if (ec_adc_p2 == ec_adc_p1) return 0.0f;   // sin calibrar
-    float pendiente = (float)(ec_us_p2 - ec_us_p1) /
-                      (float)(ec_adc_p2 - ec_adc_p1);
-    float v = ec_us_p1 + pendiente * (float)(raw - ec_adc_p1);
-    return v < 0.0f ? 0.0f : v;
+/*  Lectura del sensor TDS en milivoltios calibrados.
+ *
+ *  Se usa analogReadMilliVolts() y no analogRead(): el ADC del ESP32 no
+ *  es lineal ni tiene exactamente 3.3 V de fondo de escala, y cada chip
+ *  trae en eFuse su propia curva de calibración de fábrica. Convertir
+ *  cuentas a voltios con una regla de tres introduce un error de hasta
+ *  el 10 %, que aquí se traduce directamente en ppm equivocados.
+ *
+ *  Se toma la MEDIANA y no la media: la señal mostró picos aislados
+ *  (saltos de 118 a 778 cuentas con la sonda quieta), y la mediana los
+ *  descarta mientras que la media se los come.                          */
+float leerTDSmV() {
+    static uint16_t m[TDS_MUESTRAS];
+    for (uint8_t i = 0; i < TDS_MUESTRAS; i++) {
+        m[i] = (uint16_t)analogReadMilliVolts(PIN_EC_SENSOR);
+        delayMicroseconds(400);
+    }
+    // Ordenación por inserción: con 32 elementos es más rápida que
+    // cualquier algoritmo sofisticado y ocupa menos código.
+    for (uint8_t i = 1; i < TDS_MUESTRAS; i++) {
+        uint16_t v = m[i];
+        int8_t j = i - 1;
+        while (j >= 0 && m[j] > v) { m[j + 1] = m[j]; j--; }
+        m[j + 1] = v;
+    }
+    return (m[TDS_MUESTRAS / 2 - 1] + m[TDS_MUESTRAS / 2]) / 2.0f;
+}
+
+/*  Curva del fabricante: voltaje compensado en temperatura → ppm.
+ *  Devuelve TDS en ppm; la conductividad se obtiene dividiendo por el
+ *  factor TDS/EC.                                                       */
+float tdsDesdeVoltaje(float mv, float tempC) {
+    float v = mv / 1000.0f;
+    float coef = 1.0f + TDS_COEF_TEMP * (tempC - TDS_TEMP_REF);
+    if (coef < 0.1f) coef = 0.1f;          // evitar division absurda
+    float vc = v / coef;                    // voltaje compensado a 25 °C
+    float ppm = (133.42f * vc * vc * vc
+               - 255.86f * vc * vc
+               + 857.39f * vc) * TDS_FACTOR * tds_k;
+    return ppm < 0.0f ? 0.0f : ppm;
+}
+
+/*  ppm → µS/cm. El factor TDS/EC es el mismo que usa la curva.          */
+float ppmAMicroSiemens(float ppm) {
+    return ppm / TDS_FACTOR;
 }
 
 /*  Recorre el bus I2C y lista lo que responda. Es la primera prueba que
@@ -484,6 +514,90 @@ bool verificarHDC1080() {
     return false;
 }
 
+volatile bool monitor_activo = false;
+
+/*  Diagnóstico de un pin de ADC2 con el WiFi apagado temporalmente.
+ *
+ *  ADC2 y la radio comparten hardware: mientras el WiFi está activo,
+ *  analogRead() sobre GPIO 0,2,4,12-15,25-27 devuelve ceros. No hay
+ *  forma de sortearlo por software.
+ *
+ *  Para una prueba de banco sí se puede apagar la radio, medir y volver
+ *  a encenderla. Se pierde la conexión durante esos segundos, pero a
+ *  cambio se obtiene la lectura analógica real, que es lo único que
+ *  permite decidir si el sensor sirve y dónde poner el umbral.          */
+void diagnosticoADC2(uint16_t segundos) {
+    bool monitor_previo = monitor_activo;
+    monitor_activo = false;   // no mezclar salidas durante la medida
+
+    Serial.println();
+    Serial.println("=========================================================");
+    Serial.printf ("  DIAGNOSTICO ANALOGICO  GPIO%d  (%u s)\n",
+                   PIN_SENSOR_WATER, segundos);
+    Serial.println("  Apagando WiFi: ADC2 no funciona con la radio activa.");
+    Serial.println("  Moja el sensor a mitad de la prueba y observa.");
+    Serial.println("=========================================================");
+
+    WiFi.disconnect(true, false);
+    WiFi.mode(WIFI_OFF);
+    vTaskDelay(600 / portTICK_PERIOD_MS);
+
+    // Sin pull-up: queremos ver la señal que entrega el sensor, no la
+    // que impone el ESP32.
+    pinMode(PIN_SENSOR_WATER, INPUT);
+
+    int minimo = 4095, maximo = 0;
+    uint16_t muestras = segundos * 2;   // una cada 500 ms
+
+    Serial.println("  seg |  ADC  | voltaje | digital | barra");
+    Serial.println("  ----+-------+---------+---------+--------------------");
+
+    for (uint16_t i = 0; i < muestras; i++) {
+        int raw = 0;
+        for (uint8_t k = 0; k < 8; k++) { raw += analogRead(PIN_SENSOR_WATER); delayMicroseconds(200); }
+        raw /= 8;
+        int dig = digitalRead(PIN_SENSOR_WATER);
+
+        if (raw < minimo) minimo = raw;
+        if (raw > maximo) maximo = raw;
+
+        // Barra proporcional: la variación se ve mucho antes de forma
+        // gráfica que leyendo columnas de números.
+        char barra[21];
+        int  n = map(raw, 0, 4095, 0, 20);
+        for (int b = 0; b < 20; b++) barra[b] = (b < n) ? '#' : '.';
+        barra[20] = '\0';
+
+        Serial.printf("  %3u | %4d  |  %.2fV  |    %d    | %s\n",
+                      i / 2, raw, raw * ADC_VREF / ADC_BITS, dig, barra);
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+
+    Serial.println("  ----+-------+---------+---------+--------------------");
+    Serial.printf ("  Minimo=%d  Maximo=%d  Excursion=%d cuentas (%.2fV)\n",
+                   minimo, maximo, maximo - minimo,
+                   (maximo - minimo) * ADC_VREF / ADC_BITS);
+    if (maximo - minimo < 200) {
+        Serial.println("  >> SIN VARIACION APRECIABLE.");
+        Serial.println("     El sensor no esta llegando al pin. Revisa:");
+        Serial.println("       - alimentacion del modulo (3.3V) y GND comun");
+        Serial.println("       - que el cable sea de la salida ANALOGICA (AO), no DO");
+        Serial.println("       - continuidad del cable hasta GPIO4");
+    } else {
+        int umbral = (minimo + maximo) / 2;
+        Serial.printf ("  >> Variacion detectada. Umbral sugerido: %d cuentas\n", umbral);
+        Serial.println("     Mueve el sensor a GPIO32 y usa este valor para calibrar.");
+    }
+    Serial.println("=========================================================");
+
+    // Restaurar el pin al modo de operación y reencender la radio
+    pinMode(PIN_SENSOR_WATER, NIVEL_MODO_DIGITAL ? INPUT_PULLUP : INPUT);
+    WiFi.mode(WIFI_STA);
+    Serial.println("  WiFi reactivado, la tarea de red reconectara sola.");
+    Serial.println();
+    monitor_activo = monitor_previo;
+}
+
 void imprimirSensores() {
     Serial.println();
     Serial.println("+-----------------+--------+------+-----------+------------------+");
@@ -508,10 +622,11 @@ void imprimirSensores() {
     Serial.printf ("  Nivel: referencia seco=%d, umbral de caida=%d, actual=%d (delta %d)\n",
                    nivel_adc_seco, NIVEL_DELTA_MIN, suelo_raw,
                    nivel_adc_seco - suelo_raw);
-    Serial.printf ("  EC:    P1 ADC %d = %d uS/cm   |   P2 ADC %d = %d uS/cm\n",
-                   ec_adc_p1, ec_us_p1, ec_adc_p2, ec_us_p2);
-    if (ec_adc_p1 == EC_ADC_P1_DEF && ec_adc_p2 == EC_ADC_P2_DEF)
-        Serial.println("  AVISO: EC sin calibrar. El valor en uS/cm no es fiable.");
+    Serial.printf ("  TDS:   curva del fabricante · factor %.1f · ajuste k=%.3f\n",
+                   TDS_FACTOR, tds_k);
+    Serial.printf ("         compensado a %.0f C usando %s\n", TDS_TEMP_REF,
+                   hdcPresente ? "el HDC1080 (temp. del AIRE, no del agua)"
+                               : "un valor fijo de 25 C");
     Serial.println();
 }
 
@@ -1083,7 +1198,8 @@ void tarea_telemetria(void* pv) {
             s["agua"]   = hay_agua;          // detector de nivel, no porcentaje
         }
         if (mods.sensor_ec || mods.simulacion) {
-            s["ec"] = round(ec_us_cm * 10) / 10.0;   // uS/cm
+            s["ec"]  = round(ec_us_cm * 10) / 10.0;   // uS/cm
+            s["tds"] = round(tds_ppm * 10) / 10.0;    // ppm
         }
         if (mods.sensor_ph || mods.simulacion) {
             s["ph"] = round(ph * 100) / 100.0;
@@ -1346,15 +1462,25 @@ void tarea_sensor_ec(void* pv) {
 
         if (!mods.sensor_ec) continue;
 
-        int raw = leerADC(PIN_EC_SENSOR);
-        float us = ecRawAMicroSiemens(raw);
+        // Temperatura del HDC1080 si esta disponible; si no, la de
+        // referencia. Sin compensar, la misma disolucion leeria distinto
+        // segun el dia.
+        float tempC = (hdcPresente && temperatura_HDC > 0.0f)
+                    ? temperatura_HDC : TDS_TEMP_FALLBACK;
+
+        float mv  = leerTDSmV();
+        float ppm = tdsDesdeVoltaje(mv, tempC);
+        float us  = ppmAMicroSiemens(ppm);
 
         if (xSemaphoreTake(xMutexDatos, portMAX_DELAY) == pdTRUE) {
-            ec_raw   = raw;
+            tds_mv   = mv;
+            tds_ppm  = ppm;
+            ec_raw   = (int)mv;
             ec_us_cm = us;
             xSemaphoreGive(xMutexDatos);
         }
-        logInfoF("EC", "raw=%-5d -> %.0f uS/cm", raw, us);
+        logInfoF("TDS", "%.0f mV @ %.1f C  ->  %.0f ppm  =  %.0f uS/cm",
+                 mv, tempC, ppm, us);
     }
 }
 
@@ -1472,7 +1598,6 @@ void tarea_test_valvulas(void* pv) {
  *
  *  Lee los pines directamente y no depende de los módulos de sensores,
  *  para poder diagnosticar hardware aunque todo lo demás esté apagado.  */
-volatile bool monitor_activo = false;
 
 void tarea_monitor(void* pv) {
     bool aviso_sim_dado = false;
@@ -1502,16 +1627,19 @@ void tarea_monitor(void* pv) {
         // El monitor lee el hardware SIEMPRE, aunque los módulos estén
         // apagados: es una herramienta de diagnóstico, no de operación.
         int nivel = leerNivelRaw();
-        int ec    = leerADC(PIN_EC_SENSOR);
 
         Serial.printf("[MON] nivel: %-5d", nivel);
         if (!NIVEL_MODO_DIGITAL)
             Serial.printf(" (%.2fV)", nivel * ADC_VREF / ADC_BITS);
         else
             Serial.printf(" (digital)");
-        Serial.printf(" %-4s | ec: %-5d (%.2fV -> %.0f uS/cm) | ",
+        float mv_ec = leerTDSmV();
+        float t_ref = (hdcPresente && temperatura_HDC > 0.0f)
+                    ? temperatura_HDC : TDS_TEMP_FALLBACK;
+        float ppm   = tdsDesdeVoltaje(mv_ec, t_ref);
+        Serial.printf(" %-4s | tds: %4.0f mV -> %5.0f ppm (%5.0f uS/cm) | ",
                       hayAgua(nivel) ? "AGUA" : "seco",
-                      ec, ec * ADC_VREF / ADC_BITS, ecRawAMicroSiemens(ec));
+                      mv_ec, ppm, ppmAMicroSiemens(ppm));
 
         // Intentar levantar el HDC1080 aquí mismo si aún no responde: el
         // sensor puede conectarse en caliente durante una prueba de banco.
@@ -1585,12 +1713,12 @@ void tarea_consola(void* pv) {
                 Serial.println("    sensores         tabla con crudos y valores");
                 Serial.println("    mon on | mon off monitor continuo (para calibrar)");
                 Serial.println("    i2c              escanea el bus I2C");
+                Serial.println("    adc2 [seg]       lee GPIO4 apagando el WiFi (def. 40 s)");
                 Serial.println("    sim on | sim off valores sinteticos (enmascara el hardware)");
                 Serial.println();
                 Serial.println("  CALIBRACION");
                 Serial.println("    cal nivel        fija la referencia en SECO");
-                Serial.println("    cal ec1 1413     punto bajo, sonda en el patron");
-                Serial.println("    cal ec2 12880    punto alto");
+                Serial.println("    cal tds <ppm>    ajuste fino contra una referencia");
                 Serial.println();
                 Serial.println("  PRUEBAS");
                 Serial.println("    test on | test off   barrido secuencial");
@@ -1610,6 +1738,11 @@ void tarea_consola(void* pv) {
             else if (linea == "sim on")   { setModulo("simulacion", true);  imprimirModulos(); }
             else if (linea == "sim off")  { setModulo("simulacion", false); imprimirModulos(); }
             else if (linea == "i2c")      { escanearI2C(); }
+            else if (linea == "adc2" || linea.startsWith("adc2 ")) {
+                int seg = linea.length() > 5 ? linea.substring(5).toInt() : 40;
+                if (seg < 5 || seg > 180) seg = 40;
+                diagnosticoADC2((uint16_t)seg);
+            }
             else if (linea == "mon on")   {
                 monitor_activo = true;
                 Serial.println("[MON] Monitor continuo ON — 'mon off' para parar");
@@ -1635,8 +1768,7 @@ void tarea_consola(void* pv) {
 
             // ── Calibración ─────────────────────────────────────
             //  'cal nivel'        captura la referencia en seco
-            //  'cal ec1 1413'     punto bajo, con la sonda en el patron
-            //  'cal ec2 12880'    punto alto
+            //  'cal tds <ppm>'    ajusta k contra una referencia conocida
             else if (linea == "cal nivel") {
                 nivel_adc_seco = leerNivelRaw();
                 guardarCalibracion();
@@ -1644,24 +1776,33 @@ void tarea_consola(void* pv) {
                 Serial.printf("      Se dara agua por detectada al bajar de %d.\n",
                               nivel_adc_seco - NIVEL_DELTA_MIN);
             }
-            else if (linea.startsWith("cal ec1 ") || linea.startsWith("cal ec2 ")) {
-                bool punto1 = linea.startsWith("cal ec1 ");
-                int  us     = linea.substring(8).toInt();
-                if (us <= 0) {
-                    Serial.println("[CAL] Indica los uS/cm del patron. Ej: cal ec1 1413");
+            // Ajuste fino del TDS. NO es una calibracion de dos puntos:
+            // el modulo ya trae la curva del fabricante. Esto solo corrige
+            // una desviacion sistematica contra una referencia conocida.
+            else if (linea.startsWith("cal tds ")) {
+                float ref = linea.substring(8).toFloat();
+                if (ref <= 0.0f) {
+                    Serial.println("[CAL] Indica los ppm de referencia. Ej: cal tds 350");
                 } else {
-                    int raw = leerADC(PIN_EC_SENSOR);
-                    if (punto1) { ec_adc_p1 = raw; ec_us_p1 = us; }
-                    else        { ec_adc_p2 = raw; ec_us_p2 = us; }
-                    guardarCalibracion();
-                    Serial.printf("[CAL] Punto %d: ADC %d = %d uS/cm\n",
-                                  punto1 ? 1 : 2, raw, us);
-                    if (ec_adc_p1 != ec_adc_p2)
-                        Serial.printf("      Pendiente: %.2f uS/cm por cuenta\n",
-                                      (float)(ec_us_p2 - ec_us_p1) /
-                                      (float)(ec_adc_p2 - ec_adc_p1));
-                    else
-                        Serial.println("      AVISO: los dos puntos dan el mismo ADC.");
+                    float t = (hdcPresente && temperatura_HDC > 0.0f)
+                            ? temperatura_HDC : TDS_TEMP_FALLBACK;
+                    float k_previo = tds_k;
+                    tds_k = 1.0f;                          // medir sin correccion
+                    float mv    = leerTDSmV();
+                    float bruto = tdsDesdeVoltaje(mv, t);
+                    if (bruto < 1.0f) {
+                        tds_k = k_previo;
+                        Serial.println("[CAL] Lectura casi nula. Sonda en el agua?");
+                    } else {
+                        tds_k = ref / bruto;
+                        guardarCalibracion();
+                        Serial.printf("[CAL] %.0f mV -> %.0f ppm sin corregir
+", mv, bruto);
+                        Serial.printf("      Referencia %.0f ppm  =>  k = %.4f
+", ref, tds_k);
+                        if (tds_k < 0.5f || tds_k > 2.0f)
+                            Serial.println("      AVISO: correccion mayor del 100 %. Revisa la referencia.");
+                    }
                 }
             }
             else if (linea == "cal") { imprimirSensores(); }
