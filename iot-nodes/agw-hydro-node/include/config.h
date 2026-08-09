@@ -190,6 +190,49 @@
 //  esos datos se generaron sin supervision del gateway.
 #define PROG_SIN_GATEWAY_S          900   // 15 min
 
+// ============================================================
+//  ENCLAVAMIENTOS DE SEGURIDAD
+// ============================================================
+//  Condiciones que el nodo comprueba por si mismo, SIEMPRE, hayan
+//  llegado o no ordenes del gateway. Son el ultimo filtro entre una
+//  configuracion equivocada y un invernadero inundado.
+//
+//  Un parametro mal enviado por la Pi, un JSON corrupto o un bug en el
+//  scheduler no pueden traducirse en una bomba funcionando toda la
+//  noche. El nodo desobedece si la orden es peligrosa.
+
+//  La bomba nunca funciona mas de esto seguido, diga lo que diga el
+//  programa. Protege el motor de trabajar en seco si el tanque se vacia.
+#define SEG_MAX_BOMBA_CONTINUA_S   3600   // 1 hora
+
+//  Tiempo minimo entre el fin de un riego y el inicio del siguiente.
+//  Evita que una configuracion con descanso 0 encienda y apague el rele
+//  continuamente, que lo destruiria en horas.
+#define SEG_MIN_ENTRE_RIEGOS_S       30
+
+//  Sobretemperatura: la lampara es la principal fuente de calor del
+//  habitaculo. Si el aire se dispara se apaga aunque toque fotoperiodo,
+//  y se reanuda al bajar. La histeresis evita el parpadeo del rele.
+#define SEG_TEMP_CORTE_LUZ_C       38.0f
+#define SEG_TEMP_REANUDAR_LUZ_C    34.0f
+
+//  Si el sensor de nivel ya detecta agua ANTES de empezar el riego de
+//  tierra, el sustrato sigue humedo del ciclo anterior: no se riega.
+#define SEG_VERIFICAR_ANTES_RIEGO  true
+
+// ============================================================
+//  AUTONOMIA SIN GATEWAY
+// ============================================================
+//  El nodo lleva su propio contador de segundos desde el ultimo riego
+//  de tierra. Con hora valida manda el calendario que envia la Pi; sin
+//  ella, manda este contador. Asi el riego de tierra ocurre igual
+//  aunque la Raspberry no aparezca nunca.
+//
+//  Se persiste en NVS cada hora: en un corte de luz se pierde como
+//  mucho una hora de cuenta, despreciable frente a un ciclo de 15 dias.
+//  Escribir mas a menudo desgastaria la flash sin ganar nada.
+#define AUTO_GUARDAR_CONTADOR_S    3600   // Cada hora
+
 // ------------------------------------------------------------
 //  Nivel de log por el puerto serie
 // ------------------------------------------------------------

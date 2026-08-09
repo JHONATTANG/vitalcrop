@@ -231,9 +231,14 @@ static Programa prog = {
 volatile bool   hora_valida     = false;
 volatile time_t ultimo_contacto = 0;   // epoch del ultimo mensaje del gateway
 
-// --- Riego de tierra: calendario acordado con la Pi ---
-volatile time_t proximo_riego_tierra = 0;   // epoch, 0 = sin programar
-volatile time_t ultimo_riego_tierra  = 0;
+// --- Riego de tierra: dos relojes ---
+//  Con hora valida manda el calendario que envia la Pi.
+//  Sin ella manda `seg_desde_riego_tierra`, un contador propio que el
+//  nodo incrementa por su cuenta. Asi el riego de tierra ocurre igual
+//  aunque la Raspberry no aparezca nunca.
+volatile time_t   proximo_riego_tierra   = 0;   // epoch, 0 = sin programar
+volatile time_t   ultimo_riego_tierra    = 0;
+volatile uint32_t seg_desde_riego_tierra = 0;   // contador autonomo
 
 // --- Estado de ejecucion, se reporta en el status ---
 volatile bool regando_hidro  = false;
@@ -244,16 +249,10 @@ volatile bool huerfano       = false;   // sin noticias del gateway
 // --- Nivel de log (0=silencio … 4=depuracion) ---
 volatile uint8_t log_nivel = LOG_NIVEL_DEF;
 
-// --- Actuadores ---
-volatile int  ESTADO_ACTUADORES           = HIGH;
-int           tiempo_ciclo_riego          = 2000;
-int           tiempo_ciclo_descanso       = 5000;
-int           tiempo_ciclo_riego_noche    = 5000;
-int           tiempo_ciclo_descanso_noche = 12500;
-int           tiempo_descanso_ciclos      = 20000;
-volatile int  DESCANSO_NOCTURNO           = LOW;
-int           ciclos_riego                = 5;
-volatile bool RIEGO_FORZADO               = false;
+// --- Riego manual: gana sobre los ciclos automaticos ---
+//  Los tiempos de ciclo ya no viven aqui: los define el struct Programa,
+//  que empuja la Raspberry y persiste en NVS.
+volatile bool RIEGO_FORZADO = false;
 
 // --- Período de telemetría (configurable en caliente) ---
 volatile uint32_t periodo_telemetria_ms = INTERVAL_TELEMETRY;
@@ -365,6 +364,7 @@ bool esDeDia() {
  *  produjeron sin referencia horaria.                                  */
 bool modoDegradado() { return !hora_valida; }
 
+
 // ============================================================
 //  PERSISTENCIA DE MÓDULOS EN NVS
 // ============================================================
@@ -427,6 +427,7 @@ void guardarPrograma() {
     prefs.putULong("p_prox_tie", (uint32_t)proximo_riego_tierra);
     prefs.putULong("p_ult_tie",  (uint32_t)ultimo_riego_tierra);
     prefs.putUChar("p_log",      log_nivel);
+    prefs.putUInt ("p_seg_tie",  seg_desde_riego_tierra);
     prefs.end();
 }
 
@@ -444,6 +445,7 @@ void cargarPrograma() {
     proximo_riego_tierra        = (time_t)prefs.getULong("p_prox_tie", 0);
     ultimo_riego_tierra         = (time_t)prefs.getULong("p_ult_tie",  0);
     log_nivel                   = prefs.getUChar ("p_log",     LOG_NIVEL_DEF);
+    seg_desde_riego_tierra      = prefs.getUInt  ("p_seg_tie", 0);
     prefs.end();
 }
 
@@ -476,12 +478,18 @@ void imprimirPrograma() {
             Serial.printf ("  Proximo riego de tierra: %04d-%02d-%02d %02d:00\n",
                            tp.tm_year + 1900, tp.tm_mon + 1, tp.tm_mday, tp.tm_hour);
         } else {
-            Serial.println("  Riego de tierra SIN PROGRAMAR (la Pi debe enviar la fecha)");
+            Serial.println("  Riego de tierra por CONTADOR PROPIO (la Pi no envio fecha)");
         }
     } else {
         Serial.println("  SIN HORA VALIDA — modo degradado: se asume dia permanente");
-        Serial.println("  La Raspberry debe enviar {\"cmd\":\"set_hora\",\"epoch\":...}");
+        Serial.println("  La Raspberry deberia enviar {\"cmd\":\"set_hora\",\"epoch\":...}");
     }
+    uint32_t faltan = (uint32_t)prog.tierra_cada_dias * 86400UL;
+    faltan = seg_desde_riego_tierra >= faltan ? 0 : faltan - seg_desde_riego_tierra;
+    Serial.printf ("  Contador autonomo de tierra: %lu h transcurridas, "
+                   "faltan %lu h\n", seg_desde_riego_tierra / 3600, faltan / 3600);
+    Serial.printf ("  Enclavamientos: luz por calor %s | corte bomba a los %d s\n",
+                   luz_cortada_por_calor ? "ACTIVO" : "ok", SEG_MAX_BOMBA_CONTINUA_S);
     Serial.printf ("  Contacto con el gateway: %s\n",
                    huerfano ? "HUERFANO (sin noticias)" : "ok");
     Serial.println();
@@ -605,7 +613,9 @@ void imprimirModulos() {
     Serial.printf ("| sensor_hdc       | %-18s |\n", mods.sensor_hdc   ? "ON" : "off");
     Serial.printf ("| sensor_suelo     | %-18s |\n", mods.sensor_suelo ? "ON" : "off");
     Serial.printf ("| sensor_ph        | %-18s |\n", mods.sensor_ph    ? "ON" : "off");
-    Serial.printf ("| actuadores       | %-18s |\n", mods.actuadores   ? "ON" : "off");
+    Serial.printf ("| riego_hidro      | %-18s |\n", mods.riego_hidro  ? "ON" : "off");
+    Serial.printf ("| riego_tierra     | %-18s |\n", mods.riego_tierra ? "ON" : "off");
+    Serial.printf ("| ambiente         | %-18s |\n", mods.ambiente     ? "ON" : "off");
     Serial.printf ("| simulacion       | %-18s |\n", mods.simulacion   ? "ON" : "off");
     Serial.printf ("| ahorro_wifi      | %-18s |\n", mods.ahorro_wifi  ? "ON (~25mA)" : "off (~120mA)");
     Serial.printf ("| test_valvulas    | %-18s |\n", mods.test_valvulas ? "ON (barrido)" : "off");
@@ -875,6 +885,70 @@ void imprimirSensores() {
 }
 
 // ============================================================
+//  ENCLAVAMIENTOS DE SEGURIDAD
+// ============================================================
+/*  Estas comprobaciones las hace el nodo SIEMPRE, hayan llegado o no
+ *  ordenes del gateway. Son el ultimo filtro entre una configuracion
+ *  equivocada y un invernadero inundado: el nodo desobedece si la orden
+ *  es peligrosa, aunque venga de la Raspberry.                         */
+
+volatile uint32_t bomba_encendida_desde = 0;   // millis(), 0 = apagada
+volatile uint32_t fin_ultimo_riego      = 0;   // millis()
+volatile bool     luz_cortada_por_calor = false;
+
+/*  ¿Lleva la bomba demasiado tiempo seguido? Trabajar en seco si el
+ *  tanque se vacia quema el motor en minutos.                          */
+bool bombaExcedeTiempo() {
+    if (bomba_encendida_desde == 0) return false;
+    return (millis() - bomba_encendida_desde) > (SEG_MAX_BOMBA_CONTINUA_S * 1000UL);
+}
+
+/*  ¿Ha pasado el descanso minimo desde el ultimo riego? Un descanso de
+ *  0 segundos haria conmutar el rele sin parar y lo destruiria en horas. */
+bool descansoSuficiente() {
+    if (fin_ultimo_riego == 0) return true;
+    return (millis() - fin_ultimo_riego) > (SEG_MIN_ENTRE_RIEGOS_S * 1000UL);
+}
+
+/*  Sobretemperatura. La lampara es la principal fuente de calor del
+ *  habitaculo; si el aire se dispara se apaga aunque toque fotoperiodo.
+ *  La histeresis evita que el rele parpadee en el umbral.
+ *
+ *  Solo actua con lectura valida del HDC1080: sin sensor no se puede
+ *  afirmar que haga calor, y apagar la luz por sospecha seria peor.    */
+bool luzPermitidaPorTemperatura() {
+    if (!hdcPresente || temperatura_HDC <= 0.0f) return true;
+
+    if (!luz_cortada_por_calor && temperatura_HDC >= SEG_TEMP_CORTE_LUZ_C) {
+        luz_cortada_por_calor = true;
+        logWarnF("SEGURIDAD", "Temperatura %.1f C >= %.1f: se apaga la luz",
+                 temperatura_HDC, SEG_TEMP_CORTE_LUZ_C);
+    } else if (luz_cortada_por_calor && temperatura_HDC <= SEG_TEMP_REANUDAR_LUZ_C) {
+        luz_cortada_por_calor = false;
+        logInfoF("SEGURIDAD", "Temperatura %.1f C: se reanuda la luz", temperatura_HDC);
+    }
+    return !luz_cortada_por_calor;
+}
+
+/*  ¿Toca regar la tierra?
+ *
+ *  Dos relojes, y basta con que uno diga que si:
+ *    · Con hora valida: el calendario que envio la Pi.
+ *    · Sin ella: el contador propio del nodo.
+ *
+ *  Este es el nucleo de la autonomia. La version anterior exigia hora
+ *  valida Y fecha programada, asi que un nodo que nunca hablara con la
+ *  Raspberry no regaba la tierra JAMAS.                                */
+bool tocaRegarTierra() {
+    if (hora_valida && proximo_riego_tierra > 0)
+        return time(nullptr) >= proximo_riego_tierra;
+
+    uint32_t intervalo = (uint32_t)prog.tierra_cada_dias * 86400UL;
+    return seg_desde_riego_tierra >= intervalo;
+}
+
+
+// ============================================================
 //  DIAGNÓSTICO
 // ============================================================
 void printResetReason() {
@@ -952,6 +1026,11 @@ void publicarStatus() {
     md["ambiente"]     = mods.ambiente;
     md["ahorro_wifi"]  = mods.ahorro_wifi;
 
+    JsonObject sg = st.createNestedObject("seguridad");
+    sg["luz_cortada_calor"] = luz_cortada_por_calor;
+    sg["bomba_excedida"]    = bombaExcedeTiempo();
+
+    st["seg_desde_riego_tierra"] = (uint32_t)seg_desde_riego_tierra;
     st["prox_riego_tierra"] = (uint32_t)proximo_riego_tierra;
     st["ult_riego_tierra"]  = (uint32_t)ultimo_riego_tierra;
 
@@ -1137,20 +1216,16 @@ String procesarComando(const JsonDocument& doc) {
         return String("umbral ") + var + " actualizado";
     }
 
-    // ── Modo nocturno ────────────────────────────────────────
-    if (!strcmp(cmd, "set_nocturno")) {
-        bool activo = doc["activo"] | false;
-        DESCANSO_NOCTURNO = activo ? HIGH : LOW;
-        logInfoF("CMD", "Modo nocturno: %s", activo ? "ON" : "OFF");
-        return String("nocturno = ") + (activo ? "ON" : "OFF");
-    }
-
     // ── Forzar riego ─────────────────────────────────────────
     if (!strcmp(cmd, "set_riego")) {
         bool enc = doc["encendido"] | false;
         RIEGO_FORZADO = enc;
-        ESTADO_ACTUADORES = enc ? LOW : HIGH;   // relés activo-bajo
-        logInfoF("CMD", "Riego forzado: %s", enc ? "ON" : "OFF");
+        // Bomba + valvula de hidroponia. El manual gana sobre los ciclos
+        // automaticos, que se apartan mientras dure.
+        salidaSet(0, enc);
+        salidaSet(2, enc);
+        if (!enc) regando_hidro = false;
+        logInfoF("CMD", "Riego manual: %s", enc ? "ON" : "OFF");
         return String("riego = ") + (enc ? "ON" : "OFF");
     }
 
@@ -2280,6 +2355,12 @@ void tarea_riego_hidro(void* pv) {
             continue;
         }
 
+        // Enclavamiento: respetar el descanso mínimo entre riegos
+        if (!descansoSuficiente()) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
         bool dia = esDeDia();
         uint32_t t_riego    = dia ? prog.hidro_riego_dia_s    : prog.hidro_riego_noche_s;
         uint32_t t_descanso = dia ? prog.hidro_descanso_dia_s : prog.hidro_descanso_noche_s;
@@ -2288,13 +2369,31 @@ void tarea_riego_hidro(void* pv) {
         salidaSet(2, true);
         salidaSet(0, true);
         regando_hidro = true;
-        logInfoF("HIDRO", "Riego ON  (%s, %lu s)", dia ? "dia" : "noche", t_riego);
+        bomba_encendida_desde = millis();
+        logInfoF("HIDRO", "Riego ON  (%s%s, %lu s)",
+                 dia ? "dia" : "noche",
+                 modoDegradado() ? ", degradado" : "", t_riego);
 
-        esperarSegundos(t_riego, &mods.riego_hidro);
+        // Espera troceada vigilando el enclavamiento de tiempo máximo:
+        // si el tanque se vacía, la bomba trabajaría en seco hasta
+        // quemarse. Prefiero cortar y avisar.
+        uint32_t transcurrido = 0;
+        while (transcurrido < t_riego * 1000UL) {
+            if (!mods.riego_hidro || mods.test_valvulas || RIEGO_FORZADO) break;
+            if (bombaExcedeTiempo()) {
+                logWarnF("SEGURIDAD", "Bomba lleva mas de %d s seguidos. Corte preventivo.",
+                         SEG_MAX_BOMBA_CONTINUA_S);
+                break;
+            }
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+            transcurrido += 500;
+        }
 
         salidaSet(0, false);
         salidaSet(2, false);
         regando_hidro = false;
+        bomba_encendida_desde = 0;
+        fin_ultimo_riego = millis();
         logInfoF("HIDRO", "Riego OFF (descanso %lu s)", t_descanso);
 
         esperarSegundos(t_descanso, &mods.riego_hidro);
@@ -2317,13 +2416,35 @@ void tarea_riego_tierra(void* pv) {
     for (;;) {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
 
+        // El contador propio avanza siempre, haya gateway o no. Es lo que
+        // permite que la tierra se riegue aunque la Pi nunca aparezca.
+        seg_desde_riego_tierra += 5;
+        if (seg_desde_riego_tierra % AUTO_GUARDAR_CONTADOR_S < 5) guardarPrograma();
+
         if (!mods.riego_tierra || mods.test_valvulas || RIEGO_FORZADO) continue;
-        if (!hora_valida || proximo_riego_tierra == 0) continue;
-        if (time(nullptr) < proximo_riego_tierra) continue;
+        if (!tocaRegarTierra()) continue;
+
+        // Con hora válida se respeta además la franja horaria elegida.
+        // Sin ella se riega en cuanto toque: mejor a deshora que nunca.
+        if (hora_valida && horaDelDia() != (int)prog.tierra_hora) continue;
 
         // --- Toca regar ---
         int referencia = leerNivelRaw();
-        logInfoF("TIERRA", "Iniciando riego. Referencia del sensor: %d", referencia);
+
+        // Enclavamiento: si el sensor ya acusa agua, el sustrato sigue
+        // húmedo del ciclo anterior. Regar encharcaría y pudriría raíz.
+        if (SEG_VERIFICAR_ANTES_RIEGO && hayAgua(referencia)) {
+            logWarn("TIERRA", "El sensor ya detecta agua: se omite este riego.");
+            seg_desde_riego_tierra = 0;
+            ultimo_riego_tierra = hora_valida ? time(nullptr) : 0;
+            if (hora_valida && proximo_riego_tierra > 0)
+                proximo_riego_tierra += (time_t)prog.tierra_cada_dias * 86400L;
+            guardarPrograma();
+            continue;
+        }
+
+        logInfoF("TIERRA", "Iniciando riego%s. Referencia del sensor: %d",
+                 hora_valida ? "" : " (sin hora, por contador propio)", referencia);
 
         salidaSet(1, true);            // válvula de tierra
         regando_tierra = true;
@@ -2352,15 +2473,29 @@ void tarea_riego_tierra(void* pv) {
             logWarnF("TIERRA", "Corte por TIEMPO tras %lu s sin deteccion. "
                                "Revisar el sensor de nivel.", transcurrido / 1000);
 
-        ultimo_riego_tierra  = time(nullptr);
-        proximo_riego_tierra = ultimo_riego_tierra +
-                               (time_t)prog.tierra_cada_dias * 86400L;
+        // Se reinician AMBOS relojes: el calendario si hay hora, y el
+        // contador propio siempre. Así el nodo queda consistente tanto si
+        // recupera contacto con la Pi como si sigue solo.
+        seg_desde_riego_tierra = 0;
+        fin_ultimo_riego = millis();
+        if (hora_valida) {
+            ultimo_riego_tierra  = time(nullptr);
+            proximo_riego_tierra = ultimo_riego_tierra +
+                                   (time_t)prog.tierra_cada_dias * 86400L;
+        }
         guardarPrograma();
 
-        struct tm t;
-        localtime_r((const time_t*)&proximo_riego_tierra, &t);
-        logInfoF("TIERRA", "Riego completado en %lu s. Proximo: %04d-%02d-%02d %02d:00",
-                 transcurrido / 1000, t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour);
+        if (hora_valida && proximo_riego_tierra > 0) {
+            struct tm t;
+            localtime_r((const time_t*)&proximo_riego_tierra, &t);
+            logInfoF("TIERRA", "Riego completado en %lu s. Proximo: %04d-%02d-%02d %02d:00",
+                     transcurrido / 1000, t.tm_year + 1900, t.tm_mon + 1,
+                     t.tm_mday, t.tm_hour);
+        } else {
+            logInfoF("TIERRA", "Riego completado en %lu s. Proximo en %u dias "
+                               "(contador propio, sin hora)",
+                     transcurrido / 1000, prog.tierra_cada_dias);
+        }
     }
 }
 
@@ -2384,15 +2519,20 @@ void tarea_ambiente(void* pv) {
             continue;
         }
 
-        bool debe_estar = esDeDia();
+        // El fotoperiodo dice cuándo toca; el enclavamiento térmico puede
+        // vetarlo. La lámpara es la principal fuente de calor y un
+        // habitáculo cerrado se dispara rápido.
+        bool debe_estar = esDeDia() && luzPermitidaPorTemperatura();
+
         if (debe_estar != estado_previo || primera_vez) {
             salidaSet(3, debe_estar);
             luz_encendida = debe_estar;
             estado_previo = debe_estar;
             primera_vez = false;
-            logInfoF("AMBIENTE", "Luz y ventilador %s%s",
+            logInfoF("AMBIENTE", "Luz y ventilador %s%s%s",
                      debe_estar ? "ON" : "OFF",
-                     modoDegradado() ? "  (sin hora: modo degradado)" : "");
+                     modoDegradado()       ? "  (sin hora: modo degradado)" : "",
+                     luz_cortada_por_calor ? "  (corte por temperatura)"    : "");
         }
     }
 }
