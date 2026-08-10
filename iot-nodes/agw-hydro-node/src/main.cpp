@@ -2579,6 +2579,12 @@ void tarea_ambiente(void* pv) {
                 salidaSet(3, false);
                 luz_encendida = false;
             }
+            // Olvidar el estado anterior. Sin esto, al reactivar el módulo
+            // la comparación `debe_estar != estado_previo` daba falso y la
+            // luz no volvía a encenderse: el módulo quedaba activo pero
+            // inerte, sin ningún mensaje que lo delatara.
+            primera_vez = true;
+            estado_previo = false;
             continue;
         }
 
@@ -2587,7 +2593,12 @@ void tarea_ambiente(void* pv) {
         // habitáculo cerrado se dispara rápido.
         bool debe_estar = esDeDia() && luzPermitidaPorTemperatura();
 
-        if (debe_estar != estado_previo || primera_vez) {
+        // Reconciliación con el hardware: si alguien movió el relé por
+        // comando manual, hay que devolverlo a lo que dicta el programa.
+        // Antes solo se miraba el cambio lógico y la salida podía quedar
+        // desincronizada del estado interno.
+        if (debe_estar != estado_previo || primera_vez ||
+            estado_salida[3] != debe_estar) {
             salidaSet(3, debe_estar);
             luz_encendida = debe_estar;
             estado_previo = debe_estar;
