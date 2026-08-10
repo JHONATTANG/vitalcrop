@@ -257,6 +257,10 @@ volatile uint32_t bomba_encendida_desde = 0;   // millis(), 0 = apagada
 volatile uint32_t fin_ultimo_riego      = 0;   // millis()
 volatile bool     luz_cortada_por_calor = false;
 
+// Diagnostico del keepalive MQTT: cuenta cuantas veces seguidas no se
+// pudo ejecutar clientPub.loop() por no conseguir el mutex.
+volatile uint8_t  loops_omitidos = 0;
+
 // --- Riego manual: gana sobre los ciclos automaticos ---
 //  Los tiempos de ciclo ya no viven aqui: los define el struct Programa,
 //  que empuja la Raspberry y persiste en NVS.
@@ -1033,6 +1037,7 @@ void publicarStatus() {
     JsonObject sg = st.createNestedObject("seguridad");
     sg["luz_cortada_calor"] = luz_cortada_por_calor;
     sg["bomba_excedida"]    = bombaExcedeTiempo();
+    sg["loops_omitidos"]    = loops_omitidos;
 
     st["seg_desde_riego_tierra"] = (uint32_t)seg_desde_riego_tierra;
     st["prox_riego_tierra"] = (uint32_t)proximo_riego_tierra;
@@ -1280,30 +1285,72 @@ void httpEnviarJson(int codigo, const JsonDocument& doc) {
     httpServer.send(codigo, "application/json", out);
 }
 
+/*  Vista completa del nodo. Debe reflejar TODO lo que expone el status
+ *  de MQTT: es el plano de control alternativo, y si muestra menos que
+ *  MQTT deja de servir para diagnosticar cuando el broker falla —
+ *  justo cuando más falta hace.                                       */
 void handleEstado() {
-    StaticJsonDocument<768> doc;
-    doc["id"]        = DEVICE_ID;
-    doc["fw"]        = FIRMWARE_VERSION;
-    doc["uptime_ms"] = millis();
-    doc["heap"]      = ESP.getFreeHeap();
-    doc["ip"]        = WiFi.localIP().toString();
-    doc["rssi"]      = WiFi.RSSI();
-    doc["ssid"]      = WiFi.SSID();
-    doc["mqtt_pub"]  = clientPub.connected();
-    doc["mqtt_sub"]  = clientSub.connected();
+    DynamicJsonDocument doc(1536);
+    doc["id"]         = DEVICE_ID;
+    doc["fw"]         = FIRMWARE_VERSION;
+    doc["uptime_ms"]  = millis();
+    doc["heap"]       = ESP.getFreeHeap();
+    doc["ip"]         = WiFi.localIP().toString();
+    doc["rssi"]       = WiFi.RSSI();
+    doc["ssid"]       = WiFi.SSID();
+    doc["mqtt_pub"]   = clientPub.connected();
+    doc["mqtt_sub"]   = clientSub.connected();
     doc["periodo_ms"] = periodo_telemetria_ms;
+
+    // Reloj y supervisión
+    doc["hora_valida"] = hora_valida;
+    doc["epoch"]       = (uint32_t)ahora();
+    doc["degradado"]   = modoDegradado();
+    doc["huerfano"]    = huerfano;
+    doc["es_dia"]      = esDeDia();
+
+    // Qué está ocurriendo AHORA en el hardware
+    JsonObject ej = doc.createNestedObject("ejecutando");
+    ej["riego_hidro"]  = regando_hidro;
+    ej["riego_tierra"] = regando_tierra;
+    ej["luz"]          = luz_encendida;
+    ej["manual"]       = RIEGO_FORZADO;
+
+    // Estado real de cada relé, por si el automático y la salida
+    // discrepasen: eso siempre indica un problema.
+    JsonArray sal = doc.createNestedArray("salidas");
+    for (uint8_t i = 0; i < 4; i++) {
+        JsonObject o = sal.createNestedObject();
+        o["n"]      = i + 1;
+        o["gpio"]   = PINES_RELE[i];
+        o["rol"]    = ALIAS_RELE[i];
+        o["estado"] = estado_salida[i];
+    }
 
     JsonObject m = doc.createNestedObject("modulos");
     modulosToJson(m);
 
+    JsonObject sg = doc.createNestedObject("seguridad");
+    sg["luz_cortada_calor"] = luz_cortada_por_calor;
+    sg["bomba_excedida"]    = bombaExcedeTiempo();
+
     JsonObject s = doc.createNestedObject("sensores");
     if (xSemaphoreTake(xMutexDatos, pdMS_TO_TICKS(200)) == pdTRUE) {
-        s["temp"]   = temperatura_HDC;
-        s["hum"]    = humedad_HDC;
-        s["hsuelo"] = humedad_suelo;
-        s["ph"]     = ph_g;
+        s["temp"]      = temperatura_HDC;
+        s["hum"]       = humedad_HDC;
+        s["agua"]      = hay_agua;
+        s["nivel_raw"] = suelo_raw;
+        s["ec"]        = ec_us_cm;
+        s["tds"]       = tds_ppm;
+        s["ph"]        = ph_g;
         xSemaphoreGive(xMutexDatos);
     }
+
+    // Aviso destacado: sin esto es fácil confundir valores sintéticos
+    // con lecturas reales, como ya ocurrió una vez.
+    if (mods.simulacion)
+        doc["AVISO"] = "SIMULACION ACTIVA - los sensores son sinteticos";
+
     httpEnviarJson(200, doc);
 }
 
@@ -1558,9 +1605,21 @@ void tarea_mqtt(void* pv) {
             }
         }
 
-        if (xSemaphoreTake(xMutexMqttPub, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // clientPub.loop() es quien envía el PINGREQ del keepalive. Si se
+        // salta varias veces seguidas, el broker da el nodo por muerto y
+        // publica el LWT aunque el ESP32 esté perfectamente vivo.
+        //
+        // Antes el timeout era de 100 ms y el loop se omitía en silencio
+        // cuando una publicación tenía el mutex tomado. Con keepalive de
+        // 20 s bastan un par de omisiones para provocar la desconexión.
+        if (xSemaphoreTake(xMutexMqttPub, pdMS_TO_TICKS(1500)) == pdTRUE) {
             clientPub.loop();
             xSemaphoreGive(xMutexMqttPub);
+            loops_omitidos = 0;
+        } else {
+            loops_omitidos++;
+            if (loops_omitidos == 3)
+                logWarn("MQTT-PUB", "Loop omitido 3 veces: riesgo de perder el keepalive");
         }
         clientSub.loop();
         vTaskDelay(50 / portTICK_PERIOD_MS);
