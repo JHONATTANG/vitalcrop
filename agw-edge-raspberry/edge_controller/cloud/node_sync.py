@@ -199,6 +199,19 @@ class NodeSync:
         except Exception as exc:
             log.warning("No se pudo registrar el riego de tierra", error=str(exc))
 
+        # Reenviar el programa con la fecha recalculada. El nodo se
+        # programa el siguiente riego por su cuenta, pero a la hora en
+        # que rego, no a la hora del calendario; y hasta el siguiente
+        # arranque del gateway las dos fechas quedaban discrepando sin
+        # que nada lo dijera. Un envio aqui las deja iguales.
+        #
+        # No se realimenta: esto solo corre cuando la fecha del nodo
+        # CAMBIA, y enviar el programa no hace que el nodo riegue.
+        try:
+            await self.enviar_programa(motivo="tras riego de tierra")
+        except Exception as exc:
+            log.warning("No se pudo reenviar el programa", error=str(exc))
+
     # ─────────────────────────────────────────────────────────────
 
     async def al_reasociarse(self, mac: str = "") -> None:

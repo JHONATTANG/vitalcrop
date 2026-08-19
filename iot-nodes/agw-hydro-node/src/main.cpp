@@ -1,8 +1,30 @@
 /*
  * ============================================================
  *  AGW — Nodo HIDROPÓNICO (IoT-node-26.001)
- *  Firmware v2.1.0 / Arduino + PlatformIO / ESP32 DevKit v1
+ *  Firmware v2.2.0 / Arduino + PlatformIO / ESP32 DevKit v1
  * ============================================================
+ *
+ *  NOVEDAD v2.2.0 — El nodo, ya en produccion
+ *  ------------------------------------------------------------
+ *  · Los modulos arrancan ENCENDIDOS. Ver config.h: el arranque de
+ *    fabrica es el cultivo funcionando, no el banco de pruebas.
+ *
+ *  · Cadencia de hidroponia del cultivo: de dia 5 min de riego y 10 de
+ *    descanso (4 riegos/hora); de noche 5 y 55 (1 riego/hora).
+ *
+ *  · Apagar la luz UN DIA sin desmontar el fotoperiodo:
+ *        {"cmd":"luz","encendida":false}     o   `luz off` por consola
+ *    El veto caduca solo al llegar hora_luz_off, asi que manana la luz
+ *    enciende a su hora sin que nadie rearme nada. Antes esto se hacia
+ *    apagando el modulo `ambiente`, que no vuelve solo: la luz se
+ *    quedaba apagada hasta que alguien se acordaba.
+ *
+ *  · BUFFER MQTT. PubSubClient trae 256 bytes y no avisa cuando algo no
+ *    cabe. El nodo tenia dos averias simultaneas por esto: el status
+ *    (~700 B) no se publicaba nunca, y el set_programa del gateway
+ *    (~290 B) se descartaba al entrar mientras el set_hora, mas corto,
+ *    si pasaba. Resultado: hora correcta y programa equivocado, sin un
+ *    solo mensaje de error en ninguno de los dos lados.
  *
  *  NOVEDAD v2.1.0 — Llenado de tierra por sensor de nivel
  *  ------------------------------------------------------------
@@ -301,6 +323,18 @@ volatile uint32_t bomba_encendida_desde = 0;   // millis(), 0 = apagada
 volatile uint32_t fin_ultimo_riego      = 0;   // millis()
 volatile bool     luz_cortada_por_calor = false;
 
+// --- Veto manual de la luz, valido para UNA jornada ---
+//  Apagar la luz un dia concreto sin desmontar el fotoperiodo. El veto
+//  caduca solo al llegar la hora de apagado, asi que al dia siguiente la
+//  luz vuelve a encenderse a su hora sin que nadie tenga que acordarse
+//  de rearmarla. Olvidarse de rearmarla es justo lo que pasaba cuando
+//  esto se hacia apagando el modulo `ambiente`: la luz no volvia nunca.
+//
+//  Se persiste en NVS: un reinicio a media tarde no debe reencender una
+//  luz que se apago a proposito.
+volatile bool   luz_vetada      = false;
+volatile time_t veto_luz_hasta  = 0;   // epoch de caducidad, 0 = sin fecha
+
 // Diagnostico del keepalive MQTT: cuenta cuantas veces seguidas no se
 // pudo ejecutar clientPub.loop() por no conseguir el mutex.
 volatile uint8_t  loops_omitidos = 0;
@@ -484,6 +518,8 @@ void guardarPrograma() {
     prefs.putULong("p_ult_tie",  (uint32_t)ultimo_riego_tierra);
     prefs.putUChar("p_log",      log_nivel);
     prefs.putUInt ("p_seg_tie",  seg_desde_riego_tierra);
+    prefs.putBool ("p_veto_luz", luz_vetada);
+    prefs.putULong("p_veto_has", (uint32_t)veto_luz_hasta);
     prefs.end();
 }
 
@@ -502,6 +538,8 @@ void cargarPrograma() {
     ultimo_riego_tierra         = (time_t)prefs.getULong("p_ult_tie",  0);
     log_nivel                   = prefs.getUChar ("p_log",     LOG_NIVEL_DEF);
     seg_desde_riego_tierra      = prefs.getUInt  ("p_seg_tie", 0);
+    luz_vetada                  = prefs.getBool  ("p_veto_luz", false);
+    veto_luz_hasta              = (time_t)prefs.getULong("p_veto_has", 0);
     prefs.end();
 }
 
@@ -529,6 +567,16 @@ void imprimirPrograma() {
                        "EC %.0f -> %.0f uS/cm\n",
                        (uint32_t)ult_llenado_s, ult_llenado_sensor ? "SENSOR" : "TIEMPO",
                        ec_antes_llenado, ec_despues_llenado);
+    if (luz_vetada) {
+        if (veto_luz_hasta > 0) {
+            struct tm tv; localtime_r((const time_t*)&veto_luz_hasta, &tv);
+            Serial.printf ("  LUZ APAGADA A MANO hasta %04d-%02d-%02d %02d:00"
+                           "  ('luz on' la devuelve ya)\n",
+                           tv.tm_year + 1900, tv.tm_mon + 1, tv.tm_mday, tv.tm_hour);
+        } else {
+            Serial.println("  LUZ APAGADA A MANO, sin fecha de caducidad (no habia hora valida)");
+        }
+    }
     Serial.printf ("  Telemetria     cada %lu s\n", prog.telemetria_s);
     Serial.printf ("  Nivel de log   %u\n", log_nivel);
     Serial.println("+-------------------------------------------------------------+");
@@ -1047,6 +1095,83 @@ bool luzPermitidaPorTemperatura() {
     return !luz_cortada_por_calor;
 }
 
+/*  Momento en que termina la jornada de luz en curso, o la siguiente si
+ *  ya paso. Es hasta cuando dura un veto manual de la luz.
+ *
+ *  Devuelve 0 sin hora valida: entonces el veto no puede caducar solo y
+ *  se queda hasta que alguien vuelva a encender la luz a mano. Es la
+ *  opcion conservadora — mejor una luz apagada de mas, que el operador
+ *  ve enseguida, que una encendida toda la noche.                      */
+time_t finDeJornadaDeLuz() {
+    if (!hora_valida) return 0;
+
+    time_t ahora_t = time(nullptr);
+    struct tm t;
+    localtime_r(&ahora_t, &t);
+    t.tm_hour = prog.hora_luz_off;
+    t.tm_min  = 0;
+    t.tm_sec  = 0;
+
+    time_t objetivo = mktime(&t);
+    if (objetivo <= ahora_t) objetivo += 86400;   // ya paso hoy: manana
+    return objetivo;
+}
+
+/*  Veto manual de la luz para la jornada en curso.
+ *
+ *  `encendida = false` la apaga hasta el proximo horario de apagado;
+ *  `true` levanta el veto y devuelve el mando al fotoperiodo. El
+ *  programa no se toca en ningun caso: manana la luz se enciende a su
+ *  hora, que es justo lo que hace falta.
+ *
+ *  Antes esto se hacia apagando el modulo `ambiente`, y el modulo no
+ *  vuelve solo: la luz se quedaba apagada hasta que alguien se
+ *  acordaba. Un veto con fecha de caducidad no se olvida.              */
+String vetarLuz(bool encendida) {
+    if (encendida) {
+        if (!luz_vetada) return "la luz ya la gobierna el fotoperiodo";
+        luz_vetada     = false;
+        veto_luz_hasta = 0;
+        guardarPrograma();
+        logInfo("AMBIENTE", "Veto levantado: manda el fotoperiodo");
+        return "luz devuelta al fotoperiodo";
+    }
+
+    luz_vetada     = true;
+    veto_luz_hasta = finDeJornadaDeLuz();
+    guardarPrograma();
+
+    if (veto_luz_hasta == 0) {
+        logWarn("AMBIENTE", "Luz apagada a mano. SIN HORA VALIDA: el veto no "
+                            "caduca solo, hay que encenderla a mano.");
+        return "luz apagada (sin hora: no caduca sola)";
+    }
+
+    struct tm t;
+    localtime_r((const time_t*)&veto_luz_hasta, &t);
+    logInfoF("AMBIENTE", "Luz apagada a mano hasta las %02d:00 del %04d-%02d-%02d; "
+                         "despues vuelve el fotoperiodo",
+             t.tm_hour, t.tm_year + 1900, t.tm_mon + 1, t.tm_mday);
+
+    char msg[72];
+    snprintf(msg, sizeof(msg), "luz apagada hasta %04d-%02d-%02d %02d:00",
+             t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour);
+    return String(msg);
+}
+
+/*  Caducidad del veto. La comprueba la tarea de ambiente en cada ciclo:
+ *  al llegar la hora de apagado, el veto se levanta solo y la jornada
+ *  siguiente arranca con el fotoperiodo intacto.                       */
+void revisarCaducidadDelVeto() {
+    if (!luz_vetada || veto_luz_hasta == 0 || !hora_valida) return;
+    if (time(nullptr) < veto_luz_hasta) return;
+
+    luz_vetada     = false;
+    veto_luz_hasta = 0;
+    guardarPrograma();
+    logInfo("AMBIENTE", "El veto de luz caduco: manana enciende a su hora");
+}
+
 /*  ¿Toca regar la tierra?
  *
  *  Dos relojes, y basta con que uno diga que si:
@@ -1117,7 +1242,7 @@ void publicarStatus() {
     // la de riego de tierra es de las más justas de pila. Un documento de
     // 1 KB en la pila de esa tarea es lo que separa un status de un
     // desbordamiento silencioso justo después de regar.
-    DynamicJsonDocument st(1024);
+    DynamicJsonDocument st(1536);
     st["id"]      = DEVICE_ID;
     st["online"]  = true;
     st["uptime"]  = millis();
@@ -1152,6 +1277,12 @@ void publicarStatus() {
     sg["bomba_excedida"]    = bombaExcedeTiempo();
     sg["loops_omitidos"]    = loops_omitidos;
 
+    // Veto manual de la luz. Sin esto, la Pi vería la luz apagada en
+    // pleno fotoperiodo y no podría distinguir una orden deliberada de
+    // un relé averiado.
+    st["luz_vetada"]     = luz_vetada;
+    st["veto_luz_hasta"] = (uint32_t)veto_luz_hasta;
+
     st["seg_desde_riego_tierra"] = (uint32_t)seg_desde_riego_tierra;
     st["prox_riego_tierra"] = (uint32_t)proximo_riego_tierra;
     st["ult_riego_tierra"]  = (uint32_t)ultimo_riego_tierra;
@@ -1171,8 +1302,15 @@ void publicarStatus() {
     ti["ec_antes"]   = round(ec_antes_llenado * 10) / 10.0;
     ti["ec_despues"] = round(ec_despues_llenado * 10) / 10.0;
 
-    char buf[768];
-    serializeJson(st, buf);
+    // Se comprueba el tamano en vez de confiar en que quepa: un status
+    // truncado sigue siendo una cadena valida para serializeJson, pero
+    // es JSON roto para quien lo recibe, y el gateway lo descartaria sin
+    // decir por que. Mejor un aviso en el log del nodo.
+    char buf[1024];
+    size_t escritos = serializeJson(st, buf, sizeof(buf));
+    if (escritos >= sizeof(buf) - 1)
+        logWarn("STATUS", "El status no cabe en el buffer: se publica truncado");
+
     mqttPublish(TOPIC_STATUS, buf, false);
 }
 
@@ -1378,6 +1516,19 @@ String procesarComando(const JsonDocument& doc) {
         return String("riego = ") + (enc ? "ON" : "OFF");
     }
 
+    // ── Luz: apagarla por hoy sin desmontar el fotoperiodo ───
+    //    {"cmd":"luz","encendida":false}  apaga hasta el fin de jornada
+    //    {"cmd":"luz","encendida":true}   la devuelve al fotoperiodo
+    //
+    //    No confundir con set_modulo ambiente: eso apaga el automatismo
+    //    entero y no vuelve solo. Esto caduca al llegar hora_luz_off, de
+    //    modo que manana la luz enciende a su hora sin rearmar nada.
+    if (!strcmp(cmd, "luz")) {
+        if (!doc.containsKey("encendida"))
+            return "ERROR: falta \"encendida\": true o false";
+        return vetarLuz(doc["encendida"] | false);
+    }
+
     // ── Llenado de tierra bajo petición ──────────────────────
     //    No se ejecuta aquí: un llenado dura hasta PROG_TIERRA_MAX_S
     //    (10 min) y este código corre dentro del callback de MQTT o del
@@ -1508,6 +1659,8 @@ void handleEstado() {
     JsonObject sg = doc.createNestedObject("seguridad");
     sg["luz_cortada_calor"] = luz_cortada_por_calor;
     sg["bomba_excedida"]    = bombaExcedeTiempo();
+    sg["luz_vetada"]        = luz_vetada;
+    sg["veto_luz_hasta"]    = (uint32_t)veto_luz_hasta;
 
     // Programa vigente. Se expone entero para poder comprobar de un
     // vistazo qué plan está ejecutando el nodo, que no tiene por qué ser
@@ -1770,6 +1923,26 @@ void tarea_http(void* pv) {
 // ============================================================
 void tarea_mqtt(void* pv) {
     while (WiFi.status() != WL_CONNECTED) vTaskDelay(500 / portTICK_PERIOD_MS);
+
+    // EL BUFFER, ANTES QUE NADA. PubSubClient trae 256 bytes y no avisa
+    // cuando algo no cabe: al publicar devuelve false, y al RECIBIR se
+    // come el paquete en silencio, sin llamar al callback.
+    //
+    // Con 256 bytes este nodo tenia dos averias invisibles a la vez:
+    //   · El status (~700 B con el bloque de tierra) no se publicaba
+    //     nunca. La Pi no podia saber cuando se rego ni si el corte lo
+    //     dio el sensor. Se veian los datos de telemetria, que si caben,
+    //     asi que el nodo parecia sano.
+    //   · El set_programa del gateway (~290 B con los diez campos) se
+    //     descartaba al entrar. El set_hora, mucho mas corto, si pasaba:
+    //     el nodo tenia la hora correcta y el programa equivocado, que
+    //     es la combinacion mas dificil de sospechar.
+    //
+    // 1 KB por cliente sobre ~160 KB de heap libre. El coste es
+    // irrelevante al lado de lo que cuesta diagnosticar lo anterior.
+    if (!clientPub.setBufferSize(MQTT_BUFFER_BYTES) ||
+        !clientSub.setBufferSize(MQTT_BUFFER_BYTES))
+        logError("MQTT", "No se pudo reservar el buffer: mensajes grandes se perderan");
 
     clientPub.setServer(MQTT_BROKER, MQTT_PORT);
     clientPub.setKeepAlive(MQTT_KEEPALIVE);
@@ -2409,6 +2582,10 @@ void tarea_consola(void* pv) {
                 Serial.println("    adc2 [seg]       lee GPIO4 apagando el WiFi (def. 40 s)");
                 Serial.println("    sim on | sim off valores sinteticos (enmascara el hardware)");
                 Serial.println();
+                Serial.println("  LUZ");
+                Serial.println("    luz off          apaga la luz SOLO por hoy (manana enciende sola)");
+                Serial.println("    luz on           la devuelve al fotoperiodo ahora mismo");
+                Serial.println();
                 Serial.println("  TIERRA   se llena hasta que el sensor de nivel acusa el agua");
                 Serial.println("    llenar           llena AHORA y cuenta como el riego del ciclo");
                 Serial.println("    llenar prueba    llena AHORA sin tocar el calendario");
@@ -2542,6 +2719,10 @@ void tarea_consola(void* pv) {
                 d["cmd"] = "llenar_tierra"; d["prueba"] = true;
                 Serial.println(procesarComando(d));
             }
+            // 'luz off' apaga solo la jornada de hoy; el fotoperiodo
+            // sigue intacto y manana enciende a su hora.
+            else if (linea == "luz off") { Serial.println(vetarLuz(false)); }
+            else if (linea == "luz on")  { Serial.println(vetarLuz(true));  }
             else if (linea == "ec") {
                 StaticJsonDocument<64> d;
                 d["cmd"] = "medir_ec";
@@ -2993,10 +3174,16 @@ void tarea_ambiente(void* pv) {
             continue;
         }
 
-        // El fotoperiodo dice cuándo toca; el enclavamiento térmico puede
-        // vetarlo. La lámpara es la principal fuente de calor y un
-        // habitáculo cerrado se dispara rápido.
-        bool debe_estar = esDeDia() && luzPermitidaPorTemperatura();
+        // El veto manual dura una jornada y se levanta solo al llegar la
+        // hora de apagado. Comprobarlo aquí, y no al recibir el comando,
+        // es lo que hace que mañana la luz encienda sin que nadie tenga
+        // que rearmar nada.
+        revisarCaducidadDelVeto();
+
+        // El fotoperiodo dice cuándo toca; el enclavamiento térmico y el
+        // veto manual pueden vetarlo. La lámpara es la principal fuente
+        // de calor y un habitáculo cerrado se dispara rápido.
+        bool debe_estar = esDeDia() && luzPermitidaPorTemperatura() && !luz_vetada;
 
         // Reconciliación con el hardware: si alguien movió el relé por
         // comando manual, hay que devolverlo a lo que dicta el programa.
@@ -3008,10 +3195,11 @@ void tarea_ambiente(void* pv) {
             luz_encendida = debe_estar;
             estado_previo = debe_estar;
             primera_vez = false;
-            logInfoF("AMBIENTE", "Luz y ventilador %s%s%s",
+            logInfoF("AMBIENTE", "Luz y ventilador %s%s%s%s",
                      debe_estar ? "ON" : "OFF",
                      modoDegradado()       ? "  (sin hora: modo degradado)" : "",
-                     luz_cortada_por_calor ? "  (corte por temperatura)"    : "");
+                     luz_cortada_por_calor ? "  (corte por temperatura)"    : "",
+                     luz_vetada            ? "  (apagada a mano por hoy)"   : "");
         }
     }
 }

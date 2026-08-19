@@ -11,7 +11,7 @@
 // ------------------------------------------------------------
 #define DEVICE_ID         "IoT-node-26.001"
 #define DEVICE_TYPE       "hydro"
-#define FIRMWARE_VERSION  "2.1.0"
+#define FIRMWARE_VERSION  "2.2.0"
 
 // ------------------------------------------------------------
 //  Red WiFi
@@ -32,6 +32,13 @@
 // garantiza que un nodo VIVO siempre genere rx en menos de 20 s y nunca
 // sea confundido con uno caido.
 #define MQTT_KEEPALIVE    20
+
+// Buffer de PubSubClient, por cliente. Su valor de fabrica son 256 bytes
+// y es la causa mas probable de un mensaje que "no llega" sin error:
+// al publicar por encima devuelve false, y al recibir descarta el
+// paquete sin invocar el callback. El status de este nodo ronda los
+// 700 bytes y el set_programa del gateway los 290.
+#define MQTT_BUFFER_BYTES 1280
 
 // MQTT Autenticación — POR AHORA DESACTIVADA
 // Para activarla en el futuro:
