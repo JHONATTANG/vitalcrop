@@ -11,7 +11,7 @@
 // ------------------------------------------------------------
 #define DEVICE_ID         "IoT-node-26.001"
 #define DEVICE_TYPE       "hydro"
-#define FIRMWARE_VERSION  "2.0.0"
+#define FIRMWARE_VERSION  "2.1.0"
 
 // ------------------------------------------------------------
 //  Red WiFi
@@ -161,7 +161,16 @@
 // ------------------------------------------------------------
 //  Riego de tierra — por calendario, corte por sensor
 // ------------------------------------------------------------
-#define PROG_TIERRA_CADA_DIAS        15   // Periodicidad
+//  Periodicidad del llenado. Es el valor de FABRICA: lo que manda en
+//  operacion es prog.tierra_cada_dias, que vive en NVS y se cambia en
+//  caliente sin recompilar ni reflashear:
+//      {"cmd":"set_programa","tierra_cada_dias":9}
+//  o por consola serie:  tierra 9
+//  El rango util previsto para este cultivo es 8-13 dias; los limites de
+//  abajo son solo la barrera de seguridad contra un valor absurdo.
+#define PROG_TIERRA_CADA_DIAS        10   // Periodicidad por defecto
+#define PROG_TIERRA_DIAS_MIN          1
+#define PROG_TIERRA_DIAS_MAX        365
 #define PROG_TIERRA_HORA             7    // A las 07:00, con luz ya encendida
 
 //  Umbral de CORTE: mucho mas sensible que NIVEL_DELTA_MIN.
@@ -170,9 +179,32 @@
 //  encharca. Por eso son dos constantes distintas y no una.
 #define PROG_TIERRA_DELTA_CORTE     100   // cuentas de ADC
 
+//  Lecturas consecutivas que deben confirmar la caida antes de cortar.
+//  El ruido del ADC ronda las +-50 cuentas tras promediar, o sea la mitad
+//  del umbral de corte: una sola muestra desafortunada bastaria para
+//  abortar el llenado y dejar el sustrato a medias, con el log diciendo
+//  "agua detectada". Tres lecturas seguidas cuestan 1.5 s y lo descartan.
+#define PROG_TIERRA_CORTE_CONFIRMA    3
+
 //  Corte de seguridad por tiempo. Si el sensor se averia y nunca
 //  detecta, la valvula no puede quedarse abierta indefinidamente.
 #define PROG_TIERRA_MAX_S           600   // 10 min como maximo absoluto
+
+//  ¿El agua de la tierra llega por BOMBEO o por GRAVEDAD?
+//
+//  false → solo se abre la electrovalvula de tierra (salida 2). Es lo que
+//          hacia el firmware hasta ahora, y es correcto si el deposito
+//          esta elevado y el agua baja sola.
+//  true  → ademas arranca la motobomba (salida 3), igual que hace el
+//          riego de hidroponia. Necesario si ambas valvulas cuelgan del
+//          mismo colector presurizado por la bomba.
+//
+//  Elegir mal tiene coste en los dos sentidos, y por eso no se adivina:
+//  en false con bombeo, el llenado no da agua y siempre corta por tiempo;
+//  en true con gravedad, la bomba trabaja contra un circuito cerrado.
+//  Con la bomba activa siguen valiendo sus enclavamientos: el corte por
+//  tiempo maximo continuo y el registro de bomba_encendida_desde.
+#define PROG_TIERRA_USA_BOMBA      true
 
 // ------------------------------------------------------------
 //  Telemetría

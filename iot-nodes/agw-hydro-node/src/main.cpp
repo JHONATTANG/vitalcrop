@@ -1,8 +1,34 @@
 /*
  * ============================================================
  *  AGW — Nodo HIDROPÓNICO (IoT-node-26.001)
- *  Firmware v1.2.0 / Arduino + PlatformIO / ESP32 DevKit v1
+ *  Firmware v2.1.0 / Arduino + PlatformIO / ESP32 DevKit v1
  * ============================================================
+ *
+ *  NOVEDAD v2.1.0 — Llenado de tierra por sensor de nivel
+ *  ------------------------------------------------------------
+ *  REGLA DEL CULTIVO: la tierra se llena de agua hasta que el sensor de
+ *  nivel acusa la llegada del agua, y eso se repite cada N dias. N vale
+ *  10 de fabrica y se cambia en caliente, sin recompilar ni reflashear:
+ *
+ *      {"cmd":"set_programa","tierra_cada_dias":9}     por MQTT o HTTP
+ *      tierra 9                                        por consola serie
+ *
+ *  El valor persiste en NVS y al cambiarlo se recalcula la fecha del
+ *  proximo llenado, para que bajar de 10 a 8 dias se note ya en el ciclo
+ *  en curso y no en el siguiente.
+ *
+ *  Llenado bajo peticion, para el primer llenado y para las pruebas:
+ *
+ *      {"cmd":"llenar_tierra"}                cuenta como el riego del ciclo
+ *      {"cmd":"llenar_tierra","prueba":true}  llena sin tocar el calendario
+ *      {"cmd":"medir_ec"}                     conductividad puntual
+ *
+ *  El corte lo decide el sensor y no un temporizador: el volumen que
+ *  admite el sustrato cambia con lo seco que este y con lo que hayan
+ *  crecido las raices. Hay dos condiciones de corte —caida relativa a la
+ *  referencia del llenado y umbral absoluto de agua— y un tope de tiempo
+ *  por si el sensor se averia. Cada llenado registra la EC antes y
+ *  despues, y publica un status en cuanto termina.
  *
  *  NOVEDAD v1.2.0 — Módulos activables en caliente
  *  ------------------------------------------------------------
@@ -240,6 +266,22 @@ volatile time_t   proximo_riego_tierra   = 0;   // epoch, 0 = sin programar
 volatile time_t   ultimo_riego_tierra    = 0;
 volatile uint32_t seg_desde_riego_tierra = 0;   // contador autonomo
 
+// --- Llenado de tierra bajo peticion ---
+//  Un llenado manual NO puede ejecutarse dentro del callback de MQTT ni
+//  del handler HTTP: dura hasta 10 minutos y bloquearia el keepalive del
+//  broker, que es de 20 s. El comando solo deja la peticion aqui y la
+//  tarea de riego, que ya vive en su propio hilo, la recoge.
+volatile bool solicitud_llenado    = false;
+volatile bool solicitud_reprograma = true;   // ¿cuenta para el calendario?
+
+// --- Resultado del ultimo llenado, para el status y el informe ---
+volatile uint32_t ult_llenado_s       = 0;   // duracion en segundos
+volatile bool     ult_llenado_sensor  = false;  // ¿corto el sensor o el reloj?
+volatile int      ult_llenado_raw_ini = 0;
+volatile int      ult_llenado_raw_fin = 0;
+float ec_antes_llenado   = 0.0f;   // uS/cm justo antes de abrir la valvula
+float ec_despues_llenado = 0.0f;   // uS/cm justo despues de cerrarla
+
 // --- Estado de ejecucion, se reporta en el status ---
 volatile bool regando_hidro  = false;
 volatile bool regando_tierra = false;
@@ -473,8 +515,18 @@ void imprimirPrograma() {
                    prog.hidro_riego_dia_s, prog.hidro_descanso_dia_s);
     Serial.printf ("                 noche: %lu s riego / %lu s descanso\n",
                    prog.hidro_riego_noche_s, prog.hidro_descanso_noche_s);
-    Serial.printf ("  Tierra         cada %u dias a las %02d:00  (corte: delta>%d)\n",
-                   prog.tierra_cada_dias, prog.tierra_hora, PROG_TIERRA_DELTA_CORTE);
+    Serial.printf ("  Tierra         cada %u dias a las %02d:00 (ajustable: tierra <dias>)\n",
+                   prog.tierra_cada_dias, prog.tierra_hora);
+    Serial.printf ("                 se llena hasta que el nivel cae %d cuentas "
+                   "(%d lecturas seguidas)\n",
+                   PROG_TIERRA_DELTA_CORTE, PROG_TIERRA_CORTE_CONFIRMA);
+    Serial.printf ("                 tope de seguridad %d s si el sensor no responde\n",
+                   PROG_TIERRA_MAX_S);
+    if (ult_llenado_s > 0)
+        Serial.printf ("                 ultimo llenado: %lu s, corte por %s, "
+                       "EC %.0f -> %.0f uS/cm\n",
+                       (uint32_t)ult_llenado_s, ult_llenado_sensor ? "SENSOR" : "TIEMPO",
+                       ec_antes_llenado, ec_despues_llenado);
     Serial.printf ("  Telemetria     cada %lu s\n", prog.telemetria_s);
     Serial.printf ("  Nivel de log   %u\n", log_nivel);
     Serial.println("+-------------------------------------------------------------+");
@@ -689,7 +741,12 @@ bool hayAgua(int raw) {
  *  (saltos de 118 a 778 cuentas con la sonda quieta), y la mediana los
  *  descarta mientras que la media se los come.                          */
 float leerTDSmV() {
-    static uint16_t m[TDS_MUESTRAS];
+    // El buffer es local y no `static` a proposito: esta funcion la llaman
+    // tres tareas distintas (el sensor de EC, el monitor y la consola). Con
+    // un buffer compartido, dos lecturas simultaneas se pisaban las muestras
+    // a media ordenacion y la mediana salia de una mezcla de ambas. Son 64
+    // bytes de pila, que sobran incluso en la tarea mas ajustada.
+    uint16_t m[TDS_MUESTRAS];
     for (uint8_t i = 0; i < TDS_MUESTRAS; i++) {
         m[i] = (uint16_t)analogReadMilliVolts(PIN_EC_SENSOR);
         delayMicroseconds(400);
@@ -727,6 +784,40 @@ float tdsDesdeVoltaje(float mv, float tempC) {
 /*  ppm → µS/cm. El factor TDS/EC es el mismo que usa la curva.          */
 float ppmAMicroSiemens(float ppm) {
     return ppm / TDS_FACTOR;
+}
+
+/*  Medida de conductividad AHORA, al margen del modulo sensor_ec.
+ *
+ *  La tarea periodica solo lee si su modulo esta encendido, y encenderlo
+ *  arrastra telemetria continua. Para comprobar la EC en un momento
+ *  concreto —antes y despues de un llenado, o para verificar la sonda—
+ *  hace falta una medida puntual que no dependa de ese flag.
+ *
+ *  Publica el resultado en las mismas variables globales que la tarea,
+ *  para que el status, /estado y la tabla de sensores muestren siempre lo
+ *  ultimo medido, venga de donde venga.
+ *
+ *  Devuelve µS/cm.                                                      */
+float medirECAhora() {
+    // Con simulacion activa no se toca el hardware: devolver el valor
+    // sintetico es lo unico honesto, y evita mezclar en la misma serie
+    // lecturas reales con inventadas.
+    if (mods.simulacion) return ec_us_cm;
+
+    float tempC = (hdcPresente && temperatura_HDC > 0.0f)
+                ? temperatura_HDC : TDS_TEMP_FALLBACK;
+    float mv  = leerTDSmV();
+    float ppm = tdsDesdeVoltaje(mv, tempC);
+    float us  = ppmAMicroSiemens(ppm);
+
+    if (xSemaphoreTake(xMutexDatos, pdMS_TO_TICKS(200)) == pdTRUE) {
+        tds_mv   = mv;
+        tds_ppm  = ppm;
+        ec_raw   = (int)mv;
+        ec_us_cm = us;
+        xSemaphoreGive(xMutexDatos);
+    }
+    return us;
 }
 
 /*  Recorre el bus I2C y lista lo que responda. Es la primera prueba que
@@ -871,13 +962,16 @@ void imprimirSensores() {
     Serial.printf ("| HDC1080 humedad | I2C22  | %-4s | %-9s | %.2f %%\n",
                    mods.sensor_hdc ? "ON" : "off",
                    hdcPresente ? "0x40 ok" : "SIN CHIP", humedad_HDC);
-    Serial.printf ("| Nivel agua      | GPIO36 | %-4s | ADC %-5d | %s\n",
-                   mods.sensor_suelo ? "ON" : "off", suelo_raw,
+    // Los pines salen de las macros y no escritos a mano: la tabla decía
+    // GPIO36 cuando el cable lleva tiempo en el 32, y una tabla de
+    // diagnóstico que miente sobre el pin cuesta una tarde de sondeos.
+    Serial.printf ("| Nivel agua      | GPIO%-2d | %-4s | ADC %-5d | %s\n",
+                   PIN_SENSOR_WATER, mods.sensor_suelo ? "ON" : "off", suelo_raw,
                    hay_agua ? "HAY AGUA" : "seco");
-    Serial.printf ("| Conductividad   | GPIO33 | %-4s | ADC %-5d | %.0f uS/cm\n",
-                   mods.sensor_ec ? "ON" : "off", ec_raw, ec_us_cm);
-    Serial.printf ("| pH (retirado)   | GPIO34 | %-4s | ADC %-5d | %.2f\n",
-                   mods.sensor_ph ? "ON" : "off", ph_raw, ph_g);
+    Serial.printf ("| Conductividad   | GPIO%-2d | %-4s | ADC %-5d | %.0f uS/cm\n",
+                   PIN_EC_SENSOR, mods.sensor_ec ? "ON" : "off", ec_raw, ec_us_cm);
+    Serial.printf ("| pH (retirado)   | GPIO%-2d | %-4s | ADC %-5d | %.2f\n",
+                   PIN_PH_SENSOR, mods.sensor_ph ? "ON" : "off", ph_raw, ph_g);
     Serial.println("+-----------------+--------+------+-----------+------------------+");
     if (mods.simulacion)
         Serial.println("  >> SIMULACION ACTIVA: los valores son sinteticos, no del hardware <<");
@@ -1004,7 +1098,11 @@ bool mqttPublish(const char* topic, const char* payload, bool retain = false) {
  *  y si el nodo sigue bajo su supervisión. Es lo que alimenta la vista
  *  de la aplicación web.                                                */
 void publicarStatus() {
-    StaticJsonDocument<640> st;
+    // En el heap y no en la pila: esta función la llaman cinco tareas, y
+    // la de riego de tierra es de las más justas de pila. Un documento de
+    // 1 KB en la pila de esa tarea es lo que separa un status de un
+    // desbordamiento silencioso justo después de regar.
+    DynamicJsonDocument st(1024);
     st["id"]      = DEVICE_ID;
     st["online"]  = true;
     st["uptime"]  = millis();
@@ -1043,7 +1141,22 @@ void publicarStatus() {
     st["prox_riego_tierra"] = (uint32_t)proximo_riego_tierra;
     st["ult_riego_tierra"]  = (uint32_t)ultimo_riego_tierra;
 
-    char buf[640];
+    // Regla y resultado del último llenado de tierra. Va en el status y
+    // no en la telemetría porque es un evento, no una medida periódica:
+    // la Pi lo necesita para saber si el corte lo dio el sensor o el
+    // reloj de seguridad, que es la diferencia entre un ciclo correcto y
+    // uno en el que el sensor ha dejado de responder.
+    JsonObject ti = st.createNestedObject("tierra");
+    ti["cada_dias"]  = prog.tierra_cada_dias;
+    ti["hora"]       = prog.tierra_hora;
+    ti["ult_seg"]    = (uint32_t)ult_llenado_s;
+    ti["corte"]      = ult_llenado_sensor ? "sensor" : "tiempo";
+    ti["raw_ini"]    = ult_llenado_raw_ini;
+    ti["raw_fin"]    = ult_llenado_raw_fin;
+    ti["ec_antes"]   = round(ec_antes_llenado * 10) / 10.0;
+    ti["ec_despues"] = round(ec_despues_llenado * 10) / 10.0;
+
+    char buf[768];
     serializeJson(st, buf);
     mqttPublish(TOPIC_STATUS, buf, false);
 }
@@ -1092,8 +1205,20 @@ String procesarComando(const JsonDocument& doc) {
             prog.hidro_riego_noche_s = acotar(doc["hidro_riego_noche_s"] | 600, 10, 21600);
         if (doc.containsKey("hidro_descanso_noche_s"))
             prog.hidro_descanso_noche_s = acotar(doc["hidro_descanso_noche_s"] | 7200, 10, 86400);
-        if (doc.containsKey("tierra_cada_dias"))
-            prog.tierra_cada_dias = acotar(doc["tierra_cada_dias"] | 15, 1, 365);
+        // Periodicidad del llenado de tierra. Es el parámetro que más se
+        // toca en operación —bajarlo a 8-9 días en calor, subirlo a 12-13
+        // en invierno— así que se cambia en caliente y persiste en NVS.
+        if (doc.containsKey("tierra_cada_dias")) {
+            prog.tierra_cada_dias = acotar(doc["tierra_cada_dias"] | PROG_TIERRA_CADA_DIAS,
+                                           PROG_TIERRA_DIAS_MIN, PROG_TIERRA_DIAS_MAX);
+            // Recalcular la fecha ya programada sobre el nuevo intervalo.
+            // Sin esto, bajar de 10 a 8 días no adelantaba nada: el
+            // próximo llenado seguía clavado donde lo dejó el anterior y
+            // el cambio no se notaba hasta el ciclo siguiente.
+            if (ultimo_riego_tierra > 0)
+                proximo_riego_tierra = ultimo_riego_tierra +
+                                       (time_t)prog.tierra_cada_dias * 86400L;
+        }
         if (doc.containsKey("tierra_hora"))
             prog.tierra_hora = acotar(doc["tierra_hora"] | 7, 0, 23);
         if (doc.containsKey("telemetria_s")) {
@@ -1238,6 +1363,41 @@ String procesarComando(const JsonDocument& doc) {
         return String("riego = ") + (enc ? "ON" : "OFF");
     }
 
+    // ── Llenado de tierra bajo petición ──────────────────────
+    //    No se ejecuta aquí: un llenado dura hasta PROG_TIERRA_MAX_S
+    //    (10 min) y este código corre dentro del callback de MQTT o del
+    //    handler HTTP. Bloquearlos tanto tiraría la conexión con el
+    //    broker, cuyo keepalive es de 20 s. Se deja la petición y la
+    //    tarea de riego, que ya tiene su propio hilo, la recoge en 5 s.
+    //
+    //    {"cmd":"llenar_tierra"}                  cuenta como el riego del ciclo
+    //    {"cmd":"llenar_tierra","prueba":true}    llena sin tocar el calendario
+    if (!strcmp(cmd, "llenar_tierra") || !strcmp(cmd, "regar_tierra")) {
+        if (regando_tierra)      return "ERROR: ya hay un llenado en curso";
+        if (mods.test_valvulas)  return "ERROR: barrido de valvulas activo";
+        if (RIEGO_FORZADO)       return "ERROR: riego manual activo, apagalo primero";
+
+        bool prueba = doc["prueba"] | false;
+        solicitud_reprograma = !prueba;
+        solicitud_llenado    = true;
+        logInfoF("CMD", "Llenado de tierra solicitado%s",
+                 prueba ? " (PRUEBA: no reprograma el calendario)" : "");
+        return prueba ? "llenado de PRUEBA en cola (no reprograma)"
+                      : "llenado de tierra en cola";
+    }
+
+    // ── Medida puntual de conductividad ──────────────────────
+    //    Devuelve el valor en la respuesta HTTP, así que sirve para
+    //    comprobar la sonda sin encender la telemetría continua.
+    if (!strcmp(cmd, "medir_ec")) {
+        float us = medirECAhora();
+        char r[96];
+        snprintf(r, sizeof(r), "EC = %.0f uS/cm  (%.0f ppm, %.0f mV)",
+                 us, tds_ppm, tds_mv);
+        logInfo("CMD", r);
+        return String(r);
+    }
+
     // ── Status inmediato ─────────────────────────────────────
     if (!strcmp(cmd, "get_status")) {
         publicarStatus();
@@ -1290,7 +1450,7 @@ void httpEnviarJson(int codigo, const JsonDocument& doc) {
  *  MQTT deja de servir para diagnosticar cuando el broker falla —
  *  justo cuando más falta hace.                                       */
 void handleEstado() {
-    DynamicJsonDocument doc(1536);
+    DynamicJsonDocument doc(2048);
     doc["id"]         = DEVICE_ID;
     doc["fw"]         = FIRMWARE_VERSION;
     doc["uptime_ms"]  = millis();
@@ -1334,12 +1494,41 @@ void handleEstado() {
     sg["luz_cortada_calor"] = luz_cortada_por_calor;
     sg["bomba_excedida"]    = bombaExcedeTiempo();
 
+    // Programa vigente. Se expone entero para poder comprobar de un
+    // vistazo qué plan está ejecutando el nodo, que no tiene por qué ser
+    // el que la Pi cree haberle enviado.
+    JsonObject pr = doc.createNestedObject("programa");
+    pr["hora_luz_on"]      = prog.hora_luz_on;
+    pr["hora_luz_off"]     = prog.hora_luz_off;
+    pr["tierra_cada_dias"] = prog.tierra_cada_dias;
+    pr["tierra_hora"]      = prog.tierra_hora;
+    pr["telemetria_s"]     = prog.telemetria_s;
+    pr["prox_riego_tierra"] = (uint32_t)proximo_riego_tierra;
+    pr["seg_desde_tierra"]  = (uint32_t)seg_desde_riego_tierra;
+
+    // Último llenado de tierra: cuánto duró, qué lo cortó y con qué
+    // conductividad se regó.
+    JsonObject ti = doc.createNestedObject("ult_llenado");
+    ti["seg"]        = (uint32_t)ult_llenado_s;
+    ti["corte"]      = ult_llenado_sensor ? "sensor" : "tiempo";
+    ti["raw_ini"]    = ult_llenado_raw_ini;
+    ti["raw_fin"]    = ult_llenado_raw_fin;
+    ti["ec_antes"]   = ec_antes_llenado;
+    ti["ec_despues"] = ec_despues_llenado;
+    ti["en_curso"]   = regando_tierra;
+    ti["pendiente"]  = solicitud_llenado;
+
     JsonObject s = doc.createNestedObject("sensores");
     if (xSemaphoreTake(xMutexDatos, pdMS_TO_TICKS(200)) == pdTRUE) {
         s["temp"]      = temperatura_HDC;
         s["hum"]       = humedad_HDC;
         s["agua"]      = hay_agua;
         s["nivel_raw"] = suelo_raw;
+        // Referencia en seco y umbrales: sin ellos, un nivel_raw suelto no
+        // dice nada. Con ellos se ve por qué el nodo decide que hay agua.
+        s["nivel_seco"]  = nivel_adc_seco;
+        s["nivel_delta"] = NIVEL_DELTA_MIN;
+        s["corte_delta"] = PROG_TIERRA_DELTA_CORTE;
         s["ec"]        = ec_us_cm;
         s["tds"]       = tds_ppm;
         s["ph"]        = ph_g;
@@ -1451,6 +1640,9 @@ void handleRaiz() {
         "<li>GET  /modulos</li>"
         "<li>POST /modulo &nbsp; {\"modulo\":\"telemetria\",\"activo\":true}</li>"
         "<li>POST /cmd &nbsp;&nbsp;&nbsp; {\"cmd\":\"get_status\"}</li>"
+        "<li>POST /cmd &nbsp;&nbsp;&nbsp; {\"cmd\":\"llenar_tierra\"}</li>"
+        "<li>POST /cmd &nbsp;&nbsp;&nbsp; {\"cmd\":\"medir_ec\"}</li>"
+        "<li>POST /cmd &nbsp;&nbsp;&nbsp; {\"cmd\":\"set_programa\",\"tierra_cada_dias\":10}</li>"
         "</ul>";
     httpServer.send(200, "text/html", html);
 }
@@ -2202,6 +2394,12 @@ void tarea_consola(void* pv) {
                 Serial.println("    adc2 [seg]       lee GPIO4 apagando el WiFi (def. 40 s)");
                 Serial.println("    sim on | sim off valores sinteticos (enmascara el hardware)");
                 Serial.println();
+                Serial.println("  TIERRA   se llena hasta que el sensor de nivel acusa el agua");
+                Serial.println("    llenar           llena AHORA y cuenta como el riego del ciclo");
+                Serial.println("    llenar prueba    llena AHORA sin tocar el calendario");
+                Serial.println("    tierra <dias>    cada cuantos dias se llena (10 por defecto)");
+                Serial.println("    ec               medida puntual de conductividad");
+                Serial.println();
                 Serial.println("  CALIBRACION");
                 Serial.println("    cal nivel        fija la referencia en SECO");
                 Serial.println("    cal cero         sonda AL AIRE y seca: fija el offset");
@@ -2312,6 +2510,40 @@ void tarea_consola(void* pv) {
                 }
             }
             else if (linea == "cal") { imprimirSensores(); }
+
+            // ── Tierra: llenado y periodicidad ──────────────────
+            //  Atajos de los comandos JSON equivalentes. Se pasa por
+            //  procesarComando() y no por la tarea directamente para que
+            //  los tres planos de control compartan las mismas
+            //  comprobaciones: una sola puerta de entrada, un solo sitio
+            //  donde arreglar un fallo.
+            else if (linea == "llenar" || linea == "llenar tierra") {
+                StaticJsonDocument<64> d;
+                d["cmd"] = "llenar_tierra";
+                Serial.println(procesarComando(d));
+            }
+            else if (linea == "llenar prueba" || linea == "llenar tierra prueba") {
+                StaticJsonDocument<64> d;
+                d["cmd"] = "llenar_tierra"; d["prueba"] = true;
+                Serial.println(procesarComando(d));
+            }
+            else if (linea == "ec") {
+                StaticJsonDocument<64> d;
+                d["cmd"] = "medir_ec";
+                Serial.println(procesarComando(d));
+            }
+            else if (linea.startsWith("tierra ")) {
+                int dias = linea.substring(7).toInt();
+                if (dias < PROG_TIERRA_DIAS_MIN || dias > PROG_TIERRA_DIAS_MAX) {
+                    Serial.printf("[TIERRA] Indica los dias (%d-%d). Ej: tierra 9\n",
+                                  PROG_TIERRA_DIAS_MIN, PROG_TIERRA_DIAS_MAX);
+                } else {
+                    StaticJsonDocument<64> d;
+                    d["cmd"] = "set_programa"; d["tierra_cada_dias"] = dias;
+                    Serial.println(procesarComando(d));
+                    imprimirPrograma();
+                }
+            }
 
             // ── on / off con lista de salidas ───────────────────
             //    "off" a secas apaga todo; "off 3" solo esa.
@@ -2424,6 +2656,22 @@ void tarea_riego_hidro(void* pv) {
             continue;
         }
 
+        // Ceder mientras se llena la tierra: con PROG_TIERRA_USA_BOMBA
+        // las dos rutinas mandan sobre la MISMA motobomba, y al terminar
+        // su fase de riego esta tarea la apagaría dejando el llenado de
+        // tierra con la válvula abierta y sin agua, que acabaría cortando
+        // por tiempo sin que nada explicara por qué.
+        //
+        // El reparto es cooperativo, no un mutex: la tierra espera a que
+        // la hidroponía termine su ciclo y la hidroponía espera a que
+        // acabe el llenado. Queda una ventana de milisegundos en la que
+        // ambas podrían arrancar a la vez; el peor caso es un llenado que
+        // corta por tiempo y lo deja escrito en el log.
+        if (regando_tierra) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
         bool dia = esDeDia();
         uint32_t t_riego    = dia ? prog.hidro_riego_dia_s    : prog.hidro_riego_noche_s;
         uint32_t t_descanso = dia ? prog.hidro_descanso_dia_s : prog.hidro_descanso_noche_s;
@@ -2466,81 +2714,163 @@ void tarea_riego_hidro(void* pv) {
 // ============================================================
 //  TAREA: Riego de tierra — por calendario, corte por sensor
 // ============================================================
-/*  Cada N días abre la válvula de tierra y la cierra en cuanto el sensor
- *  de nivel acusa la llegada del agua. El umbral de corte es mucho más
- *  sensible que el de "hay agua": reportar estado puede esperar a que el
- *  sensor esté bien mojado, pero cortar el llenado no — si se espera, se
- *  encharca.
+/*  REGLA DEL CULTIVO
+ *  La tierra se llena de agua hasta que el sensor de nivel acusa la
+ *  llegada del agua, y eso se repite cada prog.tierra_cada_dias dias
+ *  (10 de fabrica, ajustable en caliente entre 8 y 13 sin reflashear).
  *
- *  Hay además un corte por tiempo. Si el sensor se avería y nunca
- *  detecta, la válvula no puede quedarse abierta indefinidamente: en un
- *  cultivo real eso significa inundar el invernadero.                  */
-void tarea_riego_tierra(void* pv) {
-    for (;;) {
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+ *  El corte lo decide el sensor, no un tiempo fijo: el volumen que admite
+ *  el sustrato cambia con lo seco que este, con la temperatura y con lo
+ *  que hayan crecido las raices. Un temporizador acertaria un dia y
+ *  encharcaria al siguiente.
+ *
+ *  Hay ademas un corte por tiempo. Si el sensor se averia y nunca
+ *  detecta, la valvula no puede quedarse abierta indefinidamente: en un
+ *  cultivo real eso significa inundar el invernadero.                   */
 
-        // El contador propio avanza siempre, haya gateway o no. Es lo que
-        // permite que la tierra se riegue aunque la Pi nunca aparezca.
-        seg_desde_riego_tierra += 5;
-        if (seg_desde_riego_tierra % AUTO_GUARDAR_CONTADOR_S < 5) guardarPrograma();
+/*  Un llenado completo, de abrir la valvula a cerrarla.
+ *
+ *  Vive fuera de la tarea porque hay dos caminos que llegan aqui —el
+ *  calendario y la peticion manual— y duplicar la logica de corte en dos
+ *  sitios es la forma segura de que uno de los dos se quede sin arreglar
+ *  el dia que se cambie algo.
+ *
+ *    manual       la pidio un operador; no exige que el modulo
+ *                 riego_tierra este encendido.
+ *    reprogramar  el llenado cuenta como el riego del ciclo: pone a cero
+ *                 los relojes y programa el siguiente. En false solo
+ *                 llena, para probar sin descuadrar el calendario.      */
+void ejecutarLlenadoTierra(bool manual, bool reprogramar) {
+    int referencia = leerNivelRaw();
 
-        if (!mods.riego_tierra || mods.test_valvulas || RIEGO_FORZADO) continue;
-        if (!tocaRegarTierra()) continue;
-
-        // Con hora válida se respeta además la franja horaria elegida.
-        // Sin ella se riega en cuanto toque: mejor a deshora que nunca.
-        if (hora_valida && horaDelDia() != (int)prog.tierra_hora) continue;
-
-        // --- Toca regar ---
-        int referencia = leerNivelRaw();
-
-        // Enclavamiento: si el sensor ya acusa agua, el sustrato sigue
-        // húmedo del ciclo anterior. Regar encharcaría y pudriría raíz.
-        if (SEG_VERIFICAR_ANTES_RIEGO && hayAgua(referencia)) {
-            logWarn("TIERRA", "El sensor ya detecta agua: se omite este riego.");
-            seg_desde_riego_tierra = 0;
-            ultimo_riego_tierra = hora_valida ? time(nullptr) : 0;
-            if (hora_valida && proximo_riego_tierra > 0)
-                proximo_riego_tierra += (time_t)prog.tierra_cada_dias * 86400L;
-            guardarPrograma();
-            continue;
+    // Enclavamiento: si el sensor ya acusa agua, el sustrato sigue
+    // húmedo del ciclo anterior. Regar encharcaría y pudriría raíz.
+    if (SEG_VERIFICAR_ANTES_RIEGO && hayAgua(referencia)) {
+        if (manual) {
+            // En el camino manual no se toca el calendario: el operador
+            // pidió llenar, no dar el ciclo por hecho. Y si el sustrato
+            // está seco de verdad, lo que falla es la referencia.
+            logWarnF("TIERRA", "El sensor ya detecta agua (raw=%d, seco=%d): no se llena. "
+                               "Si el sustrato esta seco, recalibra con cal nivel.",
+                     referencia, nivel_adc_seco);
+            return;
         }
+        logWarn("TIERRA", "El sensor ya detecta agua: se omite este riego.");
+        seg_desde_riego_tierra = 0;
+        ultimo_riego_tierra = hora_valida ? time(nullptr) : 0;
+        if (hora_valida && proximo_riego_tierra > 0)
+            proximo_riego_tierra += (time_t)prog.tierra_cada_dias * 86400L;
+        guardarPrograma();
+        return;
+    }
 
-        logInfoF("TIERRA", "Iniciando riego%s. Referencia del sensor: %d",
-                 hora_valida ? "" : " (sin hora, por contador propio)", referencia);
+    // EC antes de abrir. Junto con la de después queda registrado qué
+    // conductividad tenía el agua con la que se regó, que es justo el
+    // dato que hay que poder enseñar cuando se discuta la nutrición.
+    ec_antes_llenado = medirECAhora();
 
-        salidaSet(1, true);            // válvula de tierra
-        regando_tierra = true;
-        uint32_t transcurrido = 0;
-        bool corte_por_sensor = false;
+    logInfoF("TIERRA", "Iniciando llenado %s. Referencia del sensor: %d. EC previa: %.0f uS/cm",
+             manual ? "MANUAL" : (hora_valida ? "por calendario"
+                                              : "por contador propio (sin hora)"),
+             referencia, ec_antes_llenado);
 
-        while (transcurrido < PROG_TIERRA_MAX_S * 1000UL) {
-            vTaskDelay(500 / portTICK_PERIOD_MS);
-            transcurrido += 500;
+    salidaSet(1, true);            // válvula de tierra
+    // La bomba solo si el agua no baja por gravedad (config.h). Primero la
+    // válvula y luego la bomba: al revés, la bomba arrancaría un instante
+    // contra el circuito cerrado.
+    if (PROG_TIERRA_USA_BOMBA) {
+        salidaSet(2, true);
+        bomba_encendida_desde = millis();
+    }
+    regando_tierra = true;
+    uint32_t transcurrido     = 0;
+    uint8_t  confirmaciones   = 0;
+    bool     corte_por_sensor = false;
+    bool     corte_por_umbral = false;
+    int      actual = referencia;
 
-            if (!mods.riego_tierra || mods.test_valvulas) break;
+    while (transcurrido < PROG_TIERRA_MAX_S * 1000UL) {
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+        transcurrido += 500;
 
-            int actual = leerNivelRaw();
-            if (abs(referencia - actual) >= PROG_TIERRA_DELTA_CORTE) {
+        // El barrido de válvulas y el riego manual escriben en los mismos
+        // relés: si alguno arranca a mitad del llenado, se cede.
+        if (mods.test_valvulas || RIEGO_FORZADO) break;
+        // Enclavamiento de la bomba: trabajar en seco si el tanque se
+        // vacía la quema en minutos, y eso no espera al corte por tiempo
+        // del llenado, que es diez veces más largo.
+        if (PROG_TIERRA_USA_BOMBA && bombaExcedeTiempo()) {
+            logWarn("TIERRA", "Corte: la bomba excedio su tiempo maximo continuo.");
+            break;
+        }
+        // El llenado por calendario obedece a su módulo; el manual no,
+        // porque su razón de ser es funcionar con el automático apagado.
+        if (!manual && !mods.riego_tierra) break;
+
+        actual = leerNivelRaw();
+
+        // Dos condiciones independientes, y basta una:
+        //   · Caída relativa a la referencia de este llenado. Es la
+        //     sensible, la que corta en cuanto el agua asoma.
+        //   · Umbral absoluto de "hay agua". Es la red de seguridad por
+        //     si la referencia se tomó ya con el sensor algo mojado y la
+        //     caída disponible se queda corta.
+        // La resta va con signo: al mojarse la lectura BAJA. Con valor
+        // absoluto, un pico de ruido hacia arriba cortaba el llenado y lo
+        // anotaba como agua detectada.
+        bool cayo   = (referencia - actual) >= PROG_TIERRA_DELTA_CORTE;
+        bool umbral = hayAgua(actual);
+
+        if (cayo || umbral) {
+            if (++confirmaciones >= PROG_TIERRA_CORTE_CONFIRMA) {
                 corte_por_sensor = true;
-                logInfoF("TIERRA", "Agua detectada: %d -> %d (delta %d). Cortando.",
-                         referencia, actual, abs(referencia - actual));
+                corte_por_umbral = umbral;
                 break;
             }
+        } else {
+            confirmaciones = 0;   // la racha tiene que ser seguida
         }
+    }
 
-        salidaSet(1, false);
-        regando_tierra = false;
+    // Primero la bomba y después la válvula: cerrar la válvula con la
+    // bomba en marcha es un golpe de ariete contra el circuito.
+    if (PROG_TIERRA_USA_BOMBA) {
+        salidaSet(2, false);
+        bomba_encendida_desde = 0;
+    }
+    salidaSet(1, false);
+    regando_tierra = false;
 
-        if (!corte_por_sensor)
-            logWarnF("TIERRA", "Corte por TIEMPO tras %lu s sin deteccion. "
-                               "Revisar el sensor de nivel.", transcurrido / 1000);
+    if (corte_por_sensor)
+        logInfoF("TIERRA", "Agua detectada por %s: %d -> %d (caida %d). Valvula cerrada.",
+                 corte_por_umbral ? "umbral absoluto" : "caida relativa",
+                 referencia, actual, referencia - actual);
+    else
+        logWarnF("TIERRA", "Corte por TIEMPO tras %lu s sin deteccion. "
+                           "Revisar el sensor de nivel.", transcurrido / 1000);
 
+    // EC después de cerrar, y resultado del llenado para el status.
+    ec_despues_llenado  = medirECAhora();
+    ult_llenado_s       = transcurrido / 1000;
+    ult_llenado_sensor  = corte_por_sensor;
+    ult_llenado_raw_ini = referencia;
+    ult_llenado_raw_fin = actual;
+
+    logInfoF("TIERRA", "Llenado completado en %lu s. EC %.0f -> %.0f uS/cm (delta %+.0f)",
+             ult_llenado_s, ec_antes_llenado, ec_despues_llenado,
+             ec_despues_llenado - ec_antes_llenado);
+
+    // El anti-repiqueteo del relé se actualiza siempre: protege el
+    // hardware, y eso no depende de si el llenado contaba o no.
+    fin_ultimo_riego = millis();
+
+    if (!reprogramar) {
+        logWarn("TIERRA", "Llenado de PRUEBA: el calendario no se toca.");
+    } else {
         // Se reinician AMBOS relojes: el calendario si hay hora, y el
         // contador propio siempre. Así el nodo queda consistente tanto si
         // recupera contacto con la Pi como si sigue solo.
         seg_desde_riego_tierra = 0;
-        fin_ultimo_riego = millis();
         if (hora_valida) {
             ultimo_riego_tierra  = time(nullptr);
             proximo_riego_tierra = ultimo_riego_tierra +
@@ -2551,14 +2881,74 @@ void tarea_riego_tierra(void* pv) {
         if (hora_valida && proximo_riego_tierra > 0) {
             struct tm t;
             localtime_r((const time_t*)&proximo_riego_tierra, &t);
-            logInfoF("TIERRA", "Riego completado en %lu s. Proximo: %04d-%02d-%02d %02d:00",
-                     transcurrido / 1000, t.tm_year + 1900, t.tm_mon + 1,
-                     t.tm_mday, t.tm_hour);
+            logInfoF("TIERRA", "Proximo llenado: %04d-%02d-%02d %02d:00  (cada %u dias)",
+                     t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour,
+                     prog.tierra_cada_dias);
         } else {
-            logInfoF("TIERRA", "Riego completado en %lu s. Proximo en %u dias "
-                               "(contador propio, sin hora)",
-                     transcurrido / 1000, prog.tierra_cada_dias);
+            logInfoF("TIERRA", "Proximo llenado en %u dias "
+                               "(contador propio, sin hora)", prog.tierra_cada_dias);
         }
+    }
+
+    // Status inmediato: el llenado es el evento del ciclo que la Pi tiene
+    // que poder registrar sin esperar al heartbeat de 60 s.
+    publicarStatus();
+}
+
+void tarea_riego_tierra(void* pv) {
+    bool espera_avisada = false;   // para no repetir el aviso cada 5 s
+
+    for (;;) {
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+        // El contador propio avanza siempre, haya gateway o no. Es lo que
+        // permite que la tierra se riegue aunque la Pi nunca aparezca.
+        seg_desde_riego_tierra += 5;
+        if (seg_desde_riego_tierra % AUTO_GUARDAR_CONTADOR_S < 5) guardarPrograma();
+
+        // ── Petición manual: gana sobre el calendario ────────────
+        //    Se atiende aquí y no en el propio comando porque un llenado
+        //    puede durar 10 minutos: hacerlo dentro del callback de MQTT
+        //    bloquearía el keepalive del broker, que es de 20 s.
+        if (solicitud_llenado) {
+            // Esperar a que la hidroponía suelte la motobomba, sin
+            // consumir la petición: se reintenta cada 5 s. Cancelarla
+            // aquí obligaría al operador a repetir el comando sin saber
+            // por qué no pasó nada.
+            if (regando_hidro) {
+                if (!espera_avisada) {
+                    logInfo("TIERRA", "Llenado en espera: la hidroponia esta bombeando.");
+                    espera_avisada = true;
+                }
+                continue;
+            }
+            espera_avisada    = false;
+            solicitud_llenado = false;
+            bool reprogramar  = solicitud_reprograma;
+
+            if (mods.test_valvulas || RIEGO_FORZADO)
+                logWarn("TIERRA", "Llenado manual cancelado: el barrido de valvulas "
+                                  "o el riego manual estan usando los reles.");
+            else if (!descansoSuficiente())
+                logWarn("TIERRA", "Llenado manual cancelado: no ha pasado el descanso "
+                                  "minimo desde el ultimo riego.");
+            else
+                ejecutarLlenadoTierra(true, reprogramar);
+
+            continue;
+        }
+
+        if (!mods.riego_tierra || mods.test_valvulas || RIEGO_FORZADO) continue;
+        if (!tocaRegarTierra()) continue;
+        // Igual que arriba: la hidroponía tiene la bomba. Se reintenta en
+        // 5 s; el calendario sigue diciendo que toca, así que no se pierde.
+        if (regando_hidro) continue;
+
+        // Con hora válida se respeta además la franja horaria elegida.
+        // Sin ella se riega en cuanto toque: mejor a deshora que nunca.
+        if (hora_valida && horaDelDia() != (int)prog.tierra_hora) continue;
+
+        ejecutarLlenadoTierra(false, true);
     }
 }
 
@@ -2662,7 +3052,10 @@ void setup() {
     xTaskCreate(tarea_sensor_ph,     "ph",         2560, NULL, 1, NULL);
     xTaskCreate(tarea_sensor_ec,     "ec",         2560, NULL, 1, NULL);
     xTaskCreate(tarea_riego_hidro,   "riego-hid",  3072, NULL, 2, NULL);
-    xTaskCreate(tarea_riego_tierra,  "riego-tie",  3072, NULL, 2, NULL);
+    // 4096 y no 3072: esta tarea ahora publica el status al terminar un
+    // llenado, y el documento JSON mas las llamadas de log no caben con
+    // holgura en la pila anterior.
+    xTaskCreate(tarea_riego_tierra,  "riego-tie",  4096, NULL, 2, NULL);
     xTaskCreate(tarea_ambiente,      "ambiente",   2560, NULL, 2, NULL);
 
     // ── Pruebas de banco ─────────────────────────────────────
