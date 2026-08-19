@@ -65,6 +65,31 @@ class HealthConfig(BaseModel):
     port: int = 8080
 
 
+class ProgramaConfig(BaseModel):
+    """
+    Programa de cultivo que el gateway empuja al nodo.
+
+    Es la FUENTE DE VERDAD: el ESP32 guarda estos valores en NVS y los
+    ejecuta aunque la Pi desaparezca, pero cada vez que el gateway
+    arranca —o repone la hora de un nodo en degradado— vuelve a
+    enviarlos. Cambiar el programa solo en el nodo dura hasta el
+    siguiente reinicio del gateway; el cambio duradero se hace aquí.
+
+    Los límites son los mismos que valida el firmware (config.h).
+    """
+    hora_luz_on: int = Field(6, ge=0, le=23)
+    hora_luz_off: int = Field(20, ge=0, le=23)
+    hidro_riego_dia_s: int = Field(900, ge=10, le=21600)
+    hidro_descanso_dia_s: int = Field(900, ge=10, le=86400)
+    hidro_riego_noche_s: int = Field(600, ge=10, le=21600)
+    hidro_descanso_noche_s: int = Field(7200, ge=10, le=86400)
+    # Cada cuántos días se llena la tierra. 10 es el valor del cultivo;
+    # se baja a 8-9 en calor y se sube a 12-13 en invierno.
+    tierra_cada_dias: int = Field(10, ge=1, le=365)
+    tierra_hora: int = Field(7, ge=0, le=23)
+    telemetria_s: int = Field(60, ge=5, le=3600)
+
+
 # ─────────────────────────────────────────────────────────────────
 # Config raíz
 # ─────────────────────────────────────────────────────────────────
@@ -76,6 +101,9 @@ class AppConfig(BaseModel):
     storage: StorageConfig
     rules: RulesConfig
     health: HealthConfig
+    # Con default: los config.yaml que ya existen en las Raspberries
+    # desplegadas siguen validando sin tocarlos.
+    programa: ProgramaConfig = Field(default_factory=ProgramaConfig)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -116,7 +144,10 @@ _load_dotenv()
 def load_config(config_path: Optional[Path] = None) -> AppConfig:
     """Carga y valida config.yaml. Permite overrides desde variables de entorno."""
     path = config_path or _CONFIG_PATH
-    with open(path, "r") as f:
+    # encoding explicito: el YAML lleva acentos y simbolos, y en un
+    # sistema cuyo locale no sea UTF-8 open() elige otro codec y revienta
+    # al arrancar, antes de que ningun log lo explique.
+    with open(path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 
     # ── Overrides desde el entorno (agw-edge-raspberry/.env) ─────

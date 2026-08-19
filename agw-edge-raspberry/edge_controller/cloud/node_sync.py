@@ -65,17 +65,12 @@ class NodeSync:
 
         # El programa vigente. Vive aquí y en SQLite; el nodo solo lo
         # ejecuta. Si alguna vez discrepan, manda el gateway.
-        self.programa = {
-            "hora_luz_on": 6,
-            "hora_luz_off": 20,
-            "hidro_riego_dia_s": 900,
-            "hidro_descanso_dia_s": 900,
-            "hidro_riego_noche_s": 600,
-            "hidro_descanso_noche_s": 7200,
-            "tierra_cada_dias": 15,
-            "tierra_hora": 7,
-            "telemetria_s": 60,
-        }
+        #
+        # Sale de config.yaml y no de literales en el código: estaba
+        # escrito aquí con 15 días de riego de tierra, así que cualquier
+        # cambio hecho sobre el nodo lo revertía este envío en el
+        # siguiente arranque del gateway, sin dejar rastro de por qué.
+        self.programa = config.programa.model_dump()
 
     # ─────────────────────────────────────────────────────────────
 

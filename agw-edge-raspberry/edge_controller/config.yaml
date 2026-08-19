@@ -33,6 +33,25 @@ storage:
   db_path: "/var/lib/agw/buffer.db"
   max_buffered_records: 50000    # ~5 meses a 1 lectura cada 5 min
 
+programa:
+  # Programa de cultivo que el gateway empuja al nodo al arrancar y cada
+  # vez que lo saca del modo degradado. Es la fuente de verdad: lo que se
+  # cambie solo en el ESP32 vuelve a este valor en el siguiente reinicio
+  # del gateway.
+  hora_luz_on: 6
+  hora_luz_off: 20
+  hidro_riego_dia_s: 900
+  hidro_descanso_dia_s: 900
+  hidro_riego_noche_s: 600
+  hidro_descanso_noche_s: 7200
+  # REGLA: la tierra se llena hasta que el sensor de nivel acusa el agua,
+  # y eso se repite cada N días. 10 es lo acordado para la hierbabuena;
+  # bajar a 8-9 en épocas de calor, subir a 12-13 en invierno.
+  # Tras cambiarlo:  sudo systemctl restart agw-edge
+  tierra_cada_dias: 10
+  tierra_hora: 7
+  telemetria_s: 60
+
 rules:
   enabled: true
   rules_file: "./rules/rules.yaml"
