@@ -40,10 +40,14 @@ programa:
   # del gateway.
   hora_luz_on: 6
   hora_luz_off: 20
-  hidro_riego_dia_s: 900
-  hidro_descanso_dia_s: 900
-  hidro_riego_noche_s: 600
-  hidro_descanso_noche_s: 7200
+  # Hidroponía. El ciclo es RIEGO + DESCANSO, y de ahí sale la cadencia:
+  #   día    300 + 600  =  900 s = 15 min  ->  4 riegos por hora
+  #   noche  300 + 3300 = 3600 s = 60 min  ->  1 riego por hora
+  # Cambiar uno sin el otro descuadra la cadencia.
+  hidro_riego_dia_s: 300
+  hidro_descanso_dia_s: 600
+  hidro_riego_noche_s: 300
+  hidro_descanso_noche_s: 3300
   # REGLA: la tierra se llena hasta que el sensor de nivel acusa el agua,
   # y eso se repite cada N días. 10 es lo acordado para la hierbabuena;
   # bajar a 8-9 en épocas de calor, subir a 12-13 en invierno.
@@ -55,6 +59,19 @@ programa:
 rules:
   enabled: true
   rules_file: "./rules/rules.yaml"
+
+ap_watcher:
+  # Vigila las asociaciones del punto de acceso. Cuando el ESP32 se va
+  # del WiFi y vuelve, se le repone hora y programa al instante, sin
+  # esperar a que lo confiese en su heartbeat ni al resync horario.
+  enabled: true
+  interface: "wlan0"
+  # MAC del nodo IoT-node-26.001. Vacío = cualquier estación que entre.
+  node_mac: "38:18:2b:8a:12:7c"
+  poll_seconds: 10
+  # Segundos entre la asociación y el envío: el nodo aún tiene que coger
+  # IP, conectar al broker y suscribirse al topic de comandos.
+  settle_seconds: 8
 
 health:
   enabled: true

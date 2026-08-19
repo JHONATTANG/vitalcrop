@@ -90,6 +90,25 @@ class ProgramaConfig(BaseModel):
     telemetria_s: int = Field(60, ge=5, le=3600)
 
 
+class APWatcherConfig(BaseModel):
+    """
+    Vigilancia de las asociaciones WiFi del punto de acceso.
+
+    Detecta que el nodo se fue y volvió mirando el AP, no el silencio
+    de MQTT: la asociación es inmediata y no depende de que el firmware
+    tenga encendido el módulo de status.
+    """
+    enabled: bool = True
+    interface: str = "wlan0"
+    # MAC del ESP32. Vacío = cualquier estación que se asocie.
+    node_mac: str = ""
+    poll_seconds: int = Field(10, ge=2, le=300)
+    # Margen entre la asociación y el envío: el nodo aún tiene que coger
+    # IP, conectar al broker y suscribirse. Antes de eso, un comando
+    # publicado se pierde.
+    settle_seconds: int = Field(8, ge=0, le=120)
+
+
 # ─────────────────────────────────────────────────────────────────
 # Config raíz
 # ─────────────────────────────────────────────────────────────────
@@ -104,6 +123,7 @@ class AppConfig(BaseModel):
     # Con default: los config.yaml que ya existen en las Raspberries
     # desplegadas siguen validando sin tocarlos.
     programa: ProgramaConfig = Field(default_factory=ProgramaConfig)
+    ap_watcher: APWatcherConfig = Field(default_factory=APWatcherConfig)
 
 
 # ─────────────────────────────────────────────────────────────────

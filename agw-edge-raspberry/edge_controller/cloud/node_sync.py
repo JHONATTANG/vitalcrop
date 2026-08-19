@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
 
@@ -60,6 +60,7 @@ class NodeSync:
             "hora_enviada": 0,
             "programa_enviado": 0,
             "resync_por_perdida": 0,
+            "resync_por_reasociacion": 0,
             "ultima_sync": None,
         }
 
@@ -71,6 +72,12 @@ class NodeSync:
         # cambio hecho sobre el nodo lo revertía este envío en el
         # siguiente arranque del gateway, sin dejar rastro de por qué.
         self.programa = config.programa.model_dump()
+
+        # Último riego de tierra según lo reporta el propio nodo. Es él
+        # quien abre la válvula, así que es la única fuente que sabe
+        # cuándo se regó de verdad.
+        self.ultimo_riego_nodo: datetime | None = None
+        self._ultimo_epoch_registrado: int = 0
 
     # ─────────────────────────────────────────────────────────────
 
@@ -124,8 +131,16 @@ class NodeSync:
         siguiente: arrancar regando nada más encender el sistema sería
         una sorpresa desagradable.
         """
-        ultimo = None
-        if self.local_db:
+        # Prioridad al nodo: es quien abre la válvula y quien sabe si el
+        # riego llegó a ocurrir. El historial local es el respaldo para
+        # cuando el gateway arranca antes de haber recibido un status.
+        #
+        # Sin esto el cálculo partía SIEMPRE de datetime.now(), porque
+        # nadie escribía el historial: cada reinicio del nodo empujaba el
+        # próximo riego diez días más allá y la tierra no se regaba nunca.
+        ultimo = self.ultimo_riego_nodo
+
+        if ultimo is None and self.local_db:
             try:
                 ultimo = await self.local_db.get_ultimo_riego_tierra()
             except Exception as exc:
@@ -137,7 +152,72 @@ class NodeSync:
             hour=self.programa["tierra_hora"], minute=0, second=0, microsecond=0
         )
 
+    def _a_hora_local(self, epoch: int) -> datetime:
+        """
+        Epoch del nodo → datetime local ingenuo.
+
+        El nodo recibe la hora LOCAL como epoch (ver enviar_hora) y la
+        devuelve igual. Pasarla por fromtimestamp() volvería a aplicar el
+        desplazamiento de zona y el resultado saldría cinco horas
+        corrido, que es de las desviaciones más difíciles de ver en un
+        log porque sigue pareciendo una fecha razonable.
+        """
+        return datetime.fromtimestamp(epoch, tz=timezone.utc).replace(tzinfo=None)
+
+    async def _anotar_riego_del_nodo(self, status: dict) -> None:
+        """Registra el último riego de tierra que reporta el nodo."""
+        try:
+            epoch = int(status.get("ult_riego_tierra") or 0)
+        except (TypeError, ValueError):
+            return
+
+        # 1.7e9 ≈ 2023. Por debajo el nodo no tenía hora válida cuando
+        # regó, y esa marca no sirve para calendario alguno.
+        if epoch < 1_700_000_000 or epoch == self._ultimo_epoch_registrado:
+            return
+
+        self._ultimo_epoch_registrado = epoch
+        self.ultimo_riego_nodo = self._a_hora_local(epoch)
+        log.info(
+            "El nodo reporta riego de tierra",
+            cuando=self.ultimo_riego_nodo.isoformat(timespec="seconds"),
+        )
+
+        if not self.local_db:
+            return
+        try:
+            await self.local_db.registrar_riego_tierra(
+                status.get("node_id") or status.get("id") or "desconocido",
+                {
+                    "epoch": epoch,
+                    "duracion_s": (status.get("tierra") or {}).get("ult_seg"),
+                    "corte": (status.get("tierra") or {}).get("corte"),
+                    "ec_antes": (status.get("tierra") or {}).get("ec_antes"),
+                    "ec_despues": (status.get("tierra") or {}).get("ec_despues"),
+                },
+            )
+        except Exception as exc:
+            log.warning("No se pudo registrar el riego de tierra", error=str(exc))
+
     # ─────────────────────────────────────────────────────────────
+
+    async def al_reasociarse(self, mac: str = "") -> None:
+        """
+        Lo llama APWatcher cuando la estación vuelve al punto de acceso.
+
+        Reasociarse al WiFi es, en la práctica, la firma de un reinicio
+        del ESP32, y un ESP32 recién arrancado no tiene hora: no lleva
+        reloj de tiempo real. Reponerla aquí es lo que evita que ejecute
+        el fotoperiodo equivocado hasta el siguiente heartbeat.
+
+        Se manda también el programa. Los módulos y el plan viven en NVS
+        y sobreviven al reinicio, así que en teoría no haría falta; pero
+        si lo que hubo fue un borrado de NVS o un reflasheo, esto es lo
+        único que devuelve el nodo a su configuración real.
+        """
+        self.stats["resync_por_reasociacion"] += 1
+        await self.enviar_hora(motivo=f"reasociacion wifi {mac}".strip())
+        await self.enviar_programa(motivo="tras reasociacion wifi")
 
     async def al_recibir_status(self, status: dict) -> None:
         """
@@ -147,6 +227,8 @@ class NodeSync:
         silencioso: el nodo avisa en su propio status, y reponerla cuesta
         un mensaje.
         """
+        await self._anotar_riego_del_nodo(status)
+
         if status.get("hora_valida") is False or status.get("degradado") is True:
             self.stats["resync_por_perdida"] += 1
             log.warning(
