@@ -86,21 +86,30 @@
 //  ciclo y no hace nada si está apagada. Así se activan y desactivan
 //  funciones sin recompilar ni reiniciar.
 //
-//  Valores por defecto = TODO APAGADO. El nodo arranca conectando solo
-//  al WiFi y levantando los dos planos de control (HTTP y MQTT-sub).
-//  Se enciende lo que se quiera probar, de uno en uno.
+//  MODO PRODUCCION. Hasta la v2.1.0 estos valores eran todos false: el
+//  nodo arrancaba mudo y se encendia lo que se queria probar, de uno en
+//  uno, que es lo correcto en banco. El cultivo ya esta en marcha, y un
+//  nodo que tras un borrado de NVS arranca sin regar ni iluminar es un
+//  cultivo perdido en silencio. Ahora el arranque de fabrica es el
+//  cultivo funcionando; lo que se apaga es lo que estorba.
 //
-//  Los cambios se guardan en NVS y sobreviven al reinicio.
+//  Fuera quedan los tres que NO deben arrancar solos:
+//    · simulacion    enmascara los sensores reales con valores inventados
+//    · test_valvulas mueve los reles en barrido, ignorando el riego
+//    · sensor_ph     retirado del alcance, sin sonda conectada
+//
+//  Los cambios se guardan en NVS y sobreviven al reinicio. Ojo: por eso
+//  mismo, reflashear NO reactiva nada — la NVS conserva lo que hubiera.
 //  Para volver a estos valores:  {"cmd":"reset_modulos"}
-#define DEFAULT_MOD_TELEMETRIA   false   // Publicar telemetría
-#define DEFAULT_MOD_STATUS       false   // Heartbeat cada 60 s
-#define DEFAULT_MOD_ALERTAS      false   // Monitor de umbrales
-#define DEFAULT_MOD_SENSOR_HDC   false   // HDC1080 (temp + humedad)
-#define DEFAULT_MOD_SENSOR_SUELO false   // Humedad de sustrato (GPIO36)
+#define DEFAULT_MOD_TELEMETRIA   true    // Publicar telemetría
+#define DEFAULT_MOD_STATUS       true    // Heartbeat cada 60 s
+#define DEFAULT_MOD_ALERTAS      true    // Monitor de umbrales
+#define DEFAULT_MOD_SENSOR_HDC   true    // HDC1080 (temp + humedad)
+#define DEFAULT_MOD_SENSOR_SUELO true    // Nivel de agua en sustrato (GPIO32)
 #define DEFAULT_MOD_SENSOR_PH    false   // pH (GPIO34) — retirado del alcance
-#define DEFAULT_MOD_RIEGO_HIDRO  false   // Ciclos de riego de hidroponia
-#define DEFAULT_MOD_RIEGO_TIERRA false   // Riego de tierra por calendario
-#define DEFAULT_MOD_AMBIENTE     false   // Luz + ventilador por fotoperiodo
+#define DEFAULT_MOD_RIEGO_HIDRO  true    // Ciclos de riego de hidroponia
+#define DEFAULT_MOD_RIEGO_TIERRA true    // Riego de tierra por calendario
+#define DEFAULT_MOD_AMBIENTE     true    // Luz + ventilador por fotoperiodo
 #define DEFAULT_MOD_SIMULACION   false   // Valores sintéticos sin hardware
 
 // ------------------------------------------------------------
@@ -153,10 +162,17 @@
 //  De dia el cultivo transpira y consume, asi que se riega mas seguido.
 //  De noche la demanda cae: ciclos espaciados bastan para mantener la
 //  lamina de agua sin desperdiciar bombeo ni oxigenar de mas la raiz.
-#define PROG_HIDRO_RIEGO_DIA_S      900   // 15 min bombeando
-#define PROG_HIDRO_DESCANSO_DIA_S   900   // 15 min parada
-#define PROG_HIDRO_RIEGO_NOCHE_S    600   // 10 min bombeando
-#define PROG_HIDRO_DESCANSO_NOCHE_S 7200  //  2 h  parada
+//
+//  El ciclo es RIEGO + DESCANSO, y de ahi sale la cadencia:
+//     dia    300 + 600  = 900 s  = 15 min  ->  4 riegos/hora
+//     noche  300 + 3300 = 3600 s = 60 min  ->  1 riego/hora
+//  Cambiar uno de los dos sin el otro descuadra la cadencia: si se
+//  alarga el riego diurno a 600 s hay que bajar el descanso a 300 para
+//  seguir teniendo cuatro por hora.
+#define PROG_HIDRO_RIEGO_DIA_S      300   //  5 min bombeando
+#define PROG_HIDRO_DESCANSO_DIA_S   600   // 10 min parada   -> 4 riegos/h
+#define PROG_HIDRO_RIEGO_NOCHE_S    300   //  5 min bombeando
+#define PROG_HIDRO_DESCANSO_NOCHE_S 3300  // 55 min parada   -> 1 riego/h
 
 // ------------------------------------------------------------
 //  Riego de tierra — por calendario, corte por sensor
@@ -441,7 +457,7 @@
 //     resultados. Lo correcto seria una sonda DS18B20 sumergida.
 #define TDS_TEMP_FALLBACK     25.0f
 
-#define DEFAULT_MOD_SENSOR_EC  false
+#define DEFAULT_MOD_SENSOR_EC   true   // Conductividad: mide la solucion del tanque
 
 // ------------------------------------------------------------
 //  Polaridad de los módulos de relé

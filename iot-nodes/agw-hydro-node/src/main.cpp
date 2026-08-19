@@ -43,10 +43,12 @@
  *  Que sean dos canales es deliberado: si el broker MQTT cae o la
  *  suscripción se pierde, el nodo sigue siendo controlable por HTTP.
  *
- *  Por defecto TODO arranca apagado (config.h). El nodo solo conecta al
- *  WiFi y levanta los dos planos de control. Se enciende lo que se quiera
- *  probar, de uno en uno. Los flags se guardan en NVS y sobreviven al
- *  reinicio; `{"cmd":"reset_modulos"}` vuelve a los valores por defecto.
+ *  Desde la v2.1.0 los valores de fabrica son los de PRODUCCION: riego,
+ *  ambiente y sensores arrancan encendidos (config.h). Solo quedan fuera
+ *  simulacion, test_valvulas y el pH retirado. Los flags se guardan en
+ *  NVS y sobreviven al reinicio, asi que reflashear NO reactiva nada: la
+ *  NVS conserva lo que hubiera. `{"cmd":"reset_modulos"}` es lo que
+ *  vuelve a los valores por defecto.
  *
  *  LOS MODULOS SON TAMBIEN UN MECANISMO DE AHORRO DE ENERGIA
  *  ------------------------------------------------------------
@@ -590,11 +592,24 @@ void resetModulos() {
     prefs.begin(NVS_NAMESPACE, false);
     prefs.clear();
     prefs.end();
-    mods = { DEFAULT_MOD_TELEMETRIA, DEFAULT_MOD_STATUS, DEFAULT_MOD_ALERTAS,
-             DEFAULT_MOD_SENSOR_HDC, DEFAULT_MOD_SENSOR_SUELO, DEFAULT_MOD_SENSOR_PH,
-             DEFAULT_MOD_RIEGO_HIDRO, DEFAULT_MOD_RIEGO_TIERRA,
-             DEFAULT_MOD_AMBIENTE, DEFAULT_MOD_SIMULACION,
-             DEFAULT_MOD_AHORRO_WIFI };
+    // Campo por campo y no con lista de inicializacion: la lista se
+    // quedaba en once de los trece miembros, asi que test_valvulas y
+    // sensor_ec se ponian a false en vez de a su valor de fabrica. Con
+    // los defaults en false no se notaba; ahora que sensor_ec arranca
+    // encendido, un reset_modulos apagaria la conductividad sin decirlo.
+    mods.telemetria    = DEFAULT_MOD_TELEMETRIA;
+    mods.status        = DEFAULT_MOD_STATUS;
+    mods.alertas       = DEFAULT_MOD_ALERTAS;
+    mods.sensor_hdc    = DEFAULT_MOD_SENSOR_HDC;
+    mods.sensor_suelo  = DEFAULT_MOD_SENSOR_SUELO;
+    mods.sensor_ph     = DEFAULT_MOD_SENSOR_PH;
+    mods.riego_hidro   = DEFAULT_MOD_RIEGO_HIDRO;
+    mods.riego_tierra  = DEFAULT_MOD_RIEGO_TIERRA;
+    mods.ambiente      = DEFAULT_MOD_AMBIENTE;
+    mods.simulacion    = DEFAULT_MOD_SIMULACION;
+    mods.ahorro_wifi   = DEFAULT_MOD_AHORRO_WIFI;
+    mods.test_valvulas = DEFAULT_MOD_TEST_VALVULAS;
+    mods.sensor_ec     = DEFAULT_MOD_SENSOR_EC;
     periodo_telemetria_ms = INTERVAL_TELEMETRY;
     logWarn("MODULOS", "Restaurados a valores por defecto");
 }
