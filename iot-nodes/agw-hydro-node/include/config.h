@@ -161,7 +161,7 @@
 //  Fotoperiodo — rige la luz Y el modo dia/noche del riego
 // ------------------------------------------------------------
 #define PROG_HORA_LUZ_ON        6    // 06:00 enciende luz y ventilador
-#define PROG_HORA_LUZ_OFF      20    // 20:00 apaga  → 14 h luz / 10 h oscuridad
+#define PROG_HORA_LUZ_OFF      18    // 18:00 apaga  → 12 h luz / 12 h oscuridad
 
 // ------------------------------------------------------------
 //  Riego de hidroponía — ciclos intermitentes
