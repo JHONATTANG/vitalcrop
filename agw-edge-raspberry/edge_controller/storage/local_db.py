@@ -205,6 +205,104 @@ class LocalDB:
         return [dict(row) for row in rows]
 
     # ─────────────────────────────────────────────────────────────
+    # Eventos e historico del nodo
+    # ─────────────────────────────────────────────────────────────
+
+    async def registrar_evento(self, node_id: str, evento: str,
+                               detalle: dict | None = None) -> None:
+        """
+        Deja constancia de algo que pasó: una caída, una reconexión, una
+        discrepancia entre lo que el nodo ejecuta y lo que debería.
+
+        Se guarda aquí y no solo en el log porque el journal de systemd
+        rota: cuando quieras saber cuántas veces se cayó el nodo el mes
+        pasado, el log ya no lo sabe y esta tabla sí.
+        """
+        await self._db.execute(
+            "INSERT INTO node_events (node_id, evento, detalle) VALUES (?, ?, ?)",
+            (node_id, evento, json.dumps(detalle or {}, default=str)),
+        )
+        await self._db.commit()
+
+    async def guardar_snapshot(self, node_id: str, e: dict) -> None:
+        """
+        Una fila del histórico a partir de un /estado del nodo.
+
+        Recibe el JSON tal cual lo entrega el nodo y se queda con lo que
+        vale la pena en el tiempo. Si el nodo no respondió, se llama con
+        `{}` y queda la fila con online=0: los huecos también son dato.
+        """
+        ts = int(time.time())
+
+        if not e:
+            await self._db.execute(
+                "INSERT INTO node_history (node_id, ts, online) VALUES (?, ?, 0)",
+                (node_id, ts),
+            )
+            await self._db.commit()
+            return
+
+        sal = e.get("salidas") or []
+        def rele(i: int) -> int | None:
+            return int(bool(sal[i]["estado"])) if len(sal) > i else None
+
+        s  = e.get("sensores") or {}
+        ej = e.get("ejecutando") or {}
+
+        await self._db.execute(
+            """
+            INSERT INTO node_history (
+                node_id, ts, online, uptime_s, rssi, heap, es_dia, hora_valida,
+                luz, bomba, valv_hidro, valv_tierra, riego_hidro,
+                temp, hum, ec, tds, nivel_raw, agua
+            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                node_id, ts,
+                (e.get("uptime_ms") or 0) // 1000,
+                e.get("rssi"), e.get("heap"),
+                int(bool(e.get("es_dia"))), int(bool(e.get("hora_valida"))),
+                rele(3), rele(2), rele(0), rele(1),
+                int(bool(ej.get("riego_hidro"))),
+                s.get("temp"), s.get("hum"), s.get("ec"), s.get("tds"),
+                s.get("nivel_raw"), int(bool(s.get("agua"))),
+            ),
+        )
+        await self._db.commit()
+
+    async def podar_historico(self, dias: int) -> int:
+        """
+        Borra historial y eventos más viejos que `dias`.
+
+        El disco de la Pi son 6.9 GB y esto crece sin freno: una fila cada
+        cinco minutos son ~18 MB al año, poco, pero nada que escriba sin
+        parar puede quedarse sin poda.
+        """
+        corte = int(time.time()) - dias * 86400
+        cur = await self._db.execute("DELETE FROM node_history WHERE ts < ?", (corte,))
+        borradas = cur.rowcount or 0
+        cur = await self._db.execute(
+            "DELETE FROM node_events WHERE created_at < ?", (corte,)
+        )
+        borradas += cur.rowcount or 0
+        await self._db.commit()
+        return borradas
+
+    async def resumen_eventos(self, horas: int = 24) -> list[dict]:
+        """Eventos recientes, para el endpoint de salud y para consultar."""
+        desde = int(time.time()) - horas * 3600
+        async with self._db.execute(
+            """
+            SELECT evento, COUNT(*) AS n, MAX(created_at) AS ultimo
+            FROM node_events WHERE created_at >= ?
+            GROUP BY evento ORDER BY ultimo DESC
+            """,
+            (desde,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    # ─────────────────────────────────────────────────────────────
     # Buffer management
     # ─────────────────────────────────────────────────────────────
 

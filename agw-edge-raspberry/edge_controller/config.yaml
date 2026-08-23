@@ -61,6 +61,19 @@ rules:
   enabled: true
   rules_file: "./rules/rules.yaml"
 
+reconciler:
+  # Pregunta al nodo por HTTP qué programa está ejecutando y lo compara
+  # con la sección `programa` de arriba. Si difieren, lo registra en
+  # node_events y lo corrige. Guarda además una serie temporal en
+  # SQLite: es el archivo local, independiente de la nube.
+  enabled: true
+  node_url: "http://10.42.0.26"
+  poll_seconds: 60
+  timeout_seconds: 6
+  snapshot_seconds: 300      # una fila cada 5 min ≈ 18 MB al año
+  retention_days: 90
+  corregir: true             # false = solo avisar, no tocar el nodo
+
 ap_watcher:
   # Vigila las asociaciones del punto de acceso. Cuando el ESP32 se va
   # del WiFi y vuelve, se le repone hora y programa al instante, sin

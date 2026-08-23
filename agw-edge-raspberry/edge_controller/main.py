@@ -15,6 +15,7 @@ from mqtt.broker_client import MQTTClient
 from cloud.sync_telemetry import TelemetrySyncer
 from cloud.sync_commands import CommandPoller
 from cloud.node_sync import NodeSync
+from cloud.reconciler import Reconciler
 from rules.rules_engine import RulesEngine
 from storage.local_db import LocalDB
 from utils.ap_watcher import APWatcher
@@ -74,6 +75,7 @@ async def main() -> None:
     command_poller = CommandPoller(config, mqtt_client)
     node_sync = NodeSync(config, mqtt_client, local_db)
     ap_watcher = APWatcher(config, node_sync)
+    reconciler = Reconciler(config, node_sync, local_db)
     health_server = HealthServer(config, mqtt_client, local_db)
 
     # Sin esto las reglas con acción mqtt_publish no llegan al ESP32: el
@@ -93,6 +95,7 @@ async def main() -> None:
         asyncio.create_task(command_poller.run(), name="command-poller"),
         asyncio.create_task(node_sync.run(), name="node-sync"),
         asyncio.create_task(ap_watcher.run(), name="ap-watcher"),
+        asyncio.create_task(reconciler.run(), name="reconciler"),
         asyncio.create_task(health_server.run(), name="health-server"),
         asyncio.create_task(shutdown_event.wait(), name="shutdown-watcher"),
     ]

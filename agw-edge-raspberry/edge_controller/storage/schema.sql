@@ -50,3 +50,70 @@ CREATE TABLE IF NOT EXISTS node_status (
     last_seen    INTEGER DEFAULT (strftime('%s', 'now')),
     payload      TEXT                   -- Último status JSON completo
 );
+
+-- ── Eventos del nodo ──────────────────────────────────────────
+--
+--  node_status guarda SOLO el último estado, una fila por nodo. Sirve
+--  para saber como esta ahora, y para nada mas: cuando el nodo se cayo
+--  el 23 de agosto no quedo rastro de la caida en ningun sitio salvo el
+--  journal de systemd, que rota y se pierde.
+--
+--  Aqui queda la historia de lo que PASA: conexiones, caidas, y las
+--  discrepancias entre el programa que ejecuta el nodo y el que deberia
+--  ejecutar. Sin esto, un gateway reenviando valores viejos durante
+--  cinco dias no deja ni una linea.
+
+CREATE TABLE IF NOT EXISTS node_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id    TEXT    NOT NULL,
+    evento     TEXT    NOT NULL,   -- conectado | desconectado | discrepancia
+                                   -- | corregido | riego_tierra
+    detalle    TEXT,               -- JSON con lo especifico del evento
+    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_created
+    ON node_events (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_events_tipo
+    ON node_events (evento, created_at DESC);
+
+-- ── Historico del nodo ────────────────────────────────────────
+--
+--  Serie temporal local, independiente de la nube. El buffer de
+--  telemetria se borra al sincronizar y se poda al llegar al limite, asi
+--  que no sirve como archivo: esta pensado para transportar, no para
+--  guardar. Esta tabla si es el archivo, y vive en la Pi aunque la nube
+--  no exista.
+--
+--  Se guardan columnas y no un JSON entero para poder consultarlo con
+--  SQL corriente: "cuantas horas rego ayer", "que EC tenia el martes".
+
+CREATE TABLE IF NOT EXISTS node_history (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id      TEXT    NOT NULL,
+    ts           INTEGER NOT NULL,     -- epoch local de la Pi
+    online       INTEGER,              -- 1 respondio, 0 no
+    uptime_s     INTEGER,
+    rssi         INTEGER,
+    heap         INTEGER,
+    es_dia       INTEGER,
+    hora_valida  INTEGER,
+    luz          INTEGER,              -- estado del rele de ambiente
+    bomba        INTEGER,
+    valv_hidro   INTEGER,
+    valv_tierra  INTEGER,
+    riego_hidro  INTEGER,              -- ciclo de hidroponia en curso
+    temp         REAL,
+    hum          REAL,
+    ec           REAL,
+    tds          REAL,
+    nivel_raw    INTEGER,
+    agua         INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_history_ts
+    ON node_history (ts DESC);
+
+CREATE INDEX IF NOT EXISTS idx_history_node_ts
+    ON node_history (node_id, ts DESC);

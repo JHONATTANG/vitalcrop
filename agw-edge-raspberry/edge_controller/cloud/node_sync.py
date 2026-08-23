@@ -36,6 +36,7 @@ from datetime import datetime, timedelta, timezone
 
 import structlog
 
+from config_loader import load_config
 from mqtt.topics import Topics
 
 log = structlog.get_logger("agw.nodesync")
@@ -107,9 +108,31 @@ class NodeSync:
             offset_h=offset / 3600,
         )
 
+    def programa_vigente(self) -> dict:
+        """
+        El programa del archivo, releído AHORA.
+
+        Antes esto era una copia hecha una sola vez en __init__, y el
+        gateway lleva semanas en marcha: si alguien editaba config.yaml,
+        el proceso seguía enviando la versión con la que arrancó. Pasó
+        exactamente eso —300 s de bomba en vez de 180 durante cinco
+        días— y no lo delató ningún error, porque desde el punto de
+        vista del código todo iba bien.
+
+        Si el archivo está roto se conserva la última copia buena: entre
+        no enviar nada y enviar lo último que se sabe correcto, lo
+        segundo deja el cultivo regando.
+        """
+        try:
+            self.programa = load_config().programa.model_dump()
+        except Exception as exc:
+            log.warning("No se pudo releer config.yaml; sigo con la ultima copia buena",
+                        error=str(exc))
+        return dict(self.programa)
+
     async def enviar_programa(self, motivo: str = "periodica") -> None:
         """Empuja el programa de cultivo completo."""
-        payload = {"cmd": "set_programa", **self.programa}
+        payload = {"cmd": "set_programa", **self.programa_vigente()}
 
         # Fecha del próximo riego de tierra. El nodo tiene además su
         # propio contador por si nunca recibe esto, pero mientras haya

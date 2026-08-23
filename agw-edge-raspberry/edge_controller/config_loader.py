@@ -109,6 +109,27 @@ class APWatcherConfig(BaseModel):
     settle_seconds: int = Field(8, ge=0, le=120)
 
 
+class ReconcilerConfig(BaseModel):
+    """
+    Vigilancia del programa que ejecuta el nodo, y archivo local.
+
+    Pregunta al nodo por HTTP —que no depende del broker— y contrasta lo
+    que ejecuta con lo que dice config.yaml. Si difieren, lo registra y
+    lo corrige. De paso guarda una serie temporal en SQLite, que es el
+    archivo que queda cuando no hay nube.
+    """
+    enabled: bool = True
+    node_url: str = "http://10.42.0.26"
+    poll_seconds: int = Field(60, ge=10, le=3600)
+    timeout_seconds: float = Field(6.0, ge=1, le=30)
+    # Cada cuánto se archiva una fila del histórico. 300 s son ~18 MB al
+    # año, holgado para el disco de la Pi.
+    snapshot_seconds: int = Field(300, ge=30, le=86400)
+    retention_days: int = Field(90, ge=1, le=3650)
+    # Corregir además de avisar. En false solo deja constancia.
+    corregir: bool = True
+
+
 # ─────────────────────────────────────────────────────────────────
 # Config raíz
 # ─────────────────────────────────────────────────────────────────
@@ -124,6 +145,7 @@ class AppConfig(BaseModel):
     # desplegadas siguen validando sin tocarlos.
     programa: ProgramaConfig = Field(default_factory=ProgramaConfig)
     ap_watcher: APWatcherConfig = Field(default_factory=APWatcherConfig)
+    reconciler: ReconcilerConfig = Field(default_factory=ReconcilerConfig)
 
 
 # ─────────────────────────────────────────────────────────────────
