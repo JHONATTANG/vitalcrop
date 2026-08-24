@@ -41,6 +41,18 @@ class Rule(BaseModel):
     actions: list[RuleAction]
     enabled: bool = True
 
+    # Segundos de silencio tras disparar. Sin esto, una regla se cumple
+    # en CADA trama de telemetria: la de EC baja genero 288 alertas
+    # identicas al dia, llenando la base y enterrando las de verdad.
+    # Una condicion sostenida es un solo problema, no doscientos.
+    cooldown_s: int = 900
+
+    # Tratar el 0 exacto como "sin dato" y no evaluar. El nodo publica
+    # 0.0 en el arranque, antes de la primera lectura del sensor, y eso
+    # disparaba "temperatura bajo 12 C" y "humedad bajo 40%" en cada
+    # reinicio. Tambien cubre la sonda desconectada, que da 0 fijo.
+    ignorar_cero: bool = False
+
     @field_validator("device_type")
     @classmethod
     def normalize_device_type(cls, v: str) -> str:

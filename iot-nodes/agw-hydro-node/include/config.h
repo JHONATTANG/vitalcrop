@@ -11,7 +11,7 @@
 // ------------------------------------------------------------
 #define DEVICE_ID         "IoT-node-26.001"
 #define DEVICE_TYPE       "hydro"
-#define FIRMWARE_VERSION  "2.2.0"
+#define FIRMWARE_VERSION  "2.3.0"
 
 // ------------------------------------------------------------
 //  Red WiFi
@@ -61,6 +61,11 @@
 #define TOPIC_TELEMETRIA  "cultivo/indoor/hierbabuena/telemetria"
 #define TOPIC_ALERTA      "cultivo/indoor/hierbabuena/alerta"
 #define TOPIC_STATUS      "cultivo/indoor/hierbabuena/status"
+// Eventos discretos: arranque y fin de un ciclo de riego. Van por su
+// propio topic y NO por telemetria, porque no son una medida periodica:
+// si el riego se publicara con la telemetria, bajar la cadencia a 5 min
+// haria que un ciclo de 3 min no apareciera en ningun sitio.
+#define TOPIC_EVENTO      "cultivo/indoor/hierbabuena/evento"
 // Raspberry → Nodo
 #define TOPIC_CMD         "cultivo/indoor/hierbabuena/cmd"
 
@@ -232,6 +237,18 @@
 // ------------------------------------------------------------
 //  Telemetría
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+//  Cadencia del sensor de conductividad
+// ------------------------------------------------------------
+//  La sonda vive sumergida en el tanque, que es la unica forma de
+//  vigilar la solucion. Leerla cada 5 s como el resto de sensores la
+//  excita 17.000 veces al dia sin ganar nada: la EC de un deposito no
+//  cambia en segundos. Un minuto da la misma curva con una fraccion del
+//  desgaste de los electrodos.
+#define PROG_EC_CADA_S               60
+#define PROG_EC_CADA_MIN_S            5
+#define PROG_EC_CADA_MAX_S         3600
+
 #define PROG_TELEMETRIA_S            60   // 1 min por defecto, ajustable
 #define PROG_TELEMETRIA_MIN_S         5   // Suelo: por debajo satura la red
 #define PROG_TELEMETRIA_MAX_S      3600   // Techo: 1 hora

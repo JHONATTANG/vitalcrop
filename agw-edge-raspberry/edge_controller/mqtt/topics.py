@@ -24,6 +24,11 @@ class Topics:
     TELEMETRIA = f"{BASE}/telemetria"   # cada periodo_ms (default 5 min)
     ALERTA     = f"{BASE}/alerta"       # asíncrono, independiente del período
     STATUS     = f"{BASE}/status"       # heartbeat 60 s + LWT
+    # Eventos discretos: inicio y fin de cada ciclo de riego. Van aparte
+    # de la telemetria porque un ciclo de 3 min no cabe en una cadencia
+    # de 5: publicarlo con la telemetria haria que ciclos enteros no
+    # aparecieran en ningun sitio.
+    EVENTO     = f"{BASE}/evento"
 
     # ── Raspberry → ESP32 (la Pi publica) ────────────────────────
     CMD        = f"{BASE}/cmd"

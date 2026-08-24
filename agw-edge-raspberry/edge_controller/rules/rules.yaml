@@ -33,10 +33,25 @@ rules:
   #    SIEMPRE que no hay agua. Durante una prueba de banco activó el
   #    riego real sin que nadie lo pidiera. Quedó obsoleta al cambiar
   #    la semántica del sensor y no se actualizó con ella.
+  # ⛔ DESACTIVADA — hacia lo contrario de lo que dice su nombre.
+  #
+  #    `set_riego` NO controla la valvula de tierra: controla la bomba y
+  #    la valvula de HIDROPONIA. Asi que esta regla, al detectar agua en
+  #    el sustrato, apagaba el riego de los tubos NFT — dos circuitos
+  #    distintos confundidos en una sola orden. Y ademas ponia
+  #    RIEGO_FORZADO en false y bajaba los reles, cortando en seco
+  #    cualquier ciclo de hidroponia en curso.
+  #
+  #    Es redundante desde la v2.1.0 del firmware: el corte del llenado
+  #    de tierra lo hace el propio nodo, con el sensor, en medio segundo
+  #    y sin depender de que el gateway este vivo. Delegarlo al edge era
+  #    ademas mas lento y mas fragil.
+  #
+  #    Se conserva como registro de por que no debe volver.
   - id: "nivel_alcanzado_corte"
     name: "Nivel de agua alcanzado — cortar llenado"
     device_type: "*"
-    enabled: true
+    enabled: false
     condition:
       sensor: "agua"
       operator: "=="
@@ -44,12 +59,7 @@ rules:
     actions:
       - type: "alert"
         severity: "INFO"
-        message: "Nivel de agua alcanzado en tierra — llenado detenido por el edge"
-      - type: "mqtt_publish"
-        topic: "cultivo/indoor/hierbabuena/cmd"
-        payload:
-          cmd: "set_riego"
-          encendido: false
+        message: "Nivel de agua alcanzado en tierra — llenado detenido por el nodo"
 
   # ── Conductividad fuera de rango ──────────────────────────────
   # Rango orientativo para solución nutritiva de hoja: 1200-2000 uS/cm.
@@ -59,6 +69,11 @@ rules:
     name: "Conductividad baja — solucion diluida"
     device_type: "*"
     enabled: true
+    # Con la sonda fuera del agua la lectura es 0 fijo, y eso disparaba
+    # esta alerta 288 veces al dia diciendo que la solucion estaba
+    # diluida cuando el problema era otro. Lo cubre `ec_sonda_muda`.
+    ignorar_cero: true
+    cooldown_s: 3600
     condition:
       sensor: "ec"
       operator: "<"
@@ -72,6 +87,8 @@ rules:
     name: "Conductividad alta — riesgo de quemado"
     device_type: "*"
     enabled: true
+    ignorar_cero: true
+    cooldown_s: 3600
     condition:
       sensor: "ec"
       operator: ">"
@@ -87,6 +104,8 @@ rules:
     name: "Temperatura alta — estrés térmico"
     device_type: "*"
     enabled: true
+    ignorar_cero: true
+    cooldown_s: 1800
     condition:
       sensor: "temp"
       operator: ">"
@@ -101,6 +120,8 @@ rules:
     name: "Temperatura baja — riesgo de detencion del crecimiento"
     device_type: "*"
     enabled: true
+    ignorar_cero: true
+    cooldown_s: 1800
     condition:
       sensor: "temp"
       operator: "<"
@@ -116,6 +137,8 @@ rules:
     name: "Humedad relativa baja"
     device_type: "*"
     enabled: true
+    ignorar_cero: true
+    cooldown_s: 3600
     condition:
       sensor: "hum"
       operator: "<"
@@ -131,6 +154,8 @@ rules:
     name: "Humedad relativa alta — riesgo fungico"
     device_type: "*"
     enabled: true
+    ignorar_cero: true
+    cooldown_s: 3600
     condition:
       sensor: "hum"
       operator: ">"
@@ -147,6 +172,7 @@ rules:
     name: "Señal WiFi debil del nodo"
     device_type: "*"
     enabled: true
+    cooldown_s: 3600
     condition:
       sensor: "rssi"
       operator: "<"
@@ -185,3 +211,22 @@ rules:
       - type: "alert"
         severity: "CRITICAL"
         message: "pH bajo 5.5 — riesgo de toxicidad por metales"
+
+  # ── Sonda de conductividad muda ───────────────────────────────
+  # Un 0.0 exacto y sostenido no es "solucion muy diluida": es que no
+  # llega senal. Sonda fuera del agua, cable suelto o modulo muerto.
+  # Merece un mensaje propio, porque la accion del operador es otra:
+  # no es dosificar nutrientes, es ir a mirar el cable.
+  - id: "ec_sonda_muda"
+    name: "Sonda de conductividad sin senal"
+    device_type: "*"
+    enabled: true
+    cooldown_s: 21600        # cada 6 h basta para algo que no cambia solo
+    condition:
+      sensor: "ec"
+      operator: "=="
+      threshold: 0.0
+    actions:
+      - type: "alert"
+        severity: "WARNING"
+        message: "EC = 0 uS/cm: la sonda no esta leyendo. Revisar que este sumergida y conectada al GPIO33"

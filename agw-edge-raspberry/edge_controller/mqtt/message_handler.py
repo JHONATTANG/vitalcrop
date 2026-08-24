@@ -58,6 +58,7 @@ class MessageHandler:
             "alerta_rx": 0,
             "alerta_deduplicada": 0,
             "status_rx": 0,
+            "evento_rx": 0,
             "lwt_rx": 0,
             "payload_invalido": 0,
             "sin_handler": 0,
@@ -67,6 +68,7 @@ class MessageHandler:
             Topics.TELEMETRIA: self._handle_telemetria,
             Topics.ALERTA:     self._handle_alerta,
             Topics.STATUS:     self._handle_status,
+            Topics.EVENTO:     self._handle_evento,
         }
 
     # ─────────────────────────────────────────────────────────────
@@ -192,6 +194,40 @@ class MessageHandler:
             return
         cutoff = now - (ALERT_DEDUP_WINDOW_S * 2)
         self._alert_seen = {k: v for k, v in self._alert_seen.items() if v > cutoff}
+
+    # ─────────────────────────────────────────────────────────────
+    # Eventos de riego
+    # ─────────────────────────────────────────────────────────────
+
+    async def _handle_evento(self, topic: str, raw: dict) -> None:
+        """
+        Inicio y fin de un ciclo de riego, tal como los publica el nodo.
+
+        Se guardan en `node_events` porque son la única fuente fiable de
+        cuánto se ha regado: la telemetría va a 5 minutos y un ciclo
+        dura 3, así que muestrear no basta — hay ciclos que no caen en
+        ninguna muestra. Hasta ahora, saber si la bomba respetaba el
+        programa exigía cronometrarla desde fuera con un script.
+        """
+        self.stats["evento_rx"] += 1
+
+        node_id  = raw.get("id") or "desconocido"
+        circuito = raw.get("circuito", "?")
+        fase     = raw.get("fase", "?")
+        segundos = raw.get("segundos")
+
+        if fase == "fin":
+            log.info("Ciclo de riego terminado", circuito=circuito,
+                     modo=raw.get("modo"), segundos=segundos)
+        else:
+            log.info("Ciclo de riego iniciado", circuito=circuito,
+                     modo=raw.get("modo"), programado_s=segundos)
+
+        try:
+            await self.local_db.registrar_evento(
+                node_id, f"riego_{circuito}_{fase}", raw)
+        except Exception as exc:
+            log.warning("No se pudo registrar el evento de riego", error=str(exc))
 
     # ─────────────────────────────────────────────────────────────
     # Status / heartbeat / LWT

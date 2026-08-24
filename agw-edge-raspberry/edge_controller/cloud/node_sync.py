@@ -139,7 +139,7 @@ class NodeSync:
         # gateway manda el calendario: es el que la app web muestra.
         proximo = await self._calcular_proximo_riego_tierra()
         if proximo:
-            payload["proximo_riego_tierra"] = int(proximo.timestamp())
+            payload["proximo_riego_tierra"] = self._a_epoch_nodo(proximo)
 
         await self.mqtt.publish(Topics.CMD, payload)
         self.stats["programa_enviado"] += 1
@@ -174,6 +174,23 @@ class NodeSync:
         return proximo.replace(
             hour=self.programa["tierra_hora"], minute=0, second=0, microsecond=0
         )
+
+    def _a_epoch_nodo(self, cuando: datetime) -> int:
+        """
+        datetime local ingenuo → epoch en la convención del nodo.
+
+        Es el inverso exacto de `_a_hora_local`, y hace falta porque el
+        nodo NO usa epoch UTC: recibe la hora de pared local disfrazada
+        de UTC (ver `enviar_hora`), y compara contra eso.
+
+        Usar `.timestamp()` a secas daba un epoch UTC de verdad, cinco
+        horas por delante del reloj del nodo. El riego de tierra quedaba
+        apuntado a las 12:00 en vez de a las 07:00, y como el filtro de
+        franja horaria lo rechazaba a esa hora, el llenado se corría al
+        día siguiente. Un día de retraso por cada ciclo, sin error
+        visible en ninguno de los dos lados.
+        """
+        return int(cuando.replace(tzinfo=timezone.utc).timestamp())
 
     def _a_hora_local(self, epoch: int) -> datetime:
         """

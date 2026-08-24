@@ -1,8 +1,29 @@
 /*
  * ============================================================
  *  AGW — Nodo HIDROPÓNICO (IoT-node-26.001)
- *  Firmware v2.2.0 / Arduino + PlatformIO / ESP32 DevKit v1
+ *  Firmware v2.3.0 / Arduino + PlatformIO / ESP32 DevKit v1
  * ============================================================
+ *
+ *  NOVEDAD v2.3.0 — Lo que el nodo no contaba
+ *  ------------------------------------------------------------
+ *  · /estado publica ya los cuatro tiempos de hidroponia. Sin ellos el
+ *    gateway no podia verificar la cadencia y hubo que cronometrar la
+ *    bomba desde fuera para descubrir que regaba 300 s en vez de 180.
+ *
+ *  · Eventos de riego en su propio topic (.../evento), al abrir y al
+ *    cerrar cada ciclo, con la duracion REAL. No van con la telemetria
+ *    a proposito: la telemetria esta a 5 min y un ciclo dura 3, asi que
+ *    algunos ciclos no apareceran en ninguna trama periodica.
+ *
+ *  · Calibracion de la sonda TDS por MQTT y HTTP:
+ *        {"cmd":"cal_cero"}            sonda al aire y seca
+ *        {"cmd":"cal_tds","ppm":350}   contra solucion patron
+ *    Antes solo existia por consola serie, asi que calibrar exigia ir
+ *    con un cable a una sonda que se consulta por red.
+ *
+ *  · La conductividad tiene cadencia propia (prog.ec_cada_s, 60 s por
+ *    defecto). La sonda vive sumergida y leerla cada 5 s la excitaba
+ *    17.000 veces al dia sin ganar resolucion.
  *
  *  NOVEDAD v2.2.0 — El nodo, ya en produccion
  *  ------------------------------------------------------------
@@ -267,6 +288,7 @@ struct Programa {
     uint16_t tierra_cada_dias;
     uint8_t  tierra_hora;
     uint32_t telemetria_s;
+    uint32_t ec_cada_s;
 };
 
 static Programa prog = {
@@ -274,7 +296,7 @@ static Programa prog = {
     PROG_HIDRO_RIEGO_DIA_S,      PROG_HIDRO_DESCANSO_DIA_S,
     PROG_HIDRO_RIEGO_NOCHE_S,    PROG_HIDRO_DESCANSO_NOCHE_S,
     PROG_TIERRA_CADA_DIAS,       PROG_TIERRA_HORA,
-    PROG_TELEMETRIA_S
+    PROG_TELEMETRIA_S,           PROG_EC_CADA_S
 };
 
 // --- Reloj: el ESP32 no tiene RTC, la hora la envia la Pi ---
@@ -514,6 +536,7 @@ void guardarPrograma() {
     prefs.putUShort("p_t_dias",  prog.tierra_cada_dias);
     prefs.putUChar("p_t_hora",   prog.tierra_hora);
     prefs.putUInt ("p_telem",    prog.telemetria_s);
+    prefs.putUInt ("p_ec_cada",  prog.ec_cada_s);
     prefs.putULong("p_prox_tie", (uint32_t)proximo_riego_tierra);
     prefs.putULong("p_ult_tie",  (uint32_t)ultimo_riego_tierra);
     prefs.putUChar("p_log",      log_nivel);
@@ -534,6 +557,7 @@ void cargarPrograma() {
     prog.tierra_cada_dias       = prefs.getUShort("p_t_dias",  PROG_TIERRA_CADA_DIAS);
     prog.tierra_hora            = prefs.getUChar ("p_t_hora",  PROG_TIERRA_HORA);
     prog.telemetria_s           = prefs.getUInt  ("p_telem",   PROG_TELEMETRIA_S);
+    prog.ec_cada_s              = prefs.getUInt  ("p_ec_cada", PROG_EC_CADA_S);
     proximo_riego_tierra        = (time_t)prefs.getULong("p_prox_tie", 0);
     ultimo_riego_tierra         = (time_t)prefs.getULong("p_ult_tie",  0);
     log_nivel                   = prefs.getUChar ("p_log",     LOG_NIVEL_DEF);
@@ -577,7 +601,8 @@ void imprimirPrograma() {
             Serial.println("  LUZ APAGADA A MANO, sin fecha de caducidad (no habia hora valida)");
         }
     }
-    Serial.printf ("  Telemetria     cada %lu s\n", prog.telemetria_s);
+    Serial.printf ("  Telemetria     cada %lu s   |   conductividad cada %lu s\n",
+                   prog.telemetria_s, prog.ec_cada_s);
     Serial.printf ("  Nivel de log   %u\n", log_nivel);
     Serial.println("+-------------------------------------------------------------+");
     if (hora_valida) {
@@ -881,6 +906,77 @@ float medirECAhora() {
         xSemaphoreGive(xMutexDatos);
     }
     return us;
+}
+
+/*  CALIBRACION DE LA SONDA TDS
+ *
+ *  Estas dos funciones existen para que la consola serie y los comandos
+ *  JSON hagan exactamente lo mismo. Antes la calibracion vivia escrita
+ *  a mano dentro del parser de la consola, asi que solo se podia
+ *  calibrar con el cable puesto: desde la Pi era inalcanzable, y el
+ *  operador tenia que ir al invernadero con un portatil para ajustar
+ *  una sonda que se consulta por MQTT.
+ *
+ *  Devuelven un texto de resultado, que es lo que HTTP responde al
+ *  cliente y lo que la consola imprime.                               */
+
+/*  Cero del modulo: sonda AL AIRE y SECA. Lo que mida en esas
+ *  condiciones es el offset del amplificador mas el suelo del ADC, y
+ *  hay que restarlo de toda lectura posterior.                        */
+String calibrarCero() {
+    float mv = leerTDSmV();
+
+    // Un cero alto no es un cero: es una sonda mojada o dentro del
+    // agua. Aceptarlo desplazaria TODAS las medidas futuras hacia
+    // abajo, y el error seria constante y por tanto invisible.
+    if (mv > 500.0f) {
+        logWarnF("CAL", "%.0f mV es demasiado alto para un cero. Seca la sonda.", mv);
+        char r[96];
+        snprintf(r, sizeof(r), "ERROR: %.0f mV es demasiado alto. Sonda al aire y SECA.", mv);
+        return String(r);
+    }
+
+    tds_mv_cero = mv;
+    guardarCalibracion();
+    logInfoF("CAL", "Cero fijado en %.0f mV", tds_mv_cero);
+
+    char r[80];
+    snprintf(r, sizeof(r), "cero fijado en %.0f mV (al aire deberia dar ~0 ppm)", tds_mv_cero);
+    return String(r);
+}
+
+/*  Ajuste fino contra una solucion patron. NO es una calibracion de dos
+ *  puntos: el modulo ya trae la curva del fabricante, y esto solo
+ *  corrige una desviacion sistematica.                                */
+String calibrarTDS(float ref_ppm) {
+    if (ref_ppm <= 0.0f)
+        return "ERROR: indica los ppm de la referencia. Ej: {\"cmd\":\"cal_tds\",\"ppm\":350}";
+
+    float t = (hdcPresente && temperatura_HDC > 0.0f)
+            ? temperatura_HDC : TDS_TEMP_FALLBACK;
+
+    float k_previo = tds_k;
+    tds_k = 1.0f;                        // medir sin la correccion vigente
+    float mv    = leerTDSmV();
+    float bruto = tdsDesdeVoltaje(mv, t);
+
+    if (bruto < 1.0f) {
+        tds_k = k_previo;                // deshacer: no se ha medido nada
+        logWarn("CAL", "Lectura casi nula. La sonda esta en el agua?");
+        return "ERROR: lectura casi nula. La sonda esta en la solucion?";
+    }
+
+    tds_k = ref_ppm / bruto;
+    guardarCalibracion();
+    logInfoF("CAL", "%.0f mV -> %.0f ppm sin corregir | referencia %.0f => k=%.4f",
+             mv, bruto, ref_ppm, tds_k);
+    if (tds_k < 0.5f || tds_k > 2.0f)
+        logWarnF("CAL", "Correccion mayor del 100%% (k=%.3f). Revisa la referencia.", tds_k);
+
+    char r[112];
+    snprintf(r, sizeof(r), "k = %.4f  (%.0f mV -> %.0f ppm sin corregir, referencia %.0f)",
+             tds_k, mv, bruto, ref_ppm);
+    return String(r);
 }
 
 /*  Recorre el bus I2C y lista lo que responda. Es la primera prueba que
@@ -1315,6 +1411,39 @@ void publicarStatus() {
 }
 
 // ============================================================
+//  EVENTOS DE RIEGO
+// ============================================================
+/*  Un ciclo de riego que empieza y termina es un EVENTO, no una medida
+ *  periodica, y por eso va por su propio topic y no con la telemetria.
+ *
+ *  La diferencia importa: la telemetria esta a 5 minutos y un ciclo de
+ *  hidroponia dura 3. Publicarlo con la telemetria significaria que
+ *  algunos ciclos no aparecerian en ningun sitio, y el gateway no
+ *  podria decir cuanto se rego ayer sin inventarselo a partir de
+ *  muestras sueltas.
+ *
+ *  Se publica al abrir y al cerrar. El de cierre lleva la duracion
+ *  real, que es el dato que permite comprobar que el nodo ejecuto lo
+ *  que decia el programa — hasta ahora habia que cronometrarlo desde
+ *  fuera con un script.                                              */
+void publicarEventoRiego(const char* circuito, const char* fase,
+                         const char* modo, uint32_t segundos) {
+    StaticJsonDocument<256> ev;
+    ev["id"]       = DEVICE_ID;
+    ev["evento"]   = "riego";
+    ev["circuito"] = circuito;          // "hidroponia" | "tierra"
+    ev["fase"]     = fase;              // "inicio" | "fin"
+    ev["modo"]     = modo;              // "dia" | "noche"
+    ev["epoch"]    = (uint32_t)ahora();
+    ev["uptime"]   = millis();
+    if (segundos) ev["segundos"] = segundos;
+
+    char buf[256];
+    serializeJson(ev, buf);
+    mqttPublish(TOPIC_EVENTO, buf, false);
+}
+
+// ============================================================
 //  PROCESADOR DE COMANDOS — compartido por MQTT y HTTP
 // ============================================================
 /*  Devuelve un mensaje corto de resultado para que HTTP pueda
@@ -1379,6 +1508,9 @@ String procesarComando(const JsonDocument& doc) {
                                        PROG_TELEMETRIA_MIN_S, PROG_TELEMETRIA_MAX_S);
             periodo_telemetria_ms = prog.telemetria_s * 1000UL;
         }
+        if (doc.containsKey("ec_cada_s"))
+            prog.ec_cada_s = acotar(doc["ec_cada_s"] | PROG_EC_CADA_S,
+                                    PROG_EC_CADA_MIN_S, PROG_EC_CADA_MAX_S);
         if (doc.containsKey("proximo_riego_tierra"))
             proximo_riego_tierra = (time_t)(doc["proximo_riego_tierra"] | 0UL);
 
@@ -1552,6 +1684,18 @@ String procesarComando(const JsonDocument& doc) {
                       : "llenado de tierra en cola";
     }
 
+    // ── Calibracion de la sonda TDS, desde cualquier plano ───
+    //    {"cmd":"cal_cero"}              sonda AL AIRE y seca
+    //    {"cmd":"cal_tds","ppm":350}     contra una solucion patron
+    //
+    //    Antes solo existian como atajos de la consola serie, asi que
+    //    calibrar exigia ir con un cable al invernadero para ajustar
+    //    una sonda que se consulta por MQTT. Ahora los tres planos de
+    //    control hacen lo mismo.
+    if (!strcmp(cmd, "cal_cero")) return calibrarCero();
+
+    if (!strcmp(cmd, "cal_tds"))  return calibrarTDS(doc["ppm"] | 0.0f);
+
     // ── Medida puntual de conductividad ──────────────────────
     //    Devuelve el valor en la respuesta HTTP, así que sirve para
     //    comprobar la sonda sin encender la telemetría continua.
@@ -1668,6 +1812,15 @@ void handleEstado() {
     JsonObject pr = doc.createNestedObject("programa");
     pr["hora_luz_on"]      = prog.hora_luz_on;
     pr["hora_luz_off"]     = prog.hora_luz_off;
+    // Los cuatro tiempos de hidroponia. Sin ellos el gateway no podia
+    // comprobar que el nodo ejecutara la cadencia configurada, y hubo
+    // que cronometrar la bomba desde fuera para descubrir que iba a
+    // 300 s en vez de a 180.
+    pr["hidro_riego_dia_s"]      = prog.hidro_riego_dia_s;
+    pr["hidro_descanso_dia_s"]   = prog.hidro_descanso_dia_s;
+    pr["hidro_riego_noche_s"]    = prog.hidro_riego_noche_s;
+    pr["hidro_descanso_noche_s"] = prog.hidro_descanso_noche_s;
+    pr["ec_cada_s"]        = prog.ec_cada_s;
     pr["tierra_cada_dias"] = prog.tierra_cada_dias;
     pr["tierra_hora"]      = prog.tierra_hora;
     pr["telemetria_s"]     = prog.telemetria_s;
@@ -2314,7 +2467,10 @@ void tarea_sensor_suelo(void* pv) {
 void tarea_sensor_ec(void* pv) {
     pinMode(PIN_EC_SENSOR, INPUT);
     for (;;) {
-        vTaskDelay(INTERVAL_SENSOR / portTICK_PERIOD_MS);
+        // Cadencia propia, no la de los demas sensores: la sonda vive
+        // sumergida y excitarla cada 5 s desgasta los electrodos sin
+        // ganar resolucion. La EC de un tanque no cambia en segundos.
+        vTaskDelay((prog.ec_cada_s * 1000UL) / portTICK_PERIOD_MS);
 
         if (mods.simulacion) {
             if (xSemaphoreTake(xMutexDatos, portMAX_DELAY) == pdTRUE) {
@@ -2665,41 +2821,11 @@ void tarea_consola(void* pv) {
             // el modulo ya trae la curva del fabricante. Esto solo corrige
             // una desviacion sistematica contra una referencia conocida.
             // 'cal cero' — sonda AL AIRE y SECA. Fija el offset del modulo.
-            else if (linea == "cal cero") {
-                float mv = leerTDSmV();
-                if (mv > 500.0f) {
-                    Serial.printf("[CAL] %.0f mV es demasiado alto para un cero.\n", mv);
-                    Serial.println("      Seca la sonda y asegurate de que esta al aire.");
-                } else {
-                    tds_mv_cero = mv;
-                    guardarCalibracion();
-                    Serial.printf("[CAL] Cero fijado en %.0f mV.\n", tds_mv_cero);
-                    Serial.println("      Al aire la lectura deberia dar ahora ~0 ppm.");
-                }
-            }
+            // Los atajos llaman a las mismas funciones que los comandos
+            // JSON: una sola implementacion de la calibracion.
+            else if (linea == "cal cero") { Serial.println(calibrarCero()); }
             else if (linea.startsWith("cal tds ")) {
-                float ref = linea.substring(8).toFloat();
-                if (ref <= 0.0f) {
-                    Serial.println("[CAL] Indica los ppm de referencia. Ej: cal tds 350");
-                } else {
-                    float t = (hdcPresente && temperatura_HDC > 0.0f)
-                            ? temperatura_HDC : TDS_TEMP_FALLBACK;
-                    float k_previo = tds_k;
-                    tds_k = 1.0f;                          // medir sin correccion
-                    float mv    = leerTDSmV();
-                    float bruto = tdsDesdeVoltaje(mv, t);
-                    if (bruto < 1.0f) {
-                        tds_k = k_previo;
-                        Serial.println("[CAL] Lectura casi nula. Sonda en el agua?");
-                    } else {
-                        tds_k = ref / bruto;
-                        guardarCalibracion();
-                        Serial.printf("[CAL] %.0f mV -> %.0f ppm sin corregir\n", mv, bruto);
-                        Serial.printf("      Referencia %.0f ppm  =>  k = %.4f\n", ref, tds_k);
-                        if (tds_k < 0.5f || tds_k > 2.0f)
-                            Serial.println("      AVISO: correccion mayor del 100 %. Revisa la referencia.");
-                    }
-                }
+                Serial.println(calibrarTDS(linea.substring(8).toFloat()));
             }
             else if (linea == "cal") { imprimirSensores(); }
 
@@ -2880,6 +3006,7 @@ void tarea_riego_hidro(void* pv) {
         logInfoF("HIDRO", "Riego ON  (%s%s, %lu s)",
                  dia ? "dia" : "noche",
                  modoDegradado() ? ", degradado" : "", t_riego);
+        publicarEventoRiego("hidroponia", "inicio", dia ? "dia" : "noche", t_riego);
 
         // Espera troceada vigilando el enclavamiento de tiempo máximo:
         // si el tanque se vacía, la bomba trabajaría en seco hasta
@@ -2901,7 +3028,13 @@ void tarea_riego_hidro(void* pv) {
         regando_hidro = false;
         bomba_encendida_desde = 0;
         fin_ultimo_riego = millis();
-        logInfoF("HIDRO", "Riego OFF (descanso %lu s)", t_descanso);
+        logInfoF("HIDRO", "Riego OFF (%lu s regados, descanso %lu s)",
+                 transcurrido / 1000, t_descanso);
+        // La duracion REAL, no la programada: si el ciclo se corto antes
+        // por el enclavamiento de la bomba o porque se apago el modulo,
+        // el gateway tiene que enterarse de lo que ocurrio de verdad.
+        publicarEventoRiego("hidroponia", "fin", dia ? "dia" : "noche",
+                            transcurrido / 1000);
 
         esperarSegundos(t_descanso, &mods.riego_hidro);
     }

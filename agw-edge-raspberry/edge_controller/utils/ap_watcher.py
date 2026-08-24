@@ -100,21 +100,16 @@ class APWatcher:
             )
             salida, err = await asyncio.wait_for(proc.communicate(), timeout=_TIMEOUT_S)
         except asyncio.TimeoutError:
-            self.stats["sondeos_fallidos"] += 1
-            log.debug("hostapd_cli no respondio a tiempo")
+            self._fallo("hostapd_cli no respondio a tiempo")
             return None
         except Exception as exc:
-            self.stats["sondeos_fallidos"] += 1
-            log.debug("Fallo el sondeo de estaciones", error=str(exc))
+            self._fallo("Fallo el sondeo de estaciones", error=str(exc))
             return None
 
         if proc.returncode != 0:
-            self.stats["sondeos_fallidos"] += 1
-            log.debug(
-                "hostapd_cli devolvio error",
-                codigo=proc.returncode,
-                stderr=err.decode(errors="replace").strip()[:200],
-            )
+            self._fallo("hostapd_cli devolvio error",
+                        codigo=proc.returncode,
+                        stderr=err.decode(errors="replace").strip()[:200])
             return None
 
         return {
@@ -122,6 +117,28 @@ class APWatcher:
             for linea in salida.decode(errors="replace").splitlines()
             if _MAC_RE.match(linea.strip())
         }
+
+    def _fallo(self, mensaje: str, **datos) -> None:
+        """
+        Un sondeo que no se pudo hacer.
+
+        Los primeros fallos van a WARNING y despues se espacian. La
+        version anterior los mandaba TODOS a debug, que no se ve en
+        produccion: el vigilante llevaba cinco dias sin funcionar —
+        hostapd_cli fallaba en cada sondeo— y en el log solo aparecia
+        la linea de "en marcha" del arranque. Un vigilante cuyo modo de
+        fallo es el silencio no vigila nada.
+        """
+        self.stats["sondeos_fallidos"] += 1
+        n = self.stats["sondeos_fallidos"]
+
+        # 1, 2, 3, y luego uno de cada 60 (una hora con el sondeo a 60 s)
+        if n <= 3 or n % 60 == 0:
+            log.warning(mensaje, fallos_seguidos=n,
+                        binario=self.binario, interfaz=self.cfg.interface,
+                        pista="si el servicio corre con PrivateTmp=yes, hostapd "
+                              "no puede responder al socket cliente de hostapd_cli",
+                        **datos)
 
     def _vigiladas(self, macs: set[str]) -> set[str]:
         """Filtra por la MAC del nodo, si se configuró una."""

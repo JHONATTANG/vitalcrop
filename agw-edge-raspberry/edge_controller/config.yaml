@@ -55,7 +55,10 @@ programa:
   # Tras cambiarlo:  sudo systemctl restart agw-edge
   tierra_cada_dias: 10
   tierra_hora: 7
-  telemetria_s: 60
+  # 300 s en vez de 60: cinco veces menos escrituras, y el tope de
+  # 50.000 filas del buffer pasa de cubrir 35 dias a cubrir 173.
+  telemetria_s: 300
+  ec_cada_s: 60
 
 rules:
   enabled: true

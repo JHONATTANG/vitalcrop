@@ -58,6 +58,9 @@ class RulesEngine:
         self._rules: list[Rule] = []
         self._mqtt_publish_cb = None  # inyectado por MQTTClient
 
+        # Momento del ultimo disparo de cada regla, para el cooldown.
+        self._ultimo_disparo: dict[str, float] = {}
+
         # Última acción emitida por cada regla, para no repetirla.
         # Sin esto, una condición sostenida (p. ej. sustrato seco) republica
         # el mismo comando en CADA trama de telemetría: con período de 10 s
@@ -102,6 +105,14 @@ class RulesEngine:
                 )
                 continue
 
+            # 0.0 exacto = el sensor aun no ha leido, o esta
+            # desconectado. Ninguna magnitud de este cultivo vale cero
+            # de verdad: ni la temperatura del aire, ni la humedad, ni
+            # la conductividad de una solucion nutritiva.
+            if rule.ignorar_cero and float(sensor_value) == 0.0:
+                log.debug("Sensor a cero, se ignora", rule_id=rule.id)
+                continue
+
             compare_fn = _OPERATORS[rule.condition.operator]
             try:
                 triggered = compare_fn(float(sensor_value), rule.condition.threshold)
@@ -114,6 +125,15 @@ class RulesEngine:
                 continue
 
             if triggered:
+                # Silencio tras el ultimo disparo. La condicion sigue
+                # siendo cierta y sigue estando mal, pero repetirlo cada
+                # minuto no aporta informacion: aporta ruido que tapa lo
+                # que si es nuevo.
+                ultimo = self._ultimo_disparo.get(rule.id, 0.0)
+                if time.time() - ultimo < rule.cooldown_s:
+                    continue
+                self._ultimo_disparo[rule.id] = time.time()
+
                 log.info(
                     "Rule triggered",
                     rule_id=rule.id,

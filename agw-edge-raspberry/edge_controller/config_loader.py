@@ -88,6 +88,9 @@ class ProgramaConfig(BaseModel):
     tierra_cada_dias: int = Field(10, ge=1, le=365)
     tierra_hora: int = Field(7, ge=0, le=23)
     telemetria_s: int = Field(60, ge=5, le=3600)
+    # Cadencia de la sonda de conductividad, aparte de la telemetria: la
+    # sonda vive sumergida y no hace falta excitarla cada 5 s.
+    ec_cada_s: int = Field(60, ge=5, le=3600)
 
 
 class APWatcherConfig(BaseModel):

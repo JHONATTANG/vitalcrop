@@ -112,7 +112,13 @@ SyslogIdentifier=agw-edge
 
 # Endurecimiento razonable sin romper el acceso a /var/lib/agw
 NoNewPrivileges=yes
-PrivateTmp=yes
+
+# PrivateTmp=no A PROPOSITO. Con /tmp privado, hostapd_cli crea su
+# socket de cliente dentro del namespace del servicio y hostapd, que
+# vive fuera, no puede responderle: todos los sondeos del vigilante del
+# AP fallaban en silencio. El unico dato sensible del servicio es el
+# .env, que ya esta en chmod 600 y fuera de /tmp.
+PrivateTmp=no
 ProtectSystem=full
 ReadWritePaths=/var/lib/agw /var/log/agw
 

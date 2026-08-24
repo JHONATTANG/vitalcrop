@@ -285,6 +285,18 @@ class LocalDB:
             "DELETE FROM node_events WHERE created_at < ?", (corte,)
         )
         borradas += cur.rowcount or 0
+
+        # local_alerts no se podaba NUNCA: crecia sin freno a ~45 MB al
+        # ano. Se poda igual que el resto, con una excepcion: las filas
+        # de RIEGO_TIERRA sostienen el calendario de llenados —de ahi
+        # sale la fecha del proximo— y borrarlas reiniciaria el ciclo
+        # en silencio.
+        cur = await self._db.execute(
+            "DELETE FROM local_alerts WHERE created_at < ? AND alert_type != 'RIEGO_TIERRA'",
+            (corte,),
+        )
+        borradas += cur.rowcount or 0
+
         await self._db.commit()
         return borradas
 
