@@ -35,13 +35,12 @@ POR HTTP Y NO POR MQTT
 módulo de status. Si MQTT se cae, esto sigue viendo la verdad — que es
 justo cuando más falta hace.
 
-LO QUE NO PUEDE VERIFICAR
+QUE PUEDE VERIFICAR
 
-El nodo no publica sus tiempos de hidroponía: `/estado` trae el
-fotoperiodo, los días de tierra y la telemetría, pero no
-`hidro_riego_dia_s` ni sus tres hermanos. Hasta que el firmware los
-exponga, esos cuatro se envían pero no se pueden comprobar. Está
-señalado en `_CAMPOS_VERIFICABLES` para que no se olvide.
+Todo lo que el nodo publica en el bloque `programa` de `/estado`, que
+desde el firmware 2.3.0 es el programa completo. Con un nodo mas
+antiguo verifica solo lo que ese nodo reporte: los campos ausentes se
+saltan en vez de contarse como discrepancia.
 """
 from __future__ import annotations
 
@@ -54,14 +53,24 @@ import structlog
 log = structlog.get_logger("agw.reconciler")
 
 # Campos del programa que el nodo reporta en /estado y por tanto se
-# pueden contrastar. Los cuatro tiempos de hidroponia NO estan aqui
-# porque el firmware todavia no los publica.
+# pueden contrastar. Desde el firmware 2.3.0 estan TODOS, incluidos los
+# cuatro tiempos de hidroponia, que eran los que obligaban a cronometrar
+# la bomba desde fuera para saber si obedecia.
+#
+# La comparacion salta los campos que no vengan en el /estado, asi que
+# esta lista es segura tambien contra un nodo con firmware anterior:
+# simplemente verificara menos cosas.
 _CAMPOS_VERIFICABLES = (
     "hora_luz_on",
     "hora_luz_off",
+    "hidro_riego_dia_s",
+    "hidro_descanso_dia_s",
+    "hidro_riego_noche_s",
+    "hidro_descanso_noche_s",
     "tierra_cada_dias",
     "tierra_hora",
     "telemetria_s",
+    "ec_cada_s",
 )
 
 
