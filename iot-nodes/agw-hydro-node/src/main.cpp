@@ -1402,6 +1402,14 @@ void publicarStatus() {
     // truncado sigue siendo una cadena valida para serializeJson, pero
     // es JSON roto para quien lo recibe, y el gateway lo descartaria sin
     // decir por que. Mejor un aviso en el log del nodo.
+    // Dos comprobaciones distintas, y hacen falta las dos: el documento
+    // puede quedarse sin capacidad (y entonces ArduinoJson descarta
+    // campos en silencio) o el texto puede no caber en el buffer (y
+    // entonces sale JSON truncado, que el gateway descartaria sin
+    // explicar por que).
+    if (st.overflowed())
+        logError("STATUS", "El status no cabe en su documento: faltan campos");
+
     char buf[1024];
     size_t escritos = serializeJson(st, buf, sizeof(buf));
     if (escritos >= sizeof(buf) - 1)
@@ -1409,6 +1417,38 @@ void publicarStatus() {
 
     mqttPublish(TOPIC_STATUS, buf, false);
 }
+
+// ============================================================
+//  VIGILANCIA DE PILAS
+// ============================================================
+/*  Cuanto le quedo libre a cada tarea en su peor momento.
+ *
+ *  Un desbordamiento de pila en FreeRTOS no da un error legible: da un
+ *  reinicio con un backtrace que hay que descifrar, o peor, corrupcion
+ *  silenciosa de la tarea vecina. Y las tareas de este nodo cargan
+ *  documentos JSON de 1 KB en la pila para publicar el status.
+ *
+ *  Dimensionar "a ojo" y esperar a que falle no es una opcion cuando el
+ *  firmware se sube una sola vez. Esto expone la marca de agua en
+ *  /estado: si alguna tarea baja de unos cientos de bytes, se ve antes
+ *  de que reviente y se corrige con un numero en setup().
+ *
+ *  En ESP-IDF tanto el tamano de xTaskCreate como esta marca van en
+ *  BYTES, asi que los dos numeros se comparan directamente.           */
+struct TareaVigilada { const char* nombre; TaskHandle_t handle; uint32_t pedidos; };
+
+static TareaVigilada tareas_vigiladas[] = {
+    { "mqtt",       nullptr, 8192 },
+    { "http",       nullptr, 8192 },
+    { "status",     nullptr, 4096 },
+    { "consola",    nullptr, 4096 },
+    { "riego-tie",  nullptr, 4096 },
+    { "riego-hid",  nullptr, 3072 },
+    { "ambiente",   nullptr, 2560 },
+    { "ec",         nullptr, 2560 },
+};
+static const uint8_t N_TAREAS_VIGILADAS =
+    sizeof(tareas_vigiladas) / sizeof(tareas_vigiladas[0]);
 
 // ============================================================
 //  EVENTOS DE RIEGO
@@ -1436,7 +1476,15 @@ void publicarEventoRiego(const char* circuito, const char* fase,
     ev["modo"]     = modo;              // "dia" | "noche"
     ev["epoch"]    = (uint32_t)ahora();
     ev["uptime"]   = millis();
-    if (segundos) ev["segundos"] = segundos;
+
+    // Nombres distintos a proposito. En "inicio" el numero es lo que el
+    // programa dice que va a durar; en "fin" es lo que duro de verdad,
+    // que puede ser menos si el ciclo se corto. Llamar a los dos
+    // `segundos` invitaba a sumarlos juntos y contar el doble.
+    if (segundos) {
+        if (!strcmp(fase, "fin")) ev["segundos"]    = segundos;
+        else                      ev["programado_s"] = segundos;
+    }
 
     char buf[256];
     serializeJson(ev, buf);
@@ -1750,6 +1798,16 @@ void mqttCallback(char* topic, byte* raw, unsigned int length) {
 //  SERVIDOR HTTP DE CONTROL
 // ============================================================
 void httpEnviarJson(int codigo, const JsonDocument& doc) {
+    // ArduinoJson no falla cuando se le acaba la capacidad: descarta
+    // campos y sigue. La respuesta sale bien formada, solo que
+    // incompleta, y quien la lee no tiene forma de notarlo. Como el
+    // gateway compara /estado contra su configuracion, un campo que
+    // desaparece se leeria como "el nodo no lo reporta" en vez de como
+    // el fallo que es.
+    if (doc.overflowed())
+        logError("HTTP", "El JSON no cabe en su documento: faltan campos. "
+                         "Subir la capacidad en handleEstado.");
+
     String out;
     serializeJsonPretty(doc, out);
     httpServer.send(codigo, "application/json", out);
@@ -1760,7 +1818,7 @@ void httpEnviarJson(int codigo, const JsonDocument& doc) {
  *  MQTT deja de servir para diagnosticar cuando el broker falla —
  *  justo cuando más falta hace.                                       */
 void handleEstado() {
-    DynamicJsonDocument doc(2048);
+    DynamicJsonDocument doc(3072);
     doc["id"]         = DEVICE_ID;
     doc["fw"]         = FIRMWARE_VERSION;
     doc["uptime_ms"]  = millis();
@@ -1838,6 +1896,16 @@ void handleEstado() {
     ti["ec_despues"] = ec_despues_llenado;
     ti["en_curso"]   = regando_tierra;
     ti["pendiente"]  = solicitud_llenado;
+
+    // Pila libre minima de cada tarea, en bytes. Si alguna se acerca a
+    // cero hay que subir su tamano en setup() antes de que reinicie el
+    // nodo sin decir por que.
+    JsonObject pl = doc.createNestedObject("pilas");
+    for (uint8_t i = 0; i < N_TAREAS_VIGILADAS; i++) {
+        if (!tareas_vigiladas[i].handle) continue;
+        pl[tareas_vigiladas[i].nombre] =
+            (uint32_t)uxTaskGetStackHighWaterMark(tareas_vigiladas[i].handle);
+    }
 
     JsonObject s = doc.createNestedObject("sensores");
     if (xSemaphoreTake(xMutexDatos, pdMS_TO_TICKS(200)) == pdTRUE) {
@@ -2470,7 +2538,20 @@ void tarea_sensor_ec(void* pv) {
         // Cadencia propia, no la de los demas sensores: la sonda vive
         // sumergida y excitarla cada 5 s desgasta los electrodos sin
         // ganar resolucion. La EC de un tanque no cambia en segundos.
-        vTaskDelay((prog.ec_cada_s * 1000UL) / portTICK_PERIOD_MS);
+        //
+        // La espera va troceada para que un cambio de ec_cada_s se note
+        // enseguida: con una sola vTaskDelay larga, pasar de 3600 a 60
+        // no tendria efecto hasta una hora despues.
+        //
+        // Y con suelo: un 0 aqui seria vTaskDelay(0), o sea un bucle
+        // cerrado martilleando el ADC y matando de hambre a las tareas
+        // de menor prioridad. No deberia poder llegar un 0 —set_programa
+        // acota y la NVS tiene default— pero esto se flashea una vez.
+        uint32_t espera_s = prog.ec_cada_s ? prog.ec_cada_s : PROG_EC_CADA_S;
+        for (uint32_t t = 0; t < espera_s; t += 5) {
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            if (prog.ec_cada_s && prog.ec_cada_s < espera_s) break;  // lo bajaron
+        }
 
         if (mods.simulacion) {
             if (xSemaphoreTake(xMutexDatos, portMAX_DELAY) == pdTRUE) {
@@ -3376,27 +3457,27 @@ void setup() {
 
     // ── Planos de control: siempre activos ───────────────────
     xTaskCreate(tarea_wifi,          "wifi",       4096, NULL, 4, NULL);
-    xTaskCreate(tarea_mqtt,          "mqtt",       8192, NULL, 3, NULL);
-    xTaskCreate(tarea_http,          "http",       8192, NULL, 3, NULL);
+    xTaskCreate(tarea_mqtt,          "mqtt",       8192, NULL, 3, &tareas_vigiladas[0].handle);
+    xTaskCreate(tarea_http,          "http",       8192, NULL, 3, &tareas_vigiladas[1].handle);
 
     // ── Funciones: creadas siempre, gobernadas por sus flags ──
     xTaskCreate(tarea_telemetria,    "telemetria", 8192, NULL, 2, NULL);
-    xTaskCreate(tarea_status,        "status",     4096, NULL, 2, NULL);
+    xTaskCreate(tarea_status,        "status",     4096, NULL, 2, &tareas_vigiladas[2].handle);
     xTaskCreate(tarea_alertas,       "alertas",    4096, NULL, 2, NULL);
     xTaskCreate(tarea_sensor_hdc,    "hdc1080",    3072, NULL, 1, NULL);
     xTaskCreate(tarea_sensor_suelo,  "suelo",      2560, NULL, 1, NULL);
     xTaskCreate(tarea_sensor_ph,     "ph",         2560, NULL, 1, NULL);
-    xTaskCreate(tarea_sensor_ec,     "ec",         2560, NULL, 1, NULL);
-    xTaskCreate(tarea_riego_hidro,   "riego-hid",  3072, NULL, 2, NULL);
+    xTaskCreate(tarea_sensor_ec,     "ec",         2560, NULL, 1, &tareas_vigiladas[7].handle);
+    xTaskCreate(tarea_riego_hidro,   "riego-hid",  3072, NULL, 2, &tareas_vigiladas[5].handle);
     // 4096 y no 3072: esta tarea ahora publica el status al terminar un
     // llenado, y el documento JSON mas las llamadas de log no caben con
     // holgura en la pila anterior.
-    xTaskCreate(tarea_riego_tierra,  "riego-tie",  4096, NULL, 2, NULL);
-    xTaskCreate(tarea_ambiente,      "ambiente",   2560, NULL, 2, NULL);
+    xTaskCreate(tarea_riego_tierra,  "riego-tie",  4096, NULL, 2, &tareas_vigiladas[4].handle);
+    xTaskCreate(tarea_ambiente,      "ambiente",   2560, NULL, 2, &tareas_vigiladas[6].handle);
 
     // ── Pruebas de banco ─────────────────────────────────────
     xTaskCreate(tarea_test_valvulas, "test-valv",  3072, NULL, 2, NULL);
-    xTaskCreate(tarea_consola,       "consola",    4096, NULL, 1, NULL);
+    xTaskCreate(tarea_consola,       "consola",    4096, NULL, 1, &tareas_vigiladas[3].handle);
     xTaskCreate(tarea_monitor,       "monitor",    4096, NULL, 1, NULL);
 }
 
