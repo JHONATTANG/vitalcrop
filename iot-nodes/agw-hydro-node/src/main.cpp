@@ -1437,15 +1437,31 @@ void publicarStatus() {
  *  BYTES, asi que los dos numeros se comparan directamente.           */
 struct TareaVigilada { const char* nombre; TaskHandle_t handle; uint32_t pedidos; };
 
+/*  MEDIDO EN EL NODO, no estimado. Con los tamanos originales la tarea
+ *  de EC quedaba en 328 bytes libres de 2560 —un 87 % consumido— y la
+ *  de ambiente en 704. Ese margen no aguanta una linea de log un poco
+ *  mas larga: el printf de coma flotante de newlib es caro en pila, y
+ *  las dos tareas formatean floats.
+ *
+ *  La causa de fondo es que 2560 se eligio cuando esas tareas solo
+ *  leian un ADC. Hoy la de EC ordena 32 muestras, compensa temperatura
+ *  y registra cuatro floats; la de ambiente escribe en NVS al caducar
+ *  el veto de luz.
+ *
+ *  Todas las tareas de trabajo pasan a 4096. Son ~6 KB mas de los 280
+ *  libres: el coste es irrelevante al lado de un reinicio aleatorio con
+ *  backtrace que hay que descifrar.                                   */
 static TareaVigilada tareas_vigiladas[] = {
     { "mqtt",       nullptr, 8192 },
     { "http",       nullptr, 8192 },
     { "status",     nullptr, 4096 },
     { "consola",    nullptr, 4096 },
     { "riego-tie",  nullptr, 4096 },
-    { "riego-hid",  nullptr, 3072 },
-    { "ambiente",   nullptr, 2560 },
-    { "ec",         nullptr, 2560 },
+    { "riego-hid",  nullptr, 4096 },
+    { "ambiente",   nullptr, 4096 },
+    { "ec",         nullptr, 4096 },
+    { "hdc1080",    nullptr, 4096 },
+    { "suelo",      nullptr, 4096 },
 };
 static const uint8_t N_TAREAS_VIGILADAS =
     sizeof(tareas_vigiladas) / sizeof(tareas_vigiladas[0]);
@@ -3464,16 +3480,16 @@ void setup() {
     xTaskCreate(tarea_telemetria,    "telemetria", 8192, NULL, 2, NULL);
     xTaskCreate(tarea_status,        "status",     4096, NULL, 2, &tareas_vigiladas[2].handle);
     xTaskCreate(tarea_alertas,       "alertas",    4096, NULL, 2, NULL);
-    xTaskCreate(tarea_sensor_hdc,    "hdc1080",    3072, NULL, 1, NULL);
-    xTaskCreate(tarea_sensor_suelo,  "suelo",      2560, NULL, 1, NULL);
-    xTaskCreate(tarea_sensor_ph,     "ph",         2560, NULL, 1, NULL);
-    xTaskCreate(tarea_sensor_ec,     "ec",         2560, NULL, 1, &tareas_vigiladas[7].handle);
-    xTaskCreate(tarea_riego_hidro,   "riego-hid",  3072, NULL, 2, &tareas_vigiladas[5].handle);
+    xTaskCreate(tarea_sensor_hdc,    "hdc1080",    4096, NULL, 1, &tareas_vigiladas[8].handle);
+    xTaskCreate(tarea_sensor_suelo,  "suelo",      4096, NULL, 1, &tareas_vigiladas[9].handle);
+    xTaskCreate(tarea_sensor_ph,     "ph",         4096, NULL, 1, NULL);
+    xTaskCreate(tarea_sensor_ec,     "ec",         4096, NULL, 1, &tareas_vigiladas[7].handle);
+    xTaskCreate(tarea_riego_hidro,   "riego-hid",  4096, NULL, 2, &tareas_vigiladas[5].handle);
     // 4096 y no 3072: esta tarea ahora publica el status al terminar un
     // llenado, y el documento JSON mas las llamadas de log no caben con
     // holgura en la pila anterior.
     xTaskCreate(tarea_riego_tierra,  "riego-tie",  4096, NULL, 2, &tareas_vigiladas[4].handle);
-    xTaskCreate(tarea_ambiente,      "ambiente",   2560, NULL, 2, &tareas_vigiladas[6].handle);
+    xTaskCreate(tarea_ambiente,      "ambiente",   4096, NULL, 2, &tareas_vigiladas[6].handle);
 
     // ── Pruebas de banco ─────────────────────────────────────
     xTaskCreate(tarea_test_valvulas, "test-valv",  3072, NULL, 2, NULL);
