@@ -256,10 +256,6 @@ export default function MapaTopologia({
       layout: 'none' as const,
       roam: true,
       draggable: true,
-      // Sin esto, arrastrar un nodo lo devuelve a su sitio al refrescar
-      // los datos: al fijarlo, la posición que elige quien mira manda
-      // sobre la que trae el componente.
-      focusNodeAdjacency: true,
       categories: [
         { name: 'Nube',       itemStyle: { color: COLOR_CATEGORIA.nube } },
         { name: 'Gateway',    itemStyle: { color: COLOR_CATEGORIA.gateway } },
@@ -282,6 +278,11 @@ export default function MapaTopologia({
         formatter: (p: { data: unknown }) => (p.data as { valor?: string }).valor ?? '',
       },
       emphasis: {
+        // 'adjacency' apaga todo menos el nodo señalado y sus enlaces.
+        // En una estrella con doce aristas es la diferencia entre ver
+        // de dónde cuelga algo y adivinarlo. `focusNodeAdjacency`, que
+        // hacía esto en ECharts 4, está retirado desde la 5.
+        focus: 'adjacency' as const,
         scale: 1.08,
         label: { color: COLORES.texto, fontWeight: 'bold' as const },
         lineStyle: { width: 4, opacity: 1 },
