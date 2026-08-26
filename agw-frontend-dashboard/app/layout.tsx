@@ -6,13 +6,14 @@ import Providers from './providers';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title:       'VitalCrop AGW — Dashboard',
-  description: 'IoT Agricultural Gateway monitoring and control dashboard',
+  title:       'VitalCrop AGW — Panel de control',
+  description: 'Monitoreo y control del cultivo en ambiente controlado, '
+             + 'con analitica de telecomunicaciones del enlace IoT.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="es" className="dark">
       <body className={`${inter.variable} font-sans bg-bg-primary text-text-primary antialiased`}>
         <Providers>{children}</Providers>
       </body>

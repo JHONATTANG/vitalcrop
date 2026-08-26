@@ -11,7 +11,7 @@ import toast, { Toaster } from 'react-hot-toast';
 
 // Schema for Email Step
 const emailSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
+  email: z.string().email('Escribe una dirección de correo válida'),
 });
 type EmailForm = z.infer<typeof emailSchema>;
 
@@ -37,9 +37,9 @@ export default function LoginPage() {
       await apiClient.post('/api/auth/request-code', { email: data.email });
       setStoredEmail(data.email);
       setStep('otp');
-      toast.success('Verification code sent!');
+      toast.success('Código enviado. Revisa tu correo.');
     } catch (error) {
-      toast.error('Failed to send verification code.');
+      toast.error('No se pudo enviar el código.');
     } finally {
       setLoading(false);
     }
@@ -56,13 +56,13 @@ export default function LoginPage() {
       const { access_token } = res.data;
       if (access_token) {
         setCookie('jwt', access_token, { maxAge: 60 * 60 * 24 * 7, path: '/' });
-        toast.success('Login successful!');
+        toast.success('Sesión iniciada.');
         router.push('/dashboard');
       } else {
-        toast.error('Invalid token received.');
+        toast.error('La respuesta del servidor no traía una sesión válida.');
       }
     } catch (error) {
-      toast.error('Invalid verification code.');
+      toast.error('El código no es correcto o ya caducó.');
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold text-text-primary tracking-tight">VitalCrop AGW</h1>
           <p className="text-sm text-text-secondary mt-1">
-            {step === 'email' ? 'Sign in to access your nodes' : 'Enter the verification code'}
+            {step === 'email' ? 'Entra para ver y controlar tu cultivo' : 'Escribe el código que te hemos enviado'}
           </p>
         </div>
 
@@ -96,7 +96,7 @@ export default function LoginPage() {
         {step === 'email' && (
           <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4 relative z-10 animate-fade-in">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Email Address</label>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">Correo electrónico</label>
               <div className="relative group">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-brand-blue transition-colors" />
                 <input
@@ -115,7 +115,7 @@ export default function LoginPage() {
               type="submit" disabled={loading}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gradient-to-r from-brand-blue to-blue-500 hover:opacity-90 disabled:opacity-60 text-white text-sm font-semibold transition-all duration-200 shadow-glow_blue mt-2"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Continue'}
+              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Continuar'}
               {!loading && <ArrowRight size={16} />}
             </button>
           </form>
@@ -125,7 +125,7 @@ export default function LoginPage() {
         {step === 'otp' && (
           <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-4 relative z-10 animate-fade-in_up">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Secure Code</label>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">Código de acceso</label>
               <div className="relative group">
                 <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-brand-green transition-colors" />
                 <input
@@ -145,20 +145,20 @@ export default function LoginPage() {
               type="submit" disabled={loading}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gradient-to-r from-brand-green to-emerald-500 hover:opacity-90 disabled:opacity-60 text-white text-sm font-semibold transition-all duration-200 shadow-glow_green mt-2"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Verify & Login'}
+              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Verificar y entrar'}
             </button>
             <button
               type="button" onClick={() => setStep('email')}
               className="w-full text-xs text-text-muted hover:text-text-primary mt-3 transition-colors"
             >
-              Use a different email
+              Usar otro correo
             </button>
           </form>
         )}
       </div>
 
       <p className="text-center text-xs text-text-muted mt-6 font-medium">
-        VitalCrop AGW · Agricultural IoT Gateway
+        VitalCrop AGW · Cultivo en ambiente controlado
       </p>
     </div>
   );
