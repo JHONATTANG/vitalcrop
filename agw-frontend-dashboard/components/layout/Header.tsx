@@ -8,8 +8,10 @@ interface Props { title: string }
 
 export default function Header({ title }: Props) {
   const { data: user } = useUser();
-  const { data: alerts }  = useAlerts(true);
-  const unread = alerts?.length ?? 0;
+  // `useAlerts` devuelve { resumen, alertas }. Antes se leía como si
+  // fuese un array y el contador salía siempre en cero.
+  const { data: alertas } = useAlerts(1);
+  const criticas = alertas?.alertas.filter((a) => a.severity !== 'INFO').length ?? 0;
 
   const handleSignOut = () => {
     deleteCookie('jwt');
@@ -24,9 +26,9 @@ export default function Header({ title }: Props) {
         {/* Alerts bell */}
         <a href="/alerts" className="relative p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors">
           <Bell size={18} />
-          {unread > 0 && (
+          {criticas > 0 && (
             <span className="absolute top-1 right-1 w-4 h-4 text-[10px] font-bold flex items-center justify-center rounded-full bg-brand-red text-white leading-none">
-              {unread > 9 ? '9+' : unread}
+              {criticas > 9 ? '9+' : criticas}
             </span>
           )}
         </a>
@@ -42,7 +44,7 @@ export default function Header({ title }: Props) {
           <button
             onClick={handleSignOut}
             className="p-1.5 rounded-lg text-text-muted hover:text-brand-red hover:bg-red-500/10 transition-colors"
-            title="Sign out"
+            title="Cerrar sesión"
           >
             <LogOut size={15} />
           </button>

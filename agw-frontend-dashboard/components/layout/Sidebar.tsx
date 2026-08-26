@@ -9,14 +9,14 @@ import {
 } from 'lucide-react';
 
 const NAV = [
-  { href: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Resumen',            icon: LayoutDashboard },
   // El eje evaluativo del proyecto (MCD §9). Va arriba, junto al
-  // dashboard, y no al final con las utilidades: es lo que se mide.
-  { href: '/telecom',   label: 'Telecom',    icon: Activity },
-  { href: '/fog',       label: 'Gateway fog', icon: Server },
-  { href: '/devices',   label: 'Devices',    icon: Cpu },
-  { href: '/commands',  label: 'Commands',   icon: Terminal },
-  { href: '/alerts',    label: 'Alerts',     icon: Bell },
+  // resumen, y no al final con las utilidades: es lo que se mide.
+  { href: '/telecom',   label: 'Telecomunicaciones', icon: Activity },
+  { href: '/fog',       label: 'Nodo fog',           icon: Server },
+  { href: '/devices',   label: 'Dispositivos',       icon: Cpu },
+  { href: '/commands',  label: 'Control',            icon: Terminal },
+  { href: '/alerts',    label: 'Alertas',            icon: Bell },
 ];
 
 export default function Sidebar() {
@@ -38,7 +38,7 @@ export default function Sidebar() {
         {!col && (
           <div>
             <p className="text-sm font-bold text-text-primary leading-none">VitalCrop</p>
-            <p className="text-[10px] text-text-muted">AGW Dashboard</p>
+            <p className="text-[10px] text-text-muted">Panel AGW</p>
           </div>
         )}
       </div>
@@ -73,7 +73,7 @@ export default function Sidebar() {
       <button
         onClick={toggleSidebar}
         className="flex items-center justify-center h-10 border-t border-brand-border text-text-muted hover:text-text-primary transition-colors"
-        aria-label="Toggle sidebar"
+        aria-label="Plegar o desplegar el menú"
       >
         {col ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>

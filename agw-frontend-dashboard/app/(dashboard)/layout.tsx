@@ -3,16 +3,18 @@ import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 
-const PAGE_TITLES: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/devices':   'Devices',
-  '/commands':  'Command Center',
-  '/alerts':    'Alert Center',
+const TITULOS: Record<string, string> = {
+  '/dashboard': 'Resumen del cultivo',
+  '/telecom':   'Telecomunicaciones',
+  '/fog':       'Nodo fog · autonomía del borde',
+  '/devices':   'Dispositivos',
+  '/commands':  'Centro de control',
+  '/alerts':    'Alertas y eventos',
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const title    = Object.entries(PAGE_TITLES).find(([k]) => pathname.startsWith(k))?.[1] ?? 'VitalCrop';
+  const title    = Object.entries(TITULOS).find(([k]) => pathname.startsWith(k))?.[1] ?? 'VitalCrop';
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg-primary">

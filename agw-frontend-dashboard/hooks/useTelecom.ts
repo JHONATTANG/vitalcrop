@@ -39,9 +39,17 @@ export interface ResumenTelecom {
   }>;
   reinicios_nodo: { n: number; ultimo: string | null };
   latencia_subida: {
-    n: number; media_ms: number | null; p95_ms: number | null;
-    objetivo_ms: number; estado: string;
+    n: number; media_ms: number | null; minimo_ms: number | null;
+    p50_ms: number | null; p95_ms: number | null;
+    objetivo_ms: number; umbral_en_vivo_ms: number; estado: string;
   };
+  /**
+   * Tramas que subieron desde el buffer del borde tras un corte, no por
+   * el camino en vivo. Van aparte porque promediarlas con las otras
+   * daba una "latencia" de horas que no describía ninguno de los dos
+   * caminos.
+   */
+  recuperacion_de_buffer?: { n: number; peor_horas: number | null };
   no_instrumentado: Record<string, string>;
 }
 
@@ -139,5 +147,127 @@ export function useGateway() {
     queryKey: ['telecom', 'gateway'],
     queryFn: async () => (await apiClient.get('/api/metricas/gateway')).data,
     refetchInterval: REFRESCO,
+  });
+}
+
+// ── Series cruzadas ───────────────────────────────────────────
+//
+// Los hooks de arriba sirven una métrica cada uno. Comparar varias
+// pidiéndolas por separado sale mal: cada consulta agrupa por su cuenta
+// y basta que a una le falte un bucket para que las series queden
+// desplazadas entre sí. `/multiserie` las agrupa contra la misma
+// rejilla, así que los huecos son nulos de verdad.
+
+export interface PuntoMultiserie {
+  t: string;
+  n: number;
+  temperatura?: number | null;
+  humedad_ambiente?: number | null;
+  humedad_suelo?: number | null;
+  ec?: number | null;
+  tds?: number | null;
+  rssi?: number | null;
+  nivel_raw?: number | null;
+}
+
+export interface DiaBalance {
+  dia: string;
+  tramas: number;
+  esperadas: number;
+  rssi_medio: number | null;
+  rssi_min: number | null;
+  temp_media: number | null;
+  hum_media: number | null;
+  ec_media: number | null;
+  periodo_ms: number | null;
+  tramas_rssi_bajo: number;
+  reinicios: number;
+  ciclos_riego: number;
+  min_bomba: number;
+}
+
+export interface PuntoCorrelacion { x: number; y: number; hora: number }
+
+export interface HoraPerfil {
+  hora: number;
+  n: number;
+  temperatura: number | null;
+  humedad: number | null;
+  ec: number | null;
+  rssi: number | null;
+  rssi_sigma: number | null;
+  rssi_bajo: number;
+}
+
+export function useMultiserie(
+  metricas = 'temperatura,humedad_ambiente,ec,rssi',
+  dias = 7,
+  bucketMin = 30,
+) {
+  return useQuery<{ metricas: string[]; bucket_min: number; puntos: PuntoMultiserie[] }>({
+    queryKey: ['telecom', 'multiserie', metricas, dias, bucketMin],
+    queryFn: async () =>
+      (await apiClient.get(
+        `/api/metricas/multiserie?metricas=${encodeURIComponent(metricas)}` +
+        `&dias=${dias}&bucket_min=${bucketMin}`)).data,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useDiario(dias = 21) {
+  return useQuery<{ dias: DiaBalance[] }>({
+    queryKey: ['telecom', 'diario', dias],
+    queryFn: async () => (await apiClient.get(`/api/metricas/diario?dias=${dias}`)).data,
+    // Agrega por día: refrescarlo cada 15 s no cambiaría ninguna barra.
+    refetchInterval: 5 * 60_000,
+  });
+}
+
+export function useCorrelacion(x = 'temperatura', y = 'ec', dias = 14, muestras = 1200) {
+  return useQuery<{ x: string; y: string; r: number | null; n: number; puntos: PuntoCorrelacion[] }>({
+    queryKey: ['telecom', 'correlacion', x, y, dias, muestras],
+    queryFn: async () =>
+      (await apiClient.get(
+        `/api/metricas/correlacion?x=${x}&y=${y}&dias=${dias}&muestras=${muestras}`)).data,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
+export function usePerfilHorario(dias = 14) {
+  return useQuery<{
+    horas: HoraPerfil[];
+    riego_por_hora: Array<{ hora: number; ciclos: number }>;
+  }>({
+    queryKey: ['telecom', 'perfil-horario', dias],
+    queryFn: async () =>
+      (await apiClient.get(`/api/metricas/perfil-horario?dias=${dias}`)).data,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
+// ── Fog ───────────────────────────────────────────────────────
+
+export interface EstadoFog {
+  ventana: { desde: string; hasta: string; dias: number; sin_nube: number; con_nube: number };
+  autonomia: {
+    dias_sin_nube: number;
+    tramas_generadas_sin_nube: number;
+    pct_del_historico_sin_nube: number;
+  };
+  decisiones_del_borde: Array<{ evento: string; n: number; primero: string; ultimo: string }>;
+  riego_autonomo: { ciclos: number; minutos_bomba: number; dias_con_riego: number };
+  recuperaciones: {
+    n: number; mttr_s: number | null; peor_s: number | null; mejor_s: number | null;
+    objetivo_s: number;
+    detalle: Array<{ caida: string; vuelta: string; segundos: number }>;
+  };
+  huecos_de_datos: Array<{ desde: string; hasta: string; segundos: number }>;
+}
+
+export function useFog(dias = 30) {
+  return useQuery<EstadoFog>({
+    queryKey: ['telecom', 'fog', dias],
+    queryFn: async () => (await apiClient.get(`/api/metricas/fog?dias=${dias}`)).data,
+    refetchInterval: 60_000,
   });
 }
