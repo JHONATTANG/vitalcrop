@@ -7,7 +7,7 @@ import { Thermometer, Droplets, Activity, Zap, FlaskConical, Wifi } from 'lucide
 interface Props { telemetry: TelemetryRecord | null; deviceType: DeviceType }
 
 function ReadingCell({ label, value, unit, icon: Icon, warn }: {
-  label: string; value: number | undefined; unit: string; icon: any; warn?: boolean
+  label: string; value?: number | null; unit: string; icon: any; warn?: boolean
 }) {
   return (
     <div className={`glass rounded-xl p-4 ${warn ? 'border-yellow-500/30 shadow-glow_yellow' : ''}`}>

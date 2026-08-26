@@ -38,7 +38,10 @@ export default function TelemetryChart({ deviceId, deviceType }: { deviceId: str
 
   const chartData = (data ?? []).map((b) => ({
     ...b,
-    time: format(new Date(b.bucket), 'HH:mm'),
+    // `bucket` es el nombre antiguo y `t` el que sirve
+    // /api/metricas/series. Se acepta cualquiera de los dos en vez
+    // de renombrar la respuesta de la API o el componente.
+    time: format(new Date(b.bucket ?? b.t), 'HH:mm'),
   }));
 
   return (

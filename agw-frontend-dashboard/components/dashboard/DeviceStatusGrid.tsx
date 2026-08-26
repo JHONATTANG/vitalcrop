@@ -61,7 +61,7 @@ export default function DeviceStatusGrid() {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       {devices.map((d) => (
         <DeviceItem key={d.id} deviceId={d.id} deviceUid={d.device_uid}
-          deviceType={d.device_type} status={d.status} location={d.location} />
+          deviceType={d.device_type} status={d.status} location={d.location ?? null} />
       ))}
     </div>
   );

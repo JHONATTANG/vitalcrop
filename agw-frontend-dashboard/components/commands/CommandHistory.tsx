@@ -26,7 +26,9 @@ export default function CommandHistory({ deviceId }: { deviceId: string }) {
       ) : (
         <div className="space-y-1 max-h-60 overflow-y-auto">
           {commands.slice(0, 20).map((cmd) => {
-            const s = STATUS_STYLES[cmd.status];
+            // La API nueva sirve estados en minusculas; la UI mapea los de
+            // siempre. Hasta unificarlos, se cae a PENDING si no encaja.
+            const s = STATUS_STYLES[cmd.status as CommandStatus] ?? STATUS_STYLES.PENDING;
             const Icon = s.icon;
             return (
               <div key={cmd.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-white/5 transition-colors">
