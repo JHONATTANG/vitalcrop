@@ -27,7 +27,7 @@ cloud:
   api_key: "CAMBIAR"                           # override: AGW_CLOUD_API_KEY
   telemetry_endpoint: "/api/telemetria"        # contrato real (MCD §4.2)
   health_endpoint: "/api/health"
-  commands_endpoint: "/api/commands/pending"   # aún no existe (deuda 7.10)
+  commands_endpoint: "/api/iot/commands/pending"   # router iot (migracion 004)
   poll_interval_seconds: 5
   push_timeout_seconds: 10
   retry_max: 3

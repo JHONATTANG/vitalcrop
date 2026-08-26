@@ -6,15 +6,21 @@ Trae órdenes desde la nube y las traduce a comandos MQTT para el ESP32.
 Es el camino DOWNSTREAM del anteproyecto: *"tendrá la capacidad de recibir
 órdenes revisando una tabla de órdenes"*.
 
-⚠️ ESTADO: el endpoint de órdenes **todavía no existe** en la Cloud API
-(MCD deuda 7.10, se construye en la Fase 5). Mientras no exista:
-  · si `cloud.enabled` es false → el poller no arranca
-  · si la API responde 404 → se registra UNA vez y el poller se detiene,
-    en lugar de generar ruido cada 5 segundos durante días
+CONTRATO CON LA NUBE
 
-Traducción de formatos: la nube habla de "órdenes" genéricas; el ESP32 solo
-entiende los seis comandos de su contrato (MCD §4.1). Esa conversión ocurre
-aquí, en `_to_firmware_command()`.
+La tabla `comandos` guarda en la columna `comando` (JSONB) el payload
+**tal cual lo entiende el firmware**. Esa decisión se tomó en la
+migración 004 y es la que hace que este módulo sea corto: no hay que
+traducir nada, se republica el JSON en el topic de comandos y ya.
+
+Traducir aquí sería además una limitación real. El traductor que había
+antes conocía seis comandos; el nodo entiende más de veinte, y los que
+de verdad se usan a diario —`set_programa`, `llenar_tierra`, `medir_ec`,
+`luz`— no estaban entre los seis. Se conserva como respaldo para
+órdenes con la forma antigua (`{"tipo": ...}`), no como camino normal.
+
+Si la API responde 404 el poller se detiene tras avisar una vez, en vez
+de generar ruido cada 5 segundos durante días.
 """
 from __future__ import annotations
 
@@ -96,7 +102,12 @@ class CommandPoller:
             raise
 
         body = resp.json()
-        orders = body.get("data") or body.get("ordenes") or []
+        # "comandos" es la clave que devuelve /api/iot/commands/pending.
+        # Las otras dos son formas anteriores del contrato; se aceptan
+        # para que un gateway viejo contra una API nueva —o al revés—
+        # no se quede mudo sin decir por qué.
+        orders = (body.get("comandos") or body.get("data")
+                  or body.get("ordenes") or [])
         for order in orders:
             self.stats["recibidos"] += 1
             await self._dispatch(order)
@@ -104,7 +115,10 @@ class CommandPoller:
 
     async def _dispatch(self, order: dict) -> None:
         """Traduce la orden y la publica en el topic de comandos del nodo."""
-        payload = self._to_firmware_command(order)
+        payload = order.get("comando")
+        if not isinstance(payload, dict):
+            # Forma antigua: la orden venía descrita por campos sueltos.
+            payload = self._to_firmware_command(order)
         if payload is None:
             self.stats["no_traducibles"] += 1
             log.warning("Orden no traducible al contrato del firmware", order=order)
@@ -153,11 +167,21 @@ class CommandPoller:
         return None
 
     async def _confirm(self, order_id) -> None:
-        """Marca la orden como enviada. No es crítico si falla."""
+        """
+        Marca la orden como entregada.
+
+        El acuse cuelga de `/commands/{id}/ack`, no del endpoint de
+        pendientes: se deriva quitando el último segmento. Antes se
+        hacía PATCH sobre `/pending/{id}`, una ruta que no existe, así
+        que toda orden entregada seguía figurando como pendiente y se
+        reenviaba al nodo en cada vuelta del poller.
+
+        No es crítico si falla: el nodo ya la recibió.
+        """
+        base = self._endpoint.rstrip("/").rsplit("/", 1)[0]
         try:
-            await self._cloud.patch(
-                f"{self._endpoint.rstrip('/')}/{order_id}",
-                json={"status": "SENT"},
+            await self._cloud.post(
+                f"{base}/{order_id}/ack",
                 retries=0,
             )
         except Exception as exc:
