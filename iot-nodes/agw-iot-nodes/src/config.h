@@ -34,7 +34,7 @@
 
 // === OTA ===
 #define OTA_ENABLED     true
-#define OTA_PASSWORD    "ota_secure_password"
+#define OTA_PASSWORD    "CAMBIAR"   // real en SECRETOS.local.md
 
 // === PIN MAPPING - SOIL NODE ===
 #ifdef SOIL_NODE

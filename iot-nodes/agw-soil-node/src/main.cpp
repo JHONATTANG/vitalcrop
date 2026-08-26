@@ -55,7 +55,7 @@
 #define MQTT_PASS         "mqtt_password"
 #define MQTT_KEEPALIVE    60
 
-#define OTA_PASSWORD      "ota_secure_password"
+#define OTA_PASSWORD      "CAMBIAR"   // real en SECRETOS.local.md
 
 // Intervalos (ms)
 #define INTERVAL_SENSOR       5000

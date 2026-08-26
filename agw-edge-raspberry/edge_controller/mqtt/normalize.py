@@ -180,6 +180,39 @@ def to_cloud_payload(
         # La columna es VARCHAR(255) en Neon
         body["estado_actuadores"] = estado_actuadores[:255]
 
+    # ── Telecomunicaciones y proceso ──────────────────────────
+    #  El nodo publicaba RSSI, conductividad, uptime y cadencia desde
+    #  hace semanas, y este constructor los descartaba: solo copiaba las
+    #  cuatro variables agronómicas. La consecuencia es que el eje
+    #  evaluativo del proyecto —el desempeño de la cadena de
+    #  comunicación— no llegaba a la nube, y el panel de métricas no
+    #  tenía de dónde salir.
+    #
+    #  `t_rx` es el más importante de todos: es el instante en que ESTA
+    #  máquina recibió la trama. Junto al `created_at` que pone la nube
+    #  al insertar, da la latencia de subida por registro sin necesidad
+    #  de sincronizar relojes entre las dos.
+    if telemetry.get("rssi") is not None:
+        body["rssi"] = int(telemetry["rssi"])
+    if telemetry.get("fw"):
+        body["fw"] = str(telemetry["fw"])[:16]
+    if telemetry.get("uptime_ms") is not None:
+        body["uptime_ms"] = int(telemetry["uptime_ms"])
+    if telemetry.get("periodo_ms") is not None:
+        body["periodo_ms"] = int(telemetry["periodo_ms"])
+    if telemetry.get("t_rx_iso"):
+        body["t_rx"] = telemetry["t_rx_iso"]
+
+    sensores = telemetry.get("sensores", {}) or {}
+    # La conductividad no pasa por CLOUD_SENSOR_MAP porque su nombre
+    # coincide a ambos lados y no tiene CHECK en el esquema.
+    for clave in ("ec", "tds"):
+        v = sensores.get(clave)
+        if v is not None:
+            body[clave] = round(float(v), 2)
+    if sensores.get("agua") is not None:
+        body["agua"] = bool(sensores["agua"])
+
     return body
 
 

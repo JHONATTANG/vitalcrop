@@ -72,3 +72,18 @@ agw_diagnostico.txt
 # Se excluye para no crearlo como submódulo accidental. Sus cambios
 # se versionan allí, no aquí.
 agw-cloud-api/
+
+# ============================================================
+#  Secretos — repositorio PUBLICO
+# ============================================================
+#  Nada de esto puede entrar al historico: una vez dentro, sacarlo
+#  exige reescribirlo. Las plantillas equivalentes (*.example.*) si
+#  se versionan, para que quien clone sepa que debe definir.
+
+SECRETOS.local.md
+iot-nodes/*/include/secrets.h
+iot-nodes/*/src/secrets.h
+.env.production
+**/.env.production
+.env.vercel
+**/.env.vercel

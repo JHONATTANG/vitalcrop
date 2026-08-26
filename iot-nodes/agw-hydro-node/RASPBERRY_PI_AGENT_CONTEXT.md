@@ -51,7 +51,7 @@
 |---|---|
 | Modo WiFi Raspberry | Hotspot (Access Point) |
 | SSID | `CULTIVO_INDOOR_WIFI` |
-| Contraseña WiFi | `hierbabuena2026` |
+| Contraseña WiFi | `<CLAVE_DEL_AP>` (ver SECRETOS.local.md) |
 | IP Raspberry (gateway) | `10.42.0.1` (fija) |
 | Puerto MQTT | `1883` |
 | Autenticación MQTT | **Desactivada por ahora** (`allow_anonymous true`) |
@@ -67,7 +67,7 @@ sudo apt install hostapd dnsmasq -y
 ```
 interface=wlan0
 ssid=CULTIVO_INDOOR_WIFI
-wpa_passphrase=hierbabuena2026
+wpa_passphrase=<CLAVE_DEL_AP>
 hw_mode=g
 channel=6
 wpa=2

@@ -16,10 +16,14 @@ mqtt:
   max_reconnect_delay: 60
 
 cloud:
-  # ⚠️ No hay API desplegada. Durante la Fase 3 apuntar a la IP LAN del PC
-  # de desarrollo, con uvicorn levantado con --host 0.0.0.0
-  enabled: false
-  api_base_url: "http://192.168.20.10:8000"
+  # La API corre en el PC de desarrollo, alcanzable por Tailscale. No hay
+  # despliegue público todavía; cuando lo haya, basta cambiar esta URL o
+  # exportar AGW_CLOUD_BASE_URL, que la sobreescribe.
+  #
+  # El token NO va aquí: este archivo está en git. Vive en
+  # /opt/agw-edge/.env como AGW_CLOUD_API_KEY, con chmod 600.
+  enabled: true
+  api_base_url: "http://100.100.17.21:8000"
   api_key: "CAMBIAR"                           # override: AGW_CLOUD_API_KEY
   telemetry_endpoint: "/api/telemetria"        # contrato real (MCD §4.2)
   health_endpoint: "/api/health"

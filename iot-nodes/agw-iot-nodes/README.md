@@ -27,7 +27,7 @@ Este repositorio contiene el firmware unificado para los nodos del sistema IoT d
 El nodo soporta actualizaciones por WiFi después del primer flasheo serial. 
 Para actualizar:
 ```bash
-pio run -t upload --upload-port <IP_DEL_NODO> --upload-flags="--auth=ota_secure_password"
+pio run -t upload --upload-port <IP_DEL_NODO> --upload-flags="--auth=<CLAVE_OTA>"
 ```
 
 ## Calibración de Sensores Analógicos (pH & EC)

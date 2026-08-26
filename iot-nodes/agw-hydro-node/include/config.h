@@ -6,6 +6,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include "secrets.h"
+
 // ------------------------------------------------------------
 //  Identidad del dispositivo
 // ------------------------------------------------------------
@@ -17,7 +19,10 @@
 //  Red WiFi
 // ------------------------------------------------------------
 #define WIFI_SSID         "CULTIVO_INDOOR_WIFI"
-#define WIFI_PASS         "hierbabuena2026"
+// La clave sale de secrets.h, que esta en .gitignore. El repositorio
+// es publico: una contrasena de AP escrita aqui permitiria a
+// cualquiera asociarse a la red del cultivo.
+#define WIFI_PASS         WIFI_PASS_SECRETO
 
 // ------------------------------------------------------------
 //  MQTT Broker (IP de la Raspberry Pi en la red hotspot)
@@ -506,6 +511,6 @@
 #define DEFAULT_MOD_TEST_VALVULAS  false   // Apagado por seguridad
 
 // OTA (ArduinoOTA — no activo aún, reservado)
-#define OTA_PASSWORD      "ota_secure_password"
+#define OTA_PASSWORD      OTA_PASSWORD_SECRETO
 
 #endif // CONFIG_H

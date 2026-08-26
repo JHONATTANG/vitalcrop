@@ -4,12 +4,16 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 import {
-  LayoutDashboard, Cpu, Terminal, Bell,
+  LayoutDashboard, Cpu, Terminal, Bell, Activity, Server,
   ChevronLeft, ChevronRight, Leaf,
 } from 'lucide-react';
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
+  // El eje evaluativo del proyecto (MCD §9). Va arriba, junto al
+  // dashboard, y no al final con las utilidades: es lo que se mide.
+  { href: '/telecom',   label: 'Telecom',    icon: Activity },
+  { href: '/fog',       label: 'Gateway fog', icon: Server },
   { href: '/devices',   label: 'Devices',    icon: Cpu },
   { href: '/commands',  label: 'Commands',   icon: Terminal },
   { href: '/alerts',    label: 'Alerts',     icon: Bell },
