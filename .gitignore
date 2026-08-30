@@ -87,3 +87,6 @@ iot-nodes/*/src/secrets.h
 **/.env.production
 .env.vercel
 **/.env.vercel
+
+# ── Documentacion de grado (borradores, PDFs y plantillas pesadas) ──
+docs/

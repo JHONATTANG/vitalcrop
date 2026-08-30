@@ -91,8 +91,8 @@ class MQTTClient:
                     # Suscribir al árbol completo del cultivo: telemetria,
                     # alerta y status en una sola suscripción (MCD §4.1).
                     # QoS 1 porque el proyecto compromete "at least once".
-                    await client.subscribe(Topics.ALL, qos=1)
-                    log.info("MQTT subscribed", pattern=Topics.ALL)
+                    await client.subscribe(Topics.TODOS_LOS_CULTIVOS, qos=1)
+                    log.info("MQTT subscribed", pattern=Topics.TODOS_LOS_CULTIVOS)
 
                     # Correr listener y publisher concurrentemente
                     await asyncio.gather(

@@ -11,8 +11,15 @@
 // ------------------------------------------------------------
 //  Identidad del dispositivo
 // ------------------------------------------------------------
+// Los tres se pueden sobreescribir desde platformio.ini con -D. Asi el
+// segundo nodo comparte este mismo fichero en vez de tener una copia
+// que acabaria desincronizandose del original al primer cambio.
+#ifndef DEVICE_ID
 #define DEVICE_ID         "IoT-node-26.001"
+#endif
+#ifndef DEVICE_TYPE
 #define DEVICE_TYPE       "hydro"
+#endif
 #define FIRMWARE_VERSION  "2.3.0"
 
 // ------------------------------------------------------------
@@ -56,23 +63,37 @@
 // #define MQTT_PASS  "mqtt_password_hydro"
 
 // IDs únicos de cliente MQTT (uno por socket)
+// Tienen que ser unicos en todo el broker. Dos nodos con el mismo ID de
+// cliente se expulsan mutuamente en bucle: cada conexion echa a la
+// anterior, y el sintoma es un nodo que "parpadea" sin causa aparente.
+#ifndef MQTT_CLIENT_ID_PUB
 #define MQTT_CLIENT_ID_PUB  "agw-hydro-pub-01"   // Publicador  (telemetría + alertas)
+#endif
+#ifndef MQTT_CLIENT_ID_SUB
 #define MQTT_CLIENT_ID_SUB  "agw-hydro-sub-01"   // Suscriptor  (comandos Raspberry)
+#endif
 
 // ------------------------------------------------------------
 //  Topics MQTT
 // ------------------------------------------------------------
 // Nodo → Raspberry
-#define TOPIC_TELEMETRIA  "cultivo/indoor/hierbabuena/telemetria"
-#define TOPIC_ALERTA      "cultivo/indoor/hierbabuena/alerta"
-#define TOPIC_STATUS      "cultivo/indoor/hierbabuena/status"
+// Un solo punto de cambio: el resto se deriva por concatenacion. Antes
+// eran cinco literales y bastaba olvidar uno para que el gateway dejara
+// de recibir un canal entero sin ningun error visible.
+#ifndef TOPIC_BASE
+#define TOPIC_BASE        "cultivo/indoor/hierbabuena"
+#endif
+
+#define TOPIC_TELEMETRIA  TOPIC_BASE "/telemetria"
+#define TOPIC_ALERTA      TOPIC_BASE "/alerta"
+#define TOPIC_STATUS      TOPIC_BASE "/status"
 // Eventos discretos: arranque y fin de un ciclo de riego. Van por su
 // propio topic y NO por telemetria, porque no son una medida periodica:
 // si el riego se publicara con la telemetria, bajar la cadencia a 5 min
 // haria que un ciclo de 3 min no apareciera en ningun sitio.
-#define TOPIC_EVENTO      "cultivo/indoor/hierbabuena/evento"
+#define TOPIC_EVENTO      TOPIC_BASE "/evento"
 // Raspberry → Nodo
-#define TOPIC_CMD         "cultivo/indoor/hierbabuena/cmd"
+#define TOPIC_CMD         TOPIC_BASE "/cmd"
 
 // LWT (Last Will Testament): se publica si el nodo se desconecta sin avisar
 #define LWT_PAYLOAD       "{\"id\":\"" DEVICE_ID "\",\"online\":false}"
@@ -121,13 +142,23 @@
 #define DEFAULT_MOD_TELEMETRIA   true    // Publicar telemetría
 #define DEFAULT_MOD_STATUS       true    // Heartbeat cada 60 s
 #define DEFAULT_MOD_ALERTAS      true    // Monitor de umbrales
+#ifndef DEFAULT_MOD_SENSOR_HDC
 #define DEFAULT_MOD_SENSOR_HDC   true    // HDC1080 (temp + humedad)
+#endif
+#ifndef DEFAULT_MOD_SENSOR_SUELO
 #define DEFAULT_MOD_SENSOR_SUELO true    // Nivel de agua en sustrato (GPIO32)
+#endif
 #define DEFAULT_MOD_SENSOR_PH    false   // pH (GPIO34) — retirado del alcance
 #define DEFAULT_MOD_RIEGO_HIDRO  true    // Ciclos de riego de hidroponia
+#ifndef DEFAULT_MOD_RIEGO_TIERRA
 #define DEFAULT_MOD_RIEGO_TIERRA true    // Riego de tierra por calendario
+#endif
+#ifndef DEFAULT_MOD_AMBIENTE
 #define DEFAULT_MOD_AMBIENTE     true    // Luz + ventilador por fotoperiodo
+#endif
+#ifndef DEFAULT_MOD_SIMULACION
 #define DEFAULT_MOD_SIMULACION   false   // Valores sintéticos sin hardware
+#endif
 
 // ------------------------------------------------------------
 //  Ahorro de energía del WiFi — nivel 1 (MCD §12)
@@ -486,7 +517,9 @@
 //     resultados. Lo correcto seria una sonda DS18B20 sumergida.
 #define TDS_TEMP_FALLBACK     25.0f
 
+#ifndef DEFAULT_MOD_SENSOR_EC
 #define DEFAULT_MOD_SENSOR_EC   true   // Conductividad: mide la solucion del tanque
+#endif
 
 // ------------------------------------------------------------
 //  Polaridad de los módulos de relé

@@ -64,11 +64,15 @@ class MessageHandler:
             "sin_handler": 0,
         }
 
+        # Indexado por CANAL, no por topic completo. Con un solo cultivo
+        # daba igual; con dos, comparar el topic entero obligaría a una
+        # entrada por cultivo y por canal, y añadir un tercero sería
+        # tocar este diccionario otra vez.
         self._handlers: dict[str, HandlerFn] = {
-            Topics.TELEMETRIA: self._handle_telemetria,
-            Topics.ALERTA:     self._handle_alerta,
-            Topics.STATUS:     self._handle_status,
-            Topics.EVENTO:     self._handle_evento,
+            "telemetria": self._handle_telemetria,
+            "alerta":     self._handle_alerta,
+            "status":     self._handle_status,
+            "evento":     self._handle_evento,
         }
 
     # ─────────────────────────────────────────────────────────────
@@ -93,13 +97,18 @@ class MessageHandler:
         # El ESP32 está suscrito a CMD; cuando la Pi publica ahí, el mensaje
         # vuelve por la suscripción comodín. Se ignora para no procesar
         # nuestros propios comandos como si fueran del nodo.
-        if topic == Topics.CMD:
+        canal = Topics.canal_de(topic)
+
+        # El ESP32 está suscrito a CMD; cuando la Pi publica ahí, el mensaje
+        # vuelve por la suscripción comodín. Se ignora para no procesar
+        # nuestros propios comandos como si fueran del nodo.
+        if canal == "cmd":
             return
 
-        handler = self._handlers.get(topic)
+        handler = self._handlers.get(canal)
         if handler is None:
             self.stats["sin_handler"] += 1
-            log.warning("Topic sin handler", topic=topic)
+            log.warning("Canal sin handler", topic=topic, canal=canal)
             return
 
         try:

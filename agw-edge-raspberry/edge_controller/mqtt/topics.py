@@ -36,6 +36,31 @@ class Topics:
     # ── Suscripción única que cubre los tres canales entrantes ───
     ALL        = f"{BASE}/#"
 
+    # Comodín sobre la especie: cubre hierbabuena y cualquier cultivo que
+    # se añada después sin volver a tocar la suscripción. El `+` casa con
+    # un solo nivel, así que no se cuela nada de otra ubicación.
+    #
+    # El precio de esto es que el despacho ya no puede comparar el topic
+    # completo contra una constante: hay que mirar el último segmento.
+    # Ver `MessageHandler.handle`.
+    TODOS_LOS_CULTIVOS = "cultivo/indoor/+/#"
+
+    @staticmethod
+    def canal_de(topic: str) -> str:
+        """Último segmento: telemetria, alerta, status, evento o cmd."""
+        return topic.rsplit("/", 1)[-1]
+
+    @staticmethod
+    def especie_de(topic: str) -> str:
+        """`cultivo/indoor/lechuga/telemetria` → `lechuga`."""
+        partes = topic.split("/")
+        return partes[2] if len(partes) > 2 else "desconocido"
+
+    @staticmethod
+    def cmd_para(especie: str) -> str:
+        """Topic de órdenes del cultivo indicado."""
+        return f"cultivo/indoor/{especie.lower()}/cmd"
+
     # ── Estadísticas del broker (métricas para la Fase 6) ────────
     SYS_CLIENTS      = "$SYS/broker/clients/connected"
     SYS_MSG_RECEIVED = "$SYS/broker/messages/received"
