@@ -946,8 +946,8 @@ td.d { font-weight: 600; }
     </p>
     <p style="margin-top:.5rem">
       La pérdida del sistema <em>en operación</em> es la de la ventana de siete días:
-      <b>0,039 %</b>. Ambas son ciertas y describen cosas distintas. Dar solo la primera sería
-      injusto con el sistema; dar solo la segunda, ocultar de dónde salen los datos.
+      <b id="v-perdida7">—</b>. Ambas son ciertas y describen cosas distintas. Dar solo la primera
+      sería injusto con el sistema; dar solo la segunda, ocultar de dónde salen los datos.
     </p>
   </div>
 
@@ -1213,8 +1213,16 @@ td.d { font-weight: 600; }
     e.textContent = s;
     return e;
   };
-  const nf = (v, d = 1) => v.toLocaleString("es", {minimumFractionDigits: d, maximumFractionDigits: d});
+  // Tolera nulos: un dato ausente debe pintarse como raya, no tumbar
+  // la grafica entera y las que vengan detras.
+  const nf = (v, d = 1) => (v === null || v === undefined || isNaN(v)) ? "—"
+    : Number(v).toLocaleString("es", {minimumFractionDigits: d, maximumFractionDigits: d});
 
+  // `ent` la usan las secciones compartidas con la memoria tecnica. Sin
+  // declararla aqui, la primera tabla del bloque comun lanzaba
+  // ReferenceError y se llevaba por delante todo lo que se dibuja
+  // despues — que es justo donde se veian las tablas vacias.
+  const ent = v => (v === null || v === undefined) ? "—" : Number(v).toLocaleString("es");
   // Un tooltip para todas las gráficas. El puntero se mueve, la caja
   // le sigue; nada de una caja por marca.
   function sensible(nodo, html) {
@@ -2180,6 +2188,27 @@ td.d { font-weight: 600; }
       `<tr><td class="d" colspan="2">Media de las ${s.length}</td>
        <td class="n d">${Math.round(s.reduce((a, b) => a + b, 0) / s.length)} s</td>
        <td>Ninguna por fallo del enlace</td></tr>`);
+  })();
+
+
+  // La cifra de perdida operativa se toma del dato, no se escribe a mano:
+  // la ventana de siete dias se desplaza cada dia y un numero fijo en la
+  // prosa contradice a la tabla de al lado en cuanto pasa una semana.
+  //
+  // Los dos documentos comparten este bloque pero no los mismos datos:
+  // la memoria trae el resumen del §9 y el dossier no. De ahi la
+  // comprobacion — sin ella, aqui reventaba y se llevaba por delante
+  // todas las graficas que se dibujan despues.
+  (function () {
+    const e = document.getElementById("v-perdida7");
+    if (!e) return;
+    if (typeof r7 !== "undefined" && r7 && r7.perdida) {
+      e.textContent = nf(r7.perdida.pct, 3) + " %" +
+        (r7.perdida.perdidas === 0 ? " — ni una trama" : "");
+      return;
+    }
+    const o = (D.objetivos || []).find(x => /rdida/.test(x.metrica));
+    e.textContent = o ? o.valor : "ver la tabla de objetivos";
   })();
 
 })();
