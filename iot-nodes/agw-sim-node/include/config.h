@@ -1,6 +1,18 @@
 // ============================================================
-//  CONFIGURACIÓN — AGW HydroNode (IoT-node-26.001)
-//  Edita aquí los valores para tu entorno
+//  CONFIGURACIÓN — AGW SimNode (IoT-node-26.002)
+//
+//  SEGUNDO NODO. Sus sensores NO existen: el firmware genera la
+//  temperatura y ejecuta los ciclos de actuadores sin nada conectado a
+//  los GPIO. Sirve para dos cosas: medir cuanto aguanta el punto de
+//  acceso con varios nodos, y poblar la vista de un segundo cultivo.
+//
+//  Es una copia independiente del firmware del nodo 1, no una variante
+//  compilada del mismo arbol. Lo que se toque aqui no puede afectar al
+//  cultivo real, que es el motivo de tenerlo aparte.
+//
+//  Sus tramas van marcadas como sinteticas en la nube (migracion 006) y
+//  quedan fuera de las metricas del §9: promediarlas con las del enlace
+//  real daria una cifra que no describe ningun enlace.
 // ============================================================
 
 #ifndef CONFIG_H
@@ -11,8 +23,8 @@
 // ------------------------------------------------------------
 //  Identidad del dispositivo
 // ------------------------------------------------------------
-#define DEVICE_ID         "IoT-node-26.001"
-#define DEVICE_TYPE       "hydro"
+#define DEVICE_ID         "IoT-node-26.002"
+#define DEVICE_TYPE       "hydro-sim"
 #define FIRMWARE_VERSION  "2.3.0"
 
 // ------------------------------------------------------------
@@ -56,23 +68,23 @@
 // #define MQTT_PASS  "mqtt_password_hydro"
 
 // IDs únicos de cliente MQTT (uno por socket)
-#define MQTT_CLIENT_ID_PUB  "agw-hydro-pub-01"   // Publicador  (telemetría + alertas)
-#define MQTT_CLIENT_ID_SUB  "agw-hydro-sub-01"   // Suscriptor  (comandos Raspberry)
+#define MQTT_CLIENT_ID_PUB  "agw-sim-pub-02"   // Publicador  (telemetría + alertas)
+#define MQTT_CLIENT_ID_SUB  "agw-sim-sub-02"   // Suscriptor  (comandos Raspberry)
 
 // ------------------------------------------------------------
 //  Topics MQTT
 // ------------------------------------------------------------
 // Nodo → Raspberry
-#define TOPIC_TELEMETRIA  "cultivo/indoor/hierbabuena/telemetria"
-#define TOPIC_ALERTA      "cultivo/indoor/hierbabuena/alerta"
-#define TOPIC_STATUS      "cultivo/indoor/hierbabuena/status"
+#define TOPIC_TELEMETRIA  "cultivo/indoor/lechuga/telemetria"
+#define TOPIC_ALERTA      "cultivo/indoor/lechuga/alerta"
+#define TOPIC_STATUS      "cultivo/indoor/lechuga/status"
 // Eventos discretos: arranque y fin de un ciclo de riego. Van por su
 // propio topic y NO por telemetria, porque no son una medida periodica:
 // si el riego se publicara con la telemetria, bajar la cadencia a 5 min
 // haria que un ciclo de 3 min no apareciera en ningun sitio.
-#define TOPIC_EVENTO      "cultivo/indoor/hierbabuena/evento"
+#define TOPIC_EVENTO      "cultivo/indoor/lechuga/evento"
 // Raspberry → Nodo
-#define TOPIC_CMD         "cultivo/indoor/hierbabuena/cmd"
+#define TOPIC_CMD         "cultivo/indoor/lechuga/cmd"
 
 // LWT (Last Will Testament): se publica si el nodo se desconecta sin avisar
 #define LWT_PAYLOAD       "{\"id\":\"" DEVICE_ID "\",\"online\":false}"
@@ -120,14 +132,14 @@
 //  Para volver a estos valores:  {"cmd":"reset_modulos"}
 #define DEFAULT_MOD_TELEMETRIA   true    // Publicar telemetría
 #define DEFAULT_MOD_STATUS       true    // Heartbeat cada 60 s
-#define DEFAULT_MOD_ALERTAS      true    // Monitor de umbrales
-#define DEFAULT_MOD_SENSOR_HDC   true    // HDC1080 (temp + humedad)
-#define DEFAULT_MOD_SENSOR_SUELO true    // Nivel de agua en sustrato (GPIO32)
-#define DEFAULT_MOD_SENSOR_PH    false   // pH (GPIO34) — retirado del alcance
-#define DEFAULT_MOD_RIEGO_HIDRO  true    // Ciclos de riego de hidroponia
-#define DEFAULT_MOD_RIEGO_TIERRA true    // Riego de tierra por calendario
-#define DEFAULT_MOD_AMBIENTE     true    // Luz + ventilador por fotoperiodo
-#define DEFAULT_MOD_SIMULACION   false   // Valores sintéticos sin hardware
+#define DEFAULT_MOD_ALERTAS      false    // sin sensores reales no hay umbral que vigilar
+#define DEFAULT_MOD_SENSOR_HDC   true    // unica magnitud simulada: temperatura
+#define DEFAULT_MOD_SENSOR_SUELO false    // no hay sustrato en este cultivo
+#define DEFAULT_MOD_SENSOR_PH    false    // retirado del alcance
+#define DEFAULT_MOD_RIEGO_HIDRO  true    // ciclos de actuadores — el otro dato que produce
+#define DEFAULT_MOD_RIEGO_TIERRA false    // cultivo solo hidroponico
+#define DEFAULT_MOD_AMBIENTE     false    // sin luz ni ventilador conectados
+#define DEFAULT_MOD_SIMULACION   true    // genera los valores en vez de leerlos
 
 // ------------------------------------------------------------
 //  Ahorro de energía del WiFi — nivel 1 (MCD §12)
@@ -486,7 +498,7 @@
 //     resultados. Lo correcto seria una sonda DS18B20 sumergida.
 #define TDS_TEMP_FALLBACK     25.0f
 
-#define DEFAULT_MOD_SENSOR_EC   true   // Conductividad: mide la solucion del tanque
+#define DEFAULT_MOD_SENSOR_EC   false    // sin sonda: no se inventa conductividad
 
 // ------------------------------------------------------------
 //  Polaridad de los módulos de relé

@@ -265,7 +265,8 @@ class MessageHandler:
         # empiece a fallar en silencio.
         if self.node_sync is not None:
             try:
-                await self.node_sync.al_recibir_status({**raw, **st})
+                await self.node_sync.al_recibir_status(
+                    {**raw, **st}, Topics.especie_de(topic))
             except Exception as exc:
                 log.warning("Fallo al notificar a node_sync", error=str(exc))
 

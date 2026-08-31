@@ -82,8 +82,17 @@ class NodeSync:
 
     # ─────────────────────────────────────────────────────────────
 
-    async def enviar_hora(self, motivo: str = "periodica") -> None:
+    async def enviar_hora(self, motivo: str = "periodica",
+                          especie: str | None = None) -> None:
         """
+        Envía la hora LOCAL como epoch, al cultivo indicado.
+
+        `especie` existe porque cada cultivo tiene su propio topic de
+        órdenes. Publicar siempre en el del primero hacía que un segundo
+        nodo no recibiera nunca su hora —se quedaba en modo degradado
+        para siempre, regando con la cadencia diurna de noche— mientras
+        el primero recibía órdenes que no eran para él.
+
         Envía la hora LOCAL como epoch.
 
         El ESP32 hace localtime_r() sobre lo que reciba sin aplicar
@@ -98,7 +107,8 @@ class NodeSync:
         offset = -time.altzone if time.daylight and time.localtime().tm_isdst else -time.timezone
         epoch_local = int(time.time()) + offset
 
-        await self.mqtt.publish(Topics.CMD, {"cmd": "set_hora", "epoch": epoch_local})
+        destino = Topics.cmd_para(especie) if especie else Topics.CMD
+        await self.mqtt.publish(destino, {"cmd": "set_hora", "epoch": epoch_local})
         self.stats["hora_enviada"] += 1
         self.stats["ultima_sync"] = ahora.isoformat(timespec="seconds")
         log.info(
@@ -130,8 +140,9 @@ class NodeSync:
                         error=str(exc))
         return dict(self.programa)
 
-    async def enviar_programa(self, motivo: str = "periodica") -> None:
-        """Empuja el programa de cultivo completo."""
+    async def enviar_programa(self, motivo: str = "periodica",
+                              especie: str | None = None) -> None:
+        """Empuja el programa de cultivo completo al cultivo indicado."""
         payload = {"cmd": "set_programa", **self.programa_vigente()}
 
         # Fecha del próximo riego de tierra. El nodo tiene además su
@@ -141,9 +152,10 @@ class NodeSync:
         if proximo:
             payload["proximo_riego_tierra"] = self._a_epoch_nodo(proximo)
 
-        await self.mqtt.publish(Topics.CMD, payload)
+        destino = Topics.cmd_para(especie) if especie else Topics.CMD
+        await self.mqtt.publish(destino, payload)
         self.stats["programa_enviado"] += 1
-        log.info("Programa enviado al nodo", motivo=motivo,
+        log.info("Programa enviado al nodo", motivo=motivo, topic=destino,
                  proximo_riego=proximo.isoformat() if proximo else None)
 
     async def _calcular_proximo_riego_tierra(self) -> datetime | None:
@@ -272,7 +284,8 @@ class NodeSync:
         await self.enviar_hora(motivo=f"reasociacion wifi {mac}".strip())
         await self.enviar_programa(motivo="tras reasociacion wifi")
 
-    async def al_recibir_status(self, status: dict) -> None:
+    async def al_recibir_status(self, status: dict,
+                                especie: str | None = None) -> None:
         """
         Lo llama MessageHandler con cada heartbeat.
 
@@ -289,8 +302,8 @@ class NodeSync:
                 node=status.get("node_id"),
                 uptime_ms=status.get("uptime_ms"),
             )
-            await self.enviar_hora(motivo="nodo en degradado")
-            await self.enviar_programa(motivo="tras reponer hora")
+            await self.enviar_hora(motivo="nodo en degradado", especie=especie)
+            await self.enviar_programa(motivo="tras reponer hora", especie=especie)
 
         if status.get("huerfano"):
             log.warning(
