@@ -936,7 +936,7 @@ caption { caption-side: bottom; padding: .5rem .8rem; text-align: left;
 
   <p class="guia">
     Es la pregunta que justifica toda la arquitectura, y tiene una respuesta medida: el
-    21 de agosto se retiró el cable de red del nodo fog durante veintiún minutos y se
+    30 de agosto se retiró el cable de red del nodo fog durante veintiún minutos y se
     registró qué siguió pasando en cada capa.
   </p>
 
@@ -2193,10 +2193,12 @@ caption { caption-side: bottom; padding: .5rem .8rem; text-align: left;
 
     svg.appendChild(txt(L - 12, T + 21, "Archivo local", { anchor: "end", size: 11,
       fill: C("--tinta-2"), weight: 600 }));
-    svg.appendChild(txt(X(acum) + 10, T + 21, ent(acum) + " de " + ent(TOPE),
-      { size: 10.5, fill: C("--tinta"), weight: 600 }));
-    svg.appendChild(txt(W - R + 10, T + 34, nf(100 * acum / TOPE, 0) + " %",
-      { size: 9.5, fill: C("--tinta-3") }));
+    // Anclado al borde derecho de la pista y no al final de la barra:
+    // al 87 % de ocupacion el texto se salia y pisaba al porcentaje.
+    svg.appendChild(txt(W - R - 8, T + 15, ent(acum) + " de " + ent(TOPE),
+      { anchor: "end", size: 10.5, fill: C("--tinta"), weight: 600 }));
+    svg.appendChild(txt(W - R - 8, T + 30, nf(100 * acum / TOPE, 0) + " % del tope",
+      { anchor: "end", size: 9.5, fill: C("--tinta-3") }));
 
     [0, 12500, 25000, 37500, 50000].forEach(v =>
       svg.appendChild(txt(X(v), H - B + 30, ent(v), { anchor: "middle", size: 9.5 })));

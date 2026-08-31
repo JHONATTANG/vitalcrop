@@ -204,6 +204,38 @@ caption { caption-side: bottom; padding: .55rem .85rem; text-align: left;
   display: flex; flex-wrap: wrap; gap: .35rem 1.6rem;
 }
 
+
+/* ─────────────────────────────────────────────────────────────
+   Alias para el codigo compartido con la memoria tecnica.
+   Las secciones 13 a 15 se generan con el mismo JavaScript en los
+   dos documentos, y alli las clases se llaman de otra forma. Sin
+   estas reglas las insignias de estado salian como palabras
+   sueltas dentro de las celdas, sin recuadro ni color.
+   Se declaran como alias y no se renombra el codigo: un solo
+   generador para dos hojas de estilo es justo lo que evita que los
+   dos informes se desincronicen.
+   ───────────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: .35em;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: .7rem; font-weight: 600;
+  padding: .12em .5em; border-radius: 3px; border: 1px solid; white-space: nowrap;
+}
+.c-ok { color: #0a7a0a; border-color: #b5e3b5; background: #eefaee; }
+.c-av { color: #8a6100; border-color: #f0dfae; background: #fdf7e6; }
+.c-no { color: #a52c2c; border-color: #f0c2c2; background: #fdeded; }
+.c-mu { color: var(--tinta-3); border-color: var(--linea); background: #f6f7f5; }
+
+/* El generador marca asi la primera columna de cada fila. */
+td.d { font-weight: 600; }
+
+/* Y estos dos contenedores, por si algun bloque compartido los usa. */
+.tbl  { overflow-x: auto; margin-top: 1rem; border: 1px solid var(--linea);
+        border-radius: 4px; background: var(--superficie); }
+.nota { margin-top: 1.1rem; padding: 1rem 1.15rem; background: var(--superficie);
+        border: 1px solid var(--linea); border-left: 3px solid var(--s1); border-radius: 4px; }
+.sub2 { font-size: .82rem; color: var(--tinta-2); margin-bottom: .9rem; max-width: 68ch; }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media print {
   body { background: #fff; }
@@ -956,7 +988,7 @@ caption { caption-side: bottom; padding: .55rem .85rem; text-align: left;
       <h2>Qué hace la niebla cuando se cae internet</h2>
       <p class="sub">
     Es la pregunta que justifica toda la arquitectura, y tiene una respuesta medida: el
-    21 de agosto se retiró el cable de red del nodo fog durante veintiún minutos y se
+    30 de agosto se retiró el cable de red del nodo fog durante veintiún minutos y se
     registró qué siguió pasando en cada capa.
   </p>
     </div>
@@ -1917,10 +1949,12 @@ caption { caption-side: bottom; padding: .55rem .85rem; text-align: left;
 
     svg.appendChild(txt(L - 12, T + 21, "Archivo local", { anchor: "end", size: 11,
       fill: C("--tinta-2"), weight: 600 }));
-    svg.appendChild(txt(X(acum) + 10, T + 21, ent(acum) + " de " + ent(TOPE),
-      { size: 10.5, fill: C("--tinta"), weight: 600 }));
-    svg.appendChild(txt(W - R + 10, T + 34, nf(100 * acum / TOPE, 0) + " %",
-      { size: 9.5, fill: C("--tinta-3") }));
+    // Anclado al borde derecho de la pista y no al final de la barra:
+    // al 87 % de ocupacion el texto se salia y pisaba al porcentaje.
+    svg.appendChild(txt(W - R - 8, T + 15, ent(acum) + " de " + ent(TOPE),
+      { anchor: "end", size: 10.5, fill: C("--tinta"), weight: 600 }));
+    svg.appendChild(txt(W - R - 8, T + 30, nf(100 * acum / TOPE, 0) + " % del tope",
+      { anchor: "end", size: 9.5, fill: C("--tinta-3") }));
 
     [0, 12500, 25000, 37500, 50000].forEach(v =>
       svg.appendChild(txt(X(v), H - B + 30, ent(v), { anchor: "middle", size: 9.5 })));
