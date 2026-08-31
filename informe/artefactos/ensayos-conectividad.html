@@ -789,16 +789,174 @@ caption { caption-side: bottom; padding: .55rem .85rem; text-align: left;
     </div>
   </section>
 
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">13</span>
+      <h2>El nodo fog y la caída de datos</h2>
+      <p class="sub">
+        Los ensayos de este informe midieron el enlace. Esta sección mira al aparato que lo
+        sostiene: qué le cuesta al nodo fog hacer lo que hace, y qué se perdió realmente en
+        veintitrés días de serie.
+      </p>
+    </div>
+
+  <h3 style="margin:1.6rem 0 .6rem;font-size:1.02rem">El nodo fog como computador</h3>
+
+  <p class="sub">
+    Una arquitectura de niebla se justifica cuando el aparato del borde tiene margen para
+    decidir sin ahogarse. Estas son sus cuentas después de tres semanas operando.
+  </p>
+
+  <div class="tabla-caja">
+    <table>
+      <caption>Recursos del nodo fog, medidos en operación normal.</caption>
+      <thead><tr><th>Recurso</th><th class="n">Capacidad</th><th class="n">En uso</th>
+        <th>Holgura</th></tr></thead>
+      <tbody id="t-fog-rec"></tbody>
+    </table>
+  </div>
+
+  <div class="tabla-caja">
+    <table>
+      <caption>Los cinco procesos que sostienen el borde.</caption>
+      <thead><tr><th>Proceso</th><th class="n">CPU</th><th class="n">Memoria</th>
+        <th>Cometido</th></tr></thead>
+      <tbody id="t-fog-stack"></tbody>
+    </table>
+  </div>
+
+  <div class="hallazgo">
+    <h3>El borde va sobradísimo, y eso es un resultado</h3>
+    <p>
+      Todo el sistema —broker MQTT, punto de acceso, servidor DHCP, motor de reglas,
+      reconciliador y remitentes— consume <b>49 MiB de memoria y menos del 1 % de un núcleo</b>
+      en una máquina de cuatro. El cuello de botella del proyecto nunca fue el cómputo: fue el
+      disco, que arrancó al 89 % y hubo que adelgazar.
+    </p>
+    <p style="margin-top:.5rem">
+      La consecuencia para el diseño es que este mismo aparato admitiría decenas de nodos sin
+      cambiar de hardware. Lo que lo limita es el pool de direcciones y el techo de asociaciones
+      del controlador inalámbrico, no la capacidad de procesar lo que llega.
+    </p>
+  </div>
+
+  <figure>
+    <figcaption>Ocupación del archivo local frente a su tope</figcaption>
+    <p class="sub">
+      El archivo en SQLite es lo que permite perder internet sin perder datos. Su tope está
+      configurado en 50.000 filas de telemetría; el resto de tablas convive con ellas en el
+      mismo fichero de 20 MB.
+    </p>
+    <div class="lienzo"><svg id="g-fog-archivo" viewBox="0 0 900 130" role="img"
+      aria-label="Ocupación del archivo local del nodo fog frente a su tope configurado"></svg></div>
+  </figure>
+
+  <div class="tabla-caja">
+    <table>
+      <caption>Contenido del archivo local al cierre del periodo.</caption>
+      <thead><tr><th>Tabla</th><th class="n">Filas</th><th>Qué guarda</th></tr></thead>
+      <tbody id="t-fog-archivo"></tbody>
+    </table>
+  </div>
+
+  <h3 style="margin:2rem 0 .6rem;font-size:1.02rem">La caída de datos, y qué costó cada una</h3>
+
+  <p class="sub">
+    Un hueco en la serie no siempre significa lo mismo. Conviene separar los que se produjeron
+    montando el sistema de los que ocurrieron con el cultivo en producción, porque solo los
+    segundos dicen algo del sistema terminado.
+  </p>
+
+  <figure>
+    <figcaption>Los 36 huecos, situados en el calendario</figcaption>
+    <p class="sub">
+      Cada marca es un periodo sin una sola trama: su posición es cuándo ocurrió, su altura
+      cuántas tramas se perdieron y su anchura cuánto duró. Se sitúan en el tiempo y no se
+      ordenan por tamaño a propósito — agrupados en un día apuntan a una causa concreta y
+      datada; repartidos, a un problema de fondo del enlace.
+    </p>
+    <div class="lienzo"><svg id="g-huecos" viewBox="0 0 900 260" role="img"
+      aria-label="Los treinta y seis huecos de la serie situados en el calendario, por fecha y tamaño"></svg></div>
+  </figure>
+
+  <figure>
+    <figcaption>Tramas no recibidas, por causa</figcaption>
+    <p class="sub">
+      La misma pérdida agrupada por lo que la provocó. Cuatro de las cinco causas son trabajo
+      sobre el sistema, no fallos de él.
+    </p>
+    <div class="lienzo"><svg id="g-perdida-causa" viewBox="0 0 900 190" role="img"
+      aria-label="Tramas no recibidas agrupadas por causa"></svg></div>
+  </figure>
+
+  <div class="tabla-caja">
+    <table>
+      <caption>
+        Desglose completo. La cadencia importa: nueve minutos a 10 s son 54 tramas, y a 300 s
+        serían dos.
+      </caption>
+      <thead><tr><th>Causa</th><th class="n">Periodo</th><th class="n">Huecos</th>
+        <th class="n">Duración</th><th class="n">Cadencia</th><th class="n">Tramas</th>
+        <th class="n">Del total</th></tr></thead>
+      <tbody id="t-huecos"></tbody>
+    </table>
+  </div>
+
+  <div class="hallazgo alerta">
+    <h3>Las dos cifras de pérdida, y por qué hay que dar las dos</h3>
+    <p>
+      Sobre toda la serie se perdieron <b>661 tramas de 33.788</b>, un <b>1,96 %</b>. Esa cifra
+      no describe al sistema: <b>540 de esas 661 —el 82 %— se perdieron el primer día</b>,
+      montándolo, con el nodo reiniciándose a mano decenas de veces y publicando cada 10 s. Otras
+      94 se perdieron durante el reflasheo a la versión 2.3.0.
+    </p>
+    <p style="margin-top:.5rem">
+      La pérdida del sistema <em>en operación</em> es la de la ventana de siete días:
+      <b>0,039 %</b>. Ambas son ciertas y describen cosas distintas. Dar solo la primera sería
+      injusto con el sistema; dar solo la segunda, ocultar de dónde salen los datos.
+    </p>
+  </div>
+
+  <div class="tabla-caja">
+    <table>
+      <caption>
+        Lo que siguió funcionando durante cada hueco. Es la distinción que sostiene la
+        arquitectura de niebla.
+      </caption>
+      <thead><tr><th>Causa del hueco</th><th>El riego</th><th>El control</th>
+        <th>Observación</th></tr></thead>
+      <tbody id="t-sobrevive"></tbody>
+    </table>
+  </div>
+
+  <div class="hallazgo">
+    <h3>Un hueco de telemetría no es un hueco de control</h3>
+    <p>
+      En los 36 huecos, sumando 229 minutos sin una sola trama, <b>el cultivo no dejó de regarse
+      ni una vez</b>. Lo que se perdió fue el registro, no la operación: el nodo ejecuta su
+      programa desde memoria no volátil y no necesita que nadie lo esté mirando.
+    </p>
+    <p style="margin-top:.5rem">
+      Es la diferencia entre una arquitectura de niebla y una que solo mueve datos a la nube.
+      En la segunda, un hueco de veintitrés minutos son veintitrés minutos sin regar; aquí son
+      veintitrés minutos sin saber que se regó — y el evento aparece en cuanto vuelve el enlace,
+      porque el borde también lo guardó.
+    </p>
+  </div>
+  </section>
+
   <div class="cierre">
     <span>VitalCrop AGW</span>
     <span>Ensayos de conectividad · 30·08·2026</span>
-    <span>10.077 muestras · 2 nodos</span>
+    <span>10.077 muestras · 2 nodos · 36 huecos analizados</span>
   </div>
 </div>
 
 <div class="pista" id="pista"></div>
 
-<script id="datos" type="application/json">{"rssi_serie": [{"t": "17:32:33", "rssi": -71, "ch": 6}, {"t": "17:32:48", "rssi": -70, "ch": 6}, {"t": "17:33:03", "rssi": -70, "ch": 6}, {"t": "17:33:18", "rssi": -72, "ch": 6}, {"t": "17:33:33", "rssi": -71, "ch": 6}, {"t": "17:33:48", "rssi": -65, "ch": 6}, {"t": "17:34:03", "rssi": -72, "ch": 6}, {"t": "17:34:18", "rssi": -70, "ch": 6}, {"t": "17:34:33", "rssi": -68, "ch": 6}, {"t": "17:34:48", "rssi": -70, "ch": 6}, {"t": "17:35:03", "rssi": -73, "ch": 6}, {"t": "17:35:18", "rssi": -74, "ch": 6}, {"t": "17:35:33", "rssi": -77, "ch": 6}, {"t": "17:35:48", "rssi": -76, "ch": 6}, {"t": "17:36:03", "rssi": -75, "ch": 6}, {"t": "17:36:18", "rssi": -72, "ch": 6}, {"t": "17:36:33", "rssi": -74, "ch": 6}, {"t": "17:36:48", "rssi": -73, "ch": 6}, {"t": "17:37:03", "rssi": -75, "ch": 6}, {"t": "17:37:18", "rssi": -74, "ch": 6}, {"t": "17:37:33", "rssi": -76, "ch": 6}, {"t": "17:37:48", "rssi": -76, "ch": 6}, {"t": "17:38:03", "rssi": -73, "ch": 6}, {"t": "17:38:18", "rssi": -71, "ch": 6}, {"t": "17:38:33", "rssi": -75, "ch": 6}, {"t": "17:38:48", "rssi": -74, "ch": 6}, {"t": "17:39:03", "rssi": -76, "ch": 6}, {"t": "17:39:19", "rssi": -63, "ch": 11}, {"t": "17:39:34", "rssi": -68, "ch": 11}, {"t": "17:39:50", "rssi": -65, "ch": 11}, {"t": "17:40:05", "rssi": -59, "ch": 11}, {"t": "17:40:20", "rssi": -65, "ch": 11}, {"t": "17:40:35", "rssi": -63, "ch": 11}, {"t": "17:40:50", "rssi": -65, "ch": 11}, {"t": "17:41:05", "rssi": -61, "ch": 11}, {"t": "17:41:20", "rssi": -62, "ch": 11}, {"t": "17:41:35", "rssi": -63, "ch": 11}, {"t": "17:41:50", "rssi": -61, "ch": 11}, {"t": "17:42:05", "rssi": -61, "ch": 11}, {"t": "17:42:20", "rssi": -62, "ch": 11}, {"t": "17:42:35", "rssi": -64, "ch": 11}, {"t": "17:42:50", "rssi": -62, "ch": 11}, {"t": "17:43:05", "rssi": -62, "ch": 11}, {"t": "17:43:20", "rssi": -64, "ch": 11}, {"t": "17:43:35", "rssi": -62, "ch": 11}, {"t": "17:43:50", "rssi": -64, "ch": 11}, {"t": "17:44:05", "rssi": -61, "ch": 11}, {"t": "17:44:20", "rssi": -60, "ch": 11}, {"t": "17:44:35", "rssi": -60, "ch": 11}, {"t": "17:44:50", "rssi": -59, "ch": 11}, {"t": "17:45:05", "rssi": -73, "ch": 11}, {"t": "17:45:20", "rssi": -74, "ch": 6}, {"t": "17:45:35", "rssi": -76, "ch": 6}, {"t": "17:45:50", "rssi": -76, "ch": 6}, {"t": "17:46:05", "rssi": -69, "ch": 6}, {"t": "17:46:20", "rssi": -73, "ch": 6}, {"t": "17:46:35", "rssi": -69, "ch": 6}, {"t": "17:46:50", "rssi": -69, "ch": 6}, {"t": "17:47:05", "rssi": -69, "ch": 6}, {"t": "17:47:20", "rssi": -68, "ch": 6}, {"t": "17:47:35", "rssi": -73, "ch": 6}, {"t": "17:47:50", "rssi": -68, "ch": 6}, {"t": "17:48:05", "rssi": -71, "ch": 6}, {"t": "17:48:20", "rssi": -67, "ch": 6}, {"t": "17:48:35", "rssi": -67, "ch": 6}, {"t": "17:48:50", "rssi": -65, "ch": 6}, {"t": "17:49:05", "rssi": -67, "ch": 6}, {"t": "17:49:20", "rssi": -71, "ch": 6}, {"t": "17:49:35", "rssi": -66, "ch": 6}, {"t": "17:49:50", "rssi": -64, "ch": 6}, {"t": "17:50:05", "rssi": -63, "ch": 11}, {"t": "17:50:20", "rssi": -58, "ch": 11}, {"t": "17:50:35", "rssi": -61, "ch": 11}, {"t": "17:50:50", "rssi": -60, "ch": 11}, {"t": "17:51:05", "rssi": -62, "ch": 11}, {"t": "17:51:20", "rssi": -59, "ch": 11}, {"t": "17:51:35", "rssi": -63, "ch": 11}, {"t": "17:51:50", "rssi": -59, "ch": 11}, {"t": "17:52:05", "rssi": -59, "ch": 11}, {"t": "17:52:20", "rssi": -58, "ch": 11}, {"t": "17:52:35", "rssi": -58, "ch": 11}, {"t": "17:52:50", "rssi": -60, "ch": 11}, {"t": "17:53:05", "rssi": -60, "ch": 11}, {"t": "17:53:20", "rssi": -58, "ch": 11}, {"t": "17:53:35", "rssi": -58, "ch": 11}, {"t": "17:53:50", "rssi": -58, "ch": 11}, {"t": "17:54:05", "rssi": -57, "ch": 11}, {"t": "17:54:20", "rssi": -59, "ch": 11}, {"t": "17:54:35", "rssi": -59, "ch": 11}, {"t": "17:54:50", "rssi": -60, "ch": 11}, {"t": "17:55:05", "rssi": -61, "ch": 11}, {"t": "17:55:20", "rssi": -61, "ch": 11}, {"t": "17:55:35", "rssi": -60, "ch": 11}, {"t": "17:55:50", "rssi": -61, "ch": 11}, {"t": "17:56:05", "rssi": -61, "ch": 11}, {"t": "17:56:20", "rssi": -61, "ch": 11}, {"t": "17:56:35", "rssi": -61, "ch": 11}, {"t": "17:56:50", "rssi": -61, "ch": 11}, {"t": "17:57:05", "rssi": -61, "ch": 11}, {"t": "17:57:20", "rssi": -63, "ch": 11}, {"t": "17:57:35", "rssi": -59, "ch": 11}, {"t": "17:57:50", "rssi": -62, "ch": 11}, {"t": "17:58:05", "rssi": -64, "ch": 11}, {"t": "17:58:20", "rssi": -59, "ch": 11}, {"t": "17:58:35", "rssi": -62, "ch": 11}, {"t": "17:58:50", "rssi": -60, "ch": 11}, {"t": "17:59:05", "rssi": -63, "ch": 11}, {"t": "17:59:20", "rssi": -60, "ch": 11}, {"t": "17:59:35", "rssi": -60, "ch": 11}, {"t": "17:59:50", "rssi": -61, "ch": 11}, {"t": "18:00:05", "rssi": -59, "ch": 11}, {"t": "18:00:20", "rssi": -61, "ch": 11}, {"t": "18:00:35", "rssi": -57, "ch": 11}, {"t": "18:00:50", "rssi": -62, "ch": 11}, {"t": "18:01:05", "rssi": -59, "ch": 11}, {"t": "18:01:20", "rssi": -59, "ch": 11}, {"t": "18:01:35", "rssi": -59, "ch": 11}, {"t": "18:01:50", "rssi": -59, "ch": 11}, {"t": "18:02:05", "rssi": -59, "ch": 11}, {"t": "18:02:20", "rssi": -60, "ch": 11}, {"t": "18:02:35", "rssi": -57, "ch": 11}, {"t": "18:02:50", "rssi": -61, "ch": 11}, {"t": "18:03:05", "rssi": -60, "ch": 11}, {"t": "18:03:20", "rssi": -56, "ch": 11}, {"t": "18:03:35", "rssi": -63, "ch": 11}, {"t": "18:03:50", "rssi": -62, "ch": 11}, {"t": "18:04:05", "rssi": -63, "ch": 11}, {"t": "18:04:20", "rssi": -61, "ch": 11}, {"t": "18:04:35", "rssi": -59, "ch": 11}, {"t": "18:04:50", "rssi": -61, "ch": 11}, {"t": "18:05:05", "rssi": -61, "ch": 11}, {"t": "18:05:20", "rssi": -60, "ch": 11}, {"t": "18:05:35", "rssi": -61, "ch": 11}, {"t": "18:05:50", "rssi": -61, "ch": 11}, {"t": "18:06:05", "rssi": -64, "ch": 11}, {"t": "18:06:20", "rssi": -60, "ch": 11}, {"t": "18:06:35", "rssi": -60, "ch": 11}, {"t": "18:06:50", "rssi": -66, "ch": 11}, {"t": "18:07:05", "rssi": -67, "ch": 11}, {"t": "18:07:20", "rssi": -62, "ch": 11}, {"t": "18:07:35", "rssi": -62, "ch": 11}, {"t": "18:07:50", "rssi": -67, "ch": 11}, {"t": "18:08:05", "rssi": -74, "ch": 11}, {"t": "18:08:20", "rssi": -73, "ch": 11}, {"t": "18:08:35", "rssi": -69, "ch": 11}, {"t": "18:08:50", "rssi": -69, "ch": 11}, {"t": "18:09:05", "rssi": -68, "ch": 11}, {"t": "18:09:20", "rssi": -73, "ch": 11}, {"t": "18:09:37", "rssi": -69, "ch": 11}, {"t": "18:09:52", "rssi": -68, "ch": 11}, {"t": "18:10:07", "rssi": -61, "ch": 11}, {"t": "18:10:22", "rssi": -67, "ch": 11}, {"t": "18:10:37", "rssi": -67, "ch": 11}, {"t": "18:10:52", "rssi": -59, "ch": 11}, {"t": "18:14:25", "rssi": -58, "ch": 11}, {"t": "18:14:40", "rssi": -62, "ch": 11}, {"t": "18:14:55", "rssi": -64, "ch": 11}, {"t": "18:15:10", "rssi": -62, "ch": 11}, {"t": "18:15:25", "rssi": -63, "ch": 11}, {"t": "18:15:40", "rssi": -62, "ch": 11}, {"t": "18:15:55", "rssi": -62, "ch": 11}, {"t": "18:16:10", "rssi": -65, "ch": 11}, {"t": "18:16:25", "rssi": -60, "ch": 11}, {"t": "18:16:40", "rssi": -58, "ch": 11}, {"t": "18:16:55", "rssi": -58, "ch": 11}, {"t": "18:17:10", "rssi": -59, "ch": 11}, {"t": "18:17:25", "rssi": -66, "ch": 11}, {"t": "18:17:40", "rssi": -66, "ch": 11}, {"t": "18:17:55", "rssi": -66, "ch": 11}, {"t": "18:18:10", "rssi": -65, "ch": 11}, {"t": "18:18:25", "rssi": -61, "ch": 11}, {"t": "18:18:40", "rssi": -60, "ch": 11}, {"t": "18:18:55", "rssi": -61, "ch": 11}, {"t": "18:19:10", "rssi": -63, "ch": 11}, {"t": "18:19:25", "rssi": -59, "ch": 11}, {"t": "18:19:40", "rssi": -63, "ch": 11}, {"t": "18:19:55", "rssi": -65, "ch": 11}, {"t": "18:20:10", "rssi": -60, "ch": 11}, {"t": "18:20:25", "rssi": -59, "ch": 11}, {"t": "18:20:40", "rssi": -60, "ch": 11}, {"t": "18:20:55", "rssi": -61, "ch": 11}, {"t": "18:21:10", "rssi": -62, "ch": 11}, {"t": "18:21:25", "rssi": -62, "ch": 11}, {"t": "18:21:40", "rssi": -62, "ch": 11}, {"t": "18:21:55", "rssi": -61, "ch": 11}, {"t": "18:22:10", "rssi": -62, "ch": 11}, {"t": "18:22:25", "rssi": -66, "ch": 11}, {"t": "18:22:40", "rssi": -66, "ch": 11}, {"t": "18:22:55", "rssi": -61, "ch": 11}, {"t": "18:23:10", "rssi": -60, "ch": 11}, {"t": "18:23:25", "rssi": -66, "ch": 11}, {"t": "18:23:40", "rssi": -61, "ch": 11}, {"t": "18:23:55", "rssi": -59, "ch": 11}, {"t": "18:24:10", "rssi": -59, "ch": 11}, {"t": "18:24:25", "rssi": -60, "ch": 11}, {"t": "18:24:40", "rssi": -61, "ch": 11}, {"t": "18:24:55", "rssi": -60, "ch": 11}, {"t": "18:25:10", "rssi": -61, "ch": 11}, {"t": "18:25:25", "rssi": -59, "ch": 11}, {"t": "18:25:40", "rssi": -65, "ch": 11}, {"t": "18:25:55", "rssi": -64, "ch": 11}, {"t": "18:26:10", "rssi": -66, "ch": 11}, {"t": "18:26:25", "rssi": -64, "ch": 11}, {"t": "18:26:40", "rssi": -63, "ch": 11}, {"t": "18:26:55", "rssi": -64, "ch": 11}, {"t": "18:27:10", "rssi": -61, "ch": 11}, {"t": "18:27:25", "rssi": -64, "ch": 11}, {"t": "18:27:40", "rssi": -62, "ch": 11}, {"t": "18:27:55", "rssi": -65, "ch": 11}, {"t": "18:28:11", "rssi": -64, "ch": 11}, {"t": "18:28:26", "rssi": -63, "ch": 11}, {"t": "18:28:41", "rssi": -62, "ch": 11}, {"t": "18:28:56", "rssi": -63, "ch": 11}, {"t": "18:29:11", "rssi": -62, "ch": 11}, {"t": "18:29:26", "rssi": -62, "ch": 11}, {"t": "18:29:41", "rssi": -63, "ch": 11}, {"t": "18:29:56", "rssi": -60, "ch": 11}, {"t": "18:30:11", "rssi": -63, "ch": 11}, {"t": "18:30:26", "rssi": -62, "ch": 11}, {"t": "18:30:42", "rssi": -61, "ch": 11}, {"t": "18:30:57", "rssi": -62, "ch": 11}, {"t": "18:31:12", "rssi": -60, "ch": 11}, {"t": "18:31:27", "rssi": -61, "ch": 11}, {"t": "18:31:42", "rssi": -62, "ch": 11}, {"t": "18:31:57", "rssi": -62, "ch": 11}, {"t": "18:32:12", "rssi": -62, "ch": 11}, {"t": "18:32:27", "rssi": -63, "ch": 11}, {"t": "18:32:42", "rssi": -63, "ch": 11}, {"t": "18:32:57", "rssi": -63, "ch": 11}, {"t": "18:33:12", "rssi": -63, "ch": 11}, {"t": "18:33:27", "rssi": -65, "ch": 11}, {"t": "18:33:42", "rssi": -61, "ch": 11}, {"t": "18:33:57", "rssi": -64, "ch": 11}, {"t": "18:34:12", "rssi": -65, "ch": 11}, {"t": "18:34:27", "rssi": -64, "ch": 11}, {"t": "18:34:42", "rssi": -61, "ch": 11}, {"t": "18:34:57", "rssi": -63, "ch": 11}, {"t": "18:35:12", "rssi": -61, "ch": 11}, {"t": "18:35:27", "rssi": -61, "ch": 11}, {"t": "18:35:42", "rssi": -59, "ch": 11}, {"t": "18:35:57", "rssi": -60, "ch": 11}, {"t": "18:36:12", "rssi": -60, "ch": 11}, {"t": "18:36:27", "rssi": -60, "ch": 11}, {"t": "18:36:42", "rssi": -59, "ch": 11}, {"t": "18:36:57", "rssi": -60, "ch": 11}, {"t": "18:37:12", "rssi": -62, "ch": 11}, {"t": "18:37:27", "rssi": -62, "ch": 11}, {"t": "18:37:42", "rssi": -62, "ch": 11}, {"t": "18:37:57", "rssi": -62, "ch": 11}, {"t": "18:38:12", "rssi": -68, "ch": 11}, {"t": "18:38:27", "rssi": -61, "ch": 11}, {"t": "18:38:42", "rssi": -61, "ch": 11}, {"t": "18:38:57", "rssi": -60, "ch": 11}, {"t": "18:39:12", "rssi": -62, "ch": 11}, {"t": "18:39:27", "rssi": -69, "ch": 11}, {"t": "18:39:42", "rssi": -62, "ch": 11}, {"t": "18:39:57", "rssi": -65, "ch": 11}, {"t": "18:40:12", "rssi": -66, "ch": 11}, {"t": "18:40:27", "rssi": -63, "ch": 11}, {"t": "18:40:42", "rssi": -70, "ch": 11}, {"t": "18:40:57", "rssi": -65, "ch": 11}, {"t": "18:41:12", "rssi": -64, "ch": 11}, {"t": "18:41:27", "rssi": -60, "ch": 11}, {"t": "18:41:42", "rssi": -61, "ch": 11}, {"t": "18:41:57", "rssi": -63, "ch": 11}, {"t": "18:49:25", "rssi": -64, "ch": 11}, {"t": "18:49:40", "rssi": -63, "ch": 11}, {"t": "18:49:55", "rssi": -62, "ch": 11}, {"t": "18:50:10", "rssi": -61, "ch": 11}, {"t": "18:50:25", "rssi": -63, "ch": 11}, {"t": "18:50:40", "rssi": -64, "ch": 11}, {"t": "18:50:55", "rssi": -63, "ch": 11}, {"t": "18:51:10", "rssi": -62, "ch": 11}, {"t": "18:51:25", "rssi": -62, "ch": 11}, {"t": "18:51:40", "rssi": -62, "ch": 11}, {"t": "18:51:55", "rssi": -63, "ch": 11}, {"t": "18:52:10", "rssi": -64, "ch": 11}, {"t": "18:52:25", "rssi": -62, "ch": 11}, {"t": "18:52:40", "rssi": -63, "ch": 11}, {"t": "18:52:55", "rssi": -64, "ch": 11}, {"t": "18:53:10", "rssi": -65, "ch": 11}, {"t": "18:53:25", "rssi": -64, "ch": 11}, {"t": "18:53:40", "rssi": -65, "ch": 11}, {"t": "18:53:55", "rssi": -63, "ch": 11}, {"t": "19:01:54", "rssi": -60, "ch": 11}, {"t": "19:02:09", "rssi": -61, "ch": 11}, {"t": "19:02:24", "rssi": -63, "ch": 11}, {"t": "19:02:39", "rssi": -64, "ch": 11}, {"t": "19:02:54", "rssi": -62, "ch": 11}, {"t": "19:03:09", "rssi": -64, "ch": 11}, {"t": "19:03:24", "rssi": -61, "ch": 11}, {"t": "19:03:39", "rssi": -65, "ch": 11}, {"t": "19:03:54", "rssi": -66, "ch": 11}, {"t": "19:04:09", "rssi": -62, "ch": 11}, {"t": "19:04:24", "rssi": -63, "ch": 11}, {"t": "19:04:39", "rssi": -64, "ch": 11}, {"t": "19:04:54", "rssi": -65, "ch": 11}, {"t": "19:05:09", "rssi": -64, "ch": 11}, {"t": "19:05:24", "rssi": -63, "ch": 11}, {"t": "19:05:39", "rssi": -63, "ch": 11}, {"t": "19:05:54", "rssi": -66, "ch": 11}, {"t": "19:06:09", "rssi": -66, "ch": 11}, {"t": "19:06:24", "rssi": -63, "ch": 11}], "canal_resumen": [{"canal": 6, "n": 137, "media": -71.59, "sigma": 4.15, "min": -80, "max": -58, "bajo70": 59.1}, {"canal": 11, "n": 772, "media": -62.24, "sigma": 2.89, "min": -75, "max": -56, "bajo70": 1.7}], "hist_c6": [{"dbm": -80, "n": 2, "pct": 1.5}, {"dbm": -79, "n": 2, "pct": 1.5}, {"dbm": -78, "n": 2, "pct": 1.5}, {"dbm": -77, "n": 8, "pct": 5.8}, {"dbm": -76, "n": 12, "pct": 8.8}, {"dbm": -75, "n": 12, "pct": 8.8}, {"dbm": -74, "n": 12, "pct": 8.8}, {"dbm": -73, "n": 12, "pct": 8.8}, {"dbm": -72, "n": 8, "pct": 5.8}, {"dbm": -71, "n": 11, "pct": 8.0}, {"dbm": -70, "n": 17, "pct": 12.4}, {"dbm": -69, "n": 11, "pct": 8.0}, {"dbm": -68, "n": 8, "pct": 5.8}, {"dbm": -67, "n": 7, "pct": 5.1}, {"dbm": -66, "n": 2, "pct": 1.5}, {"dbm": -65, "n": 3, "pct": 2.2}, {"dbm": -64, "n": 3, "pct": 2.2}, {"dbm": -62, "n": 2, "pct": 1.5}, {"dbm": -61, "n": 2, "pct": 1.5}, {"dbm": -58, "n": 1, "pct": 0.7}], "hist_c11": [{"dbm": -75, "n": 1, "pct": 0.1}, {"dbm": -74, "n": 1, "pct": 0.1}, {"dbm": -73, "n": 6, "pct": 0.8}, {"dbm": -72, "n": 1, "pct": 0.1}, {"dbm": -71, "n": 4, "pct": 0.5}, {"dbm": -70, "n": 6, "pct": 0.8}, {"dbm": -69, "n": 12, "pct": 1.6}, {"dbm": -68, "n": 10, "pct": 1.3}, {"dbm": -67, "n": 14, "pct": 1.8}, {"dbm": -66, "n": 32, "pct": 4.1}, {"dbm": -65, "n": 46, "pct": 6.0}, {"dbm": -64, "n": 76, "pct": 9.8}, {"dbm": -63, "n": 111, "pct": 14.4}, {"dbm": -62, "n": 118, "pct": 15.3}, {"dbm": -61, "n": 99, "pct": 12.8}, {"dbm": -60, "n": 108, "pct": 14.0}, {"dbm": -59, "n": 91, "pct": 11.8}, {"dbm": -58, "n": 27, "pct": 3.5}, {"dbm": -57, "n": 8, "pct": 1.0}, {"dbm": -56, "n": 1, "pct": 0.1}], "scan_antes": [{"ch": 1, "dbm": -43.0, "ssid": "DAMIAN"}, {"ch": 2, "dbm": -31.0, "ssid": "Claro_66D185"}, {"ch": 2, "dbm": -28.0, "ssid": "TP-Link_Tri"}, {"ch": 4, "dbm": -22.0, "ssid": "CLARO_WIFI04"}, {"ch": 1, "dbm": -43.0, "ssid": "(oculta)"}, {"ch": 6, "dbm": -63.0, "ssid": "HV-6AA9"}, {"ch": 8, "dbm": -48.0, "ssid": "CLARO_WIFI04"}, {"ch": 10, "dbm": -59.0, "ssid": "DAMIAN"}, {"ch": 11, "dbm": -61.0, "ssid": "FAMILIA_RODRIGUEZ_B"}, {"ch": 11, "dbm": -58.0, "ssid": "Estiven MH"}, {"ch": 11, "dbm": -70.0, "ssid": "Claro_02241B"}], "scan_despues": [{"ch": 1, "dbm": -43.0, "ssid": "DAMIAN"}, {"ch": 2, "dbm": -30.0, "ssid": "Claro_66D185"}, {"ch": 2, "dbm": -28.0, "ssid": "TP-Link_Tri"}, {"ch": 4, "dbm": -24.0, "ssid": "CLARO_WIFI04"}, {"ch": 6, "dbm": -60.0, "ssid": "HV-6AA9"}, {"ch": 8, "dbm": -49.0, "ssid": "CLARO_WIFI04"}, {"ch": 10, "dbm": -54.0, "ssid": "DAMIAN"}, {"ch": 11, "dbm": -61.0, "ssid": "FAMILIA_RODRIGUEZ_B"}, {"ch": 11, "dbm": -66.0, "ssid": "Estiven MH"}, {"ch": 2, "dbm": -27.0, "ssid": "(oculta)"}, {"ch": 1, "dbm": -73.0, "ssid": "Konoshiro_Lilo777"}, {"ch": 7, "dbm": -72.0, "ssid": "HV-ANTONY"}, {"ch": 9, "dbm": -70.0, "ssid": "Conectate-Alirio-2.4"}, {"ch": 11, "dbm": -74.0, "ssid": "Familia Abril"}, {"ch": 11, "dbm": -75.0, "ssid": "DAMIAM"}, {"ch": 10, "dbm": -55.0, "ssid": "(oculta)"}], "interferencia": [{"canal": 1, "redes": 6, "agregado": -20.6}, {"canal": 2, "redes": 7, "agregado": -20.6}, {"canal": 3, "redes": 8, "agregado": -20.6}, {"canal": 4, "redes": 9, "agregado": -20.6}, {"canal": 5, "redes": 10, "agregado": -20.6}, {"canal": 6, "redes": 10, "agregado": -20.7}, {"canal": 7, "redes": 11, "agregado": -24.0}, {"canal": 8, "redes": 11, "agregado": -24.0}, {"canal": 9, "redes": 10, "agregado": -46.6}, {"canal": 10, "redes": 10, "agregado": -46.6}, {"canal": 11, "redes": 9, "agregado": -46.8}, {"canal": 12, "redes": 8, "agregado": -46.8}, {"canal": 13, "redes": 7, "agregado": -50.8}], "latencias": [{"camino": "Pi → ESP32 (WiFi privada)", "medio": 100.9, "min": 8.6, "max": 220.9, "sigma": 61.1}, {"camino": "Pi → router LAN (ethernet)", "medio": 2.35, "min": 0.49, "max": 36.1, "sigma": 7.73}, {"camino": "Pi → internet (8.8.8.8)", "medio": 8.86, "min": 6.96, "max": 14.5, "sigma": 2.35}, {"camino": "Pi → nube (Vercel)", "medio": 9.68, "min": 7.52, "max": 23.2, "sigma": 4.54}], "capacidad": [{"n": 1, "desc": "TV · planta baja, 2 cuartos", "presencia": 97, "tasa": 69.2}, {"n": 2, "desc": "TV · cercano", "presencia": 97, "tasa": 48.1}, {"n": 3, "desc": "Móvil", "presencia": 97, "tasa": 41.7}, {"n": 4, "desc": "Móvil · encerrado y tapado", "presencia": 8, "tasa": 60.2}, {"n": 5, "desc": "Móvil · exterior, punto más lejano", "presencia": 97, "tasa": 24.5}], "alcance": [{"zona": "Piso 2 · donde está la Pi", "tasa": 68.6, "presencia": 94}, {"zona": "Piso 3 · donde está el ESP32", "tasa": 68.3, "presencia": 96}, {"zona": "Piso 1", "tasa": 68.2, "presencia": 96}, {"zona": "Exterior de la casa", "tasa": 25.2, "presencia": 84}], "carga_invitados": [{"tramo": "Antes", "estaciones": 1.5, "tasa_esp": 57.6, "fallos_min": 0.44, "paq_s": 1.449}, {"tramo": "Con 5 invitados", "estaciones": 5.6, "tasa_esp": 27.3, "fallos_min": 0.0, "paq_s": 1.514}, {"tramo": "Después", "estaciones": 1.8, "tasa_esp": 46.3, "fallos_min": 0.42, "paq_s": 1.51}], "recuperaciones": [{"evento": "Canal 6 → 11", "seg": 9.76, "tipo": "canal"}, {"evento": "Canal 11 → 6", "seg": 4.35, "tipo": "canal"}, {"evento": "Canal 6 → 11", "seg": 3.56, "tipo": "canal"}, {"evento": "Reinicio del servicio del gateway", "seg": 11.54, "tipo": "servicio"}, {"evento": "ESP32 apagado 3 min", "seg": 193.0, "tipo": "corte"}], "cortes": [{"prueba": "1 · ESP32 apagado", "dur_min": 3.2, "perdidas": 1, "buffer": 0, "riego": "Reanudó al arrancar"}, {"prueba": "2 · Sin internet", "dur_min": 21.0, "perdidas": 0, "buffer": 5, "riego": "Ciclo completo de 180 s"}, {"prueba": "3 · Pi sin energía", "dur_min": 6.0, "perdidas": 2, "buffer": 0, "riego": "Autónomo, sin gateway"}, {"prueba": "4 · Apagón total", "dur_min": 8.0, "perdidas": 2, "buffer": 0, "riego": "Reanudó al arrancar"}], "escalera": [{"hora": "18:19:22", "espera_min": 20.34}, {"hora": "18:24:22", "espera_min": 15.34}, {"hora": "18:29:22", "espera_min": 10.35}, {"hora": "18:34:22", "espera_min": 5.35}, {"hora": "18:39:22", "espera_min": 0.36}], "objetivos": [{"metrica": "Pérdida de mensajes", "obj": "< 1 %", "valor": "0,039 %", "cumple": true}, {"metrica": "RSSI medio (canal 11)", "obj": "> −70 dBm", "valor": "−61,3 dBm", "cumple": true}, {"metrica": "Latencia de subida", "obj": "< 1500 ms", "valor": "432 ms", "cumple": true}, {"metrica": "Jitter a 60 s", "obj": "caracterizar", "valor": "σ 0,157 s", "cumple": true}, {"metrica": "Recuperación tras corte", "obj": "< 90 s", "valor": "5,9 s", "cumple": true}, {"metrica": "Tiempo bajo −70 dBm", "obj": "mínimo", "valor": "0,0 %", "cumple": true}], "riego_hora": [0.88, 0.88, 0.88, 0.88, 0.88, 0.88, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.38, 1.12, 1.25, 1.88, 1.12, 0.88, 0.88], "nodo2_ficha": [{"c": "Identidad", "n1": "IoT-node-26.001", "n2": "IoT-node-26.002"}, {"c": "MAC", "n1": "38:18:2b:8a:12:7c", "n2": "84:cc:a8:66:91:dc"}, {"c": "Dirección", "n1": "10.42.0.26 (reserva fija)", "n2": "10.42.0.20 (DHCP)"}, {"c": "Topics", "n1": "cultivo/indoor/hierbabuena/*", "n2": "cultivo/indoor/lechuga/*"}, {"c": "Cliente MQTT", "n1": "agw-hydro-pub-01", "n2": "agw-sim-pub-02"}, {"c": "Origen del dato", "n1": "sensores físicos", "n2": "generado en el firmware"}, {"c": "Magnitudes", "n1": "temp · hum · EC · nivel", "n2": "temp · hum"}, {"c": "Actuadores", "n1": "bomba · 2 válvulas · luz", "n2": "ciclos sin relé conectado"}, {"c": "En las métricas §9", "n1": "cuenta", "n2": "excluido"}], "dos_nodos": [{"nodo": "26.001 · real", "rssi": -57.3, "tasa_tx": 70.8, "sigma_tasa": 2.9, "paq_s": 3.174, "kbits": 6.7, "fallos_min": 0.41}, {"nodo": "26.002 · simulado", "rssi": -74.5, "tasa_tx": 34.0, "sigma_tasa": 15.8, "paq_s": 0.609, "kbits": 0.43, "fallos_min": 5.83}], "impacto_nodo2": [{"tramo": "Antes del nodo 2", "n": 905, "tasa": 69.8, "sigma": 3.7, "fallos": 0.5, "paq_s": 3.058}, {"tramo": "Con el nodo 2", "n": 342, "tasa": 70.8, "sigma": 2.9, "fallos": 0.41, "paq_s": 3.174}], "aire_por_nodo": [{"nodo": "26.001 · real (carga histórica)", "pct": 0.063}, {"nodo": "26.002 · simulado, cadencia 60 s", "pct": 0.0207}], "capacidad_actualizada": [{"limite": "Tiempo de aire al 50 %", "nodos": 2376, "clase": "calculado"}, {"limite": "Direcciones DHCP configuradas", "nodos": 41, "clase": "manda"}, {"limite": "Medido con dos nodos", "nodos": 2, "clase": "sin degradación"}], "fallos_nodo2": [{"f": "Las órdenes iban al cultivo equivocado", "d": "El gateway se abrió a varios cultivos en la recepción pero no en el envío. `node_sync` publicaba siempre en el topic del primer cultivo, así que el nodo 2 no recibía su hora —se quedaba en modo degradado, regando con cadencia diurna de noche— mientras el nodo 1 recibía órdenes ajenas.", "e": "Corregido: la especie viaja desde el topic de llegada hasta el de respuesta."}, {"f": "Fecha de riego de tierra recalculada al arrancar", "d": "Al arrancar, antes de oír al nodo, el gateway calcula el próximo llenado desde su propio registro y envía 9 de septiembre en vez de 7. Se corrige solo 21 s después, cuando el nodo reporta su último llenado real.", "e": "Anotado. Ventana de 21 s con una fecha errónea en el nodo."}, {"f": "La simulación era un interruptor global", "d": "En el firmware original, activar `simulacion` encendía todos los sensores a la vez porque cada tarea lo comprobaba por su cuenta. Un nodo sin sonda habría publicado una conductividad inventada.", "e": "En la copia del nodo 2 la simulación queda sujeta al módulo de su propio sensor."}]}</script>
+<script id="datos" type="application/json">{"rssi_serie": [{"t": "17:32:33", "rssi": -71, "ch": 6}, {"t": "17:32:48", "rssi": -70, "ch": 6}, {"t": "17:33:03", "rssi": -70, "ch": 6}, {"t": "17:33:18", "rssi": -72, "ch": 6}, {"t": "17:33:33", "rssi": -71, "ch": 6}, {"t": "17:33:48", "rssi": -65, "ch": 6}, {"t": "17:34:03", "rssi": -72, "ch": 6}, {"t": "17:34:18", "rssi": -70, "ch": 6}, {"t": "17:34:33", "rssi": -68, "ch": 6}, {"t": "17:34:48", "rssi": -70, "ch": 6}, {"t": "17:35:03", "rssi": -73, "ch": 6}, {"t": "17:35:18", "rssi": -74, "ch": 6}, {"t": "17:35:33", "rssi": -77, "ch": 6}, {"t": "17:35:48", "rssi": -76, "ch": 6}, {"t": "17:36:03", "rssi": -75, "ch": 6}, {"t": "17:36:18", "rssi": -72, "ch": 6}, {"t": "17:36:33", "rssi": -74, "ch": 6}, {"t": "17:36:48", "rssi": -73, "ch": 6}, {"t": "17:37:03", "rssi": -75, "ch": 6}, {"t": "17:37:18", "rssi": -74, "ch": 6}, {"t": "17:37:33", "rssi": -76, "ch": 6}, {"t": "17:37:48", "rssi": -76, "ch": 6}, {"t": "17:38:03", "rssi": -73, "ch": 6}, {"t": "17:38:18", "rssi": -71, "ch": 6}, {"t": "17:38:33", "rssi": -75, "ch": 6}, {"t": "17:38:48", "rssi": -74, "ch": 6}, {"t": "17:39:03", "rssi": -76, "ch": 6}, {"t": "17:39:19", "rssi": -63, "ch": 11}, {"t": "17:39:34", "rssi": -68, "ch": 11}, {"t": "17:39:50", "rssi": -65, "ch": 11}, {"t": "17:40:05", "rssi": -59, "ch": 11}, {"t": "17:40:20", "rssi": -65, "ch": 11}, {"t": "17:40:35", "rssi": -63, "ch": 11}, {"t": "17:40:50", "rssi": -65, "ch": 11}, {"t": "17:41:05", "rssi": -61, "ch": 11}, {"t": "17:41:20", "rssi": -62, "ch": 11}, {"t": "17:41:35", "rssi": -63, "ch": 11}, {"t": "17:41:50", "rssi": -61, "ch": 11}, {"t": "17:42:05", "rssi": -61, "ch": 11}, {"t": "17:42:20", "rssi": -62, "ch": 11}, {"t": "17:42:35", "rssi": -64, "ch": 11}, {"t": "17:42:50", "rssi": -62, "ch": 11}, {"t": "17:43:05", "rssi": -62, "ch": 11}, {"t": "17:43:20", "rssi": -64, "ch": 11}, {"t": "17:43:35", "rssi": -62, "ch": 11}, {"t": "17:43:50", "rssi": -64, "ch": 11}, {"t": "17:44:05", "rssi": -61, "ch": 11}, {"t": "17:44:20", "rssi": -60, "ch": 11}, {"t": "17:44:35", "rssi": -60, "ch": 11}, {"t": "17:44:50", "rssi": -59, "ch": 11}, {"t": "17:45:05", "rssi": -73, "ch": 11}, {"t": "17:45:20", "rssi": -74, "ch": 6}, {"t": "17:45:35", "rssi": -76, "ch": 6}, {"t": "17:45:50", "rssi": -76, "ch": 6}, {"t": "17:46:05", "rssi": -69, "ch": 6}, {"t": "17:46:20", "rssi": -73, "ch": 6}, {"t": "17:46:35", "rssi": -69, "ch": 6}, {"t": "17:46:50", "rssi": -69, "ch": 6}, {"t": "17:47:05", "rssi": -69, "ch": 6}, {"t": "17:47:20", "rssi": -68, "ch": 6}, {"t": "17:47:35", "rssi": -73, "ch": 6}, {"t": "17:47:50", "rssi": -68, "ch": 6}, {"t": "17:48:05", "rssi": -71, "ch": 6}, {"t": "17:48:20", "rssi": -67, "ch": 6}, {"t": "17:48:35", "rssi": -67, "ch": 6}, {"t": "17:48:50", "rssi": -65, "ch": 6}, {"t": "17:49:05", "rssi": -67, "ch": 6}, {"t": "17:49:20", "rssi": -71, "ch": 6}, {"t": "17:49:35", "rssi": -66, "ch": 6}, {"t": "17:49:50", "rssi": -64, "ch": 6}, {"t": "17:50:05", "rssi": -63, "ch": 11}, {"t": "17:50:20", "rssi": -58, "ch": 11}, {"t": "17:50:35", "rssi": -61, "ch": 11}, {"t": "17:50:50", "rssi": -60, "ch": 11}, {"t": "17:51:05", "rssi": -62, "ch": 11}, {"t": "17:51:20", "rssi": -59, "ch": 11}, {"t": "17:51:35", "rssi": -63, "ch": 11}, {"t": "17:51:50", "rssi": -59, "ch": 11}, {"t": "17:52:05", "rssi": -59, "ch": 11}, {"t": "17:52:20", "rssi": -58, "ch": 11}, {"t": "17:52:35", "rssi": -58, "ch": 11}, {"t": "17:52:50", "rssi": -60, "ch": 11}, {"t": "17:53:05", "rssi": -60, "ch": 11}, {"t": "17:53:20", "rssi": -58, "ch": 11}, {"t": "17:53:35", "rssi": -58, "ch": 11}, {"t": "17:53:50", "rssi": -58, "ch": 11}, {"t": "17:54:05", "rssi": -57, "ch": 11}, {"t": "17:54:20", "rssi": -59, "ch": 11}, {"t": "17:54:35", "rssi": -59, "ch": 11}, {"t": "17:54:50", "rssi": -60, "ch": 11}, {"t": "17:55:05", "rssi": -61, "ch": 11}, {"t": "17:55:20", "rssi": -61, "ch": 11}, {"t": "17:55:35", "rssi": -60, "ch": 11}, {"t": "17:55:50", "rssi": -61, "ch": 11}, {"t": "17:56:05", "rssi": -61, "ch": 11}, {"t": "17:56:20", "rssi": -61, "ch": 11}, {"t": "17:56:35", "rssi": -61, "ch": 11}, {"t": "17:56:50", "rssi": -61, "ch": 11}, {"t": "17:57:05", "rssi": -61, "ch": 11}, {"t": "17:57:20", "rssi": -63, "ch": 11}, {"t": "17:57:35", "rssi": -59, "ch": 11}, {"t": "17:57:50", "rssi": -62, "ch": 11}, {"t": "17:58:05", "rssi": -64, "ch": 11}, {"t": "17:58:20", "rssi": -59, "ch": 11}, {"t": "17:58:35", "rssi": -62, "ch": 11}, {"t": "17:58:50", "rssi": -60, "ch": 11}, {"t": "17:59:05", "rssi": -63, "ch": 11}, {"t": "17:59:20", "rssi": -60, "ch": 11}, {"t": "17:59:35", "rssi": -60, "ch": 11}, {"t": "17:59:50", "rssi": -61, "ch": 11}, {"t": "18:00:05", "rssi": -59, "ch": 11}, {"t": "18:00:20", "rssi": -61, "ch": 11}, {"t": "18:00:35", "rssi": -57, "ch": 11}, {"t": "18:00:50", "rssi": -62, "ch": 11}, {"t": "18:01:05", "rssi": -59, "ch": 11}, {"t": "18:01:20", "rssi": -59, "ch": 11}, {"t": "18:01:35", "rssi": -59, "ch": 11}, {"t": "18:01:50", "rssi": -59, "ch": 11}, {"t": "18:02:05", "rssi": -59, "ch": 11}, {"t": "18:02:20", "rssi": -60, "ch": 11}, {"t": "18:02:35", "rssi": -57, "ch": 11}, {"t": "18:02:50", "rssi": -61, "ch": 11}, {"t": "18:03:05", "rssi": -60, "ch": 11}, {"t": "18:03:20", "rssi": -56, "ch": 11}, {"t": "18:03:35", "rssi": -63, "ch": 11}, {"t": "18:03:50", "rssi": -62, "ch": 11}, {"t": "18:04:05", "rssi": -63, "ch": 11}, {"t": "18:04:20", "rssi": -61, "ch": 11}, {"t": "18:04:35", "rssi": -59, "ch": 11}, {"t": "18:04:50", "rssi": -61, "ch": 11}, {"t": "18:05:05", "rssi": -61, "ch": 11}, {"t": "18:05:20", "rssi": -60, "ch": 11}, {"t": "18:05:35", "rssi": -61, "ch": 11}, {"t": "18:05:50", "rssi": -61, "ch": 11}, {"t": "18:06:05", "rssi": -64, "ch": 11}, {"t": "18:06:20", "rssi": -60, "ch": 11}, {"t": "18:06:35", "rssi": -60, "ch": 11}, {"t": "18:06:50", "rssi": -66, "ch": 11}, {"t": "18:07:05", "rssi": -67, "ch": 11}, {"t": "18:07:20", "rssi": -62, "ch": 11}, {"t": "18:07:35", "rssi": -62, "ch": 11}, {"t": "18:07:50", "rssi": -67, "ch": 11}, {"t": "18:08:05", "rssi": -74, "ch": 11}, {"t": "18:08:20", "rssi": -73, "ch": 11}, {"t": "18:08:35", "rssi": -69, "ch": 11}, {"t": "18:08:50", "rssi": -69, "ch": 11}, {"t": "18:09:05", "rssi": -68, "ch": 11}, {"t": "18:09:20", "rssi": -73, "ch": 11}, {"t": "18:09:37", "rssi": -69, "ch": 11}, {"t": "18:09:52", "rssi": -68, "ch": 11}, {"t": "18:10:07", "rssi": -61, "ch": 11}, {"t": "18:10:22", "rssi": -67, "ch": 11}, {"t": "18:10:37", "rssi": -67, "ch": 11}, {"t": "18:10:52", "rssi": -59, "ch": 11}, {"t": "18:14:25", "rssi": -58, "ch": 11}, {"t": "18:14:40", "rssi": -62, "ch": 11}, {"t": "18:14:55", "rssi": -64, "ch": 11}, {"t": "18:15:10", "rssi": -62, "ch": 11}, {"t": "18:15:25", "rssi": -63, "ch": 11}, {"t": "18:15:40", "rssi": -62, "ch": 11}, {"t": "18:15:55", "rssi": -62, "ch": 11}, {"t": "18:16:10", "rssi": -65, "ch": 11}, {"t": "18:16:25", "rssi": -60, "ch": 11}, {"t": "18:16:40", "rssi": -58, "ch": 11}, {"t": "18:16:55", "rssi": -58, "ch": 11}, {"t": "18:17:10", "rssi": -59, "ch": 11}, {"t": "18:17:25", "rssi": -66, "ch": 11}, {"t": "18:17:40", "rssi": -66, "ch": 11}, {"t": "18:17:55", "rssi": -66, "ch": 11}, {"t": "18:18:10", "rssi": -65, "ch": 11}, {"t": "18:18:25", "rssi": -61, "ch": 11}, {"t": "18:18:40", "rssi": -60, "ch": 11}, {"t": "18:18:55", "rssi": -61, "ch": 11}, {"t": "18:19:10", "rssi": -63, "ch": 11}, {"t": "18:19:25", "rssi": -59, "ch": 11}, {"t": "18:19:40", "rssi": -63, "ch": 11}, {"t": "18:19:55", "rssi": -65, "ch": 11}, {"t": "18:20:10", "rssi": -60, "ch": 11}, {"t": "18:20:25", "rssi": -59, "ch": 11}, {"t": "18:20:40", "rssi": -60, "ch": 11}, {"t": "18:20:55", "rssi": -61, "ch": 11}, {"t": "18:21:10", "rssi": -62, "ch": 11}, {"t": "18:21:25", "rssi": -62, "ch": 11}, {"t": "18:21:40", "rssi": -62, "ch": 11}, {"t": "18:21:55", "rssi": -61, "ch": 11}, {"t": "18:22:10", "rssi": -62, "ch": 11}, {"t": "18:22:25", "rssi": -66, "ch": 11}, {"t": "18:22:40", "rssi": -66, "ch": 11}, {"t": "18:22:55", "rssi": -61, "ch": 11}, {"t": "18:23:10", "rssi": -60, "ch": 11}, {"t": "18:23:25", "rssi": -66, "ch": 11}, {"t": "18:23:40", "rssi": -61, "ch": 11}, {"t": "18:23:55", "rssi": -59, "ch": 11}, {"t": "18:24:10", "rssi": -59, "ch": 11}, {"t": "18:24:25", "rssi": -60, "ch": 11}, {"t": "18:24:40", "rssi": -61, "ch": 11}, {"t": "18:24:55", "rssi": -60, "ch": 11}, {"t": "18:25:10", "rssi": -61, "ch": 11}, {"t": "18:25:25", "rssi": -59, "ch": 11}, {"t": "18:25:40", "rssi": -65, "ch": 11}, {"t": "18:25:55", "rssi": -64, "ch": 11}, {"t": "18:26:10", "rssi": -66, "ch": 11}, {"t": "18:26:25", "rssi": -64, "ch": 11}, {"t": "18:26:40", "rssi": -63, "ch": 11}, {"t": "18:26:55", "rssi": -64, "ch": 11}, {"t": "18:27:10", "rssi": -61, "ch": 11}, {"t": "18:27:25", "rssi": -64, "ch": 11}, {"t": "18:27:40", "rssi": -62, "ch": 11}, {"t": "18:27:55", "rssi": -65, "ch": 11}, {"t": "18:28:11", "rssi": -64, "ch": 11}, {"t": "18:28:26", "rssi": -63, "ch": 11}, {"t": "18:28:41", "rssi": -62, "ch": 11}, {"t": "18:28:56", "rssi": -63, "ch": 11}, {"t": "18:29:11", "rssi": -62, "ch": 11}, {"t": "18:29:26", "rssi": -62, "ch": 11}, {"t": "18:29:41", "rssi": -63, "ch": 11}, {"t": "18:29:56", "rssi": -60, "ch": 11}, {"t": "18:30:11", "rssi": -63, "ch": 11}, {"t": "18:30:26", "rssi": -62, "ch": 11}, {"t": "18:30:42", "rssi": -61, "ch": 11}, {"t": "18:30:57", "rssi": -62, "ch": 11}, {"t": "18:31:12", "rssi": -60, "ch": 11}, {"t": "18:31:27", "rssi": -61, "ch": 11}, {"t": "18:31:42", "rssi": -62, "ch": 11}, {"t": "18:31:57", "rssi": -62, "ch": 11}, {"t": "18:32:12", "rssi": -62, "ch": 11}, {"t": "18:32:27", "rssi": -63, "ch": 11}, {"t": "18:32:42", "rssi": -63, "ch": 11}, {"t": "18:32:57", "rssi": -63, "ch": 11}, {"t": "18:33:12", "rssi": -63, "ch": 11}, {"t": "18:33:27", "rssi": -65, "ch": 11}, {"t": "18:33:42", "rssi": -61, "ch": 11}, {"t": "18:33:57", "rssi": -64, "ch": 11}, {"t": "18:34:12", "rssi": -65, "ch": 11}, {"t": "18:34:27", "rssi": -64, "ch": 11}, {"t": "18:34:42", "rssi": -61, "ch": 11}, {"t": "18:34:57", "rssi": -63, "ch": 11}, {"t": "18:35:12", "rssi": -61, "ch": 11}, {"t": "18:35:27", "rssi": -61, "ch": 11}, {"t": "18:35:42", "rssi": -59, "ch": 11}, {"t": "18:35:57", "rssi": -60, "ch": 11}, {"t": "18:36:12", "rssi": -60, "ch": 11}, {"t": "18:36:27", "rssi": -60, "ch": 11}, {"t": "18:36:42", "rssi": -59, "ch": 11}, {"t": "18:36:57", "rssi": -60, "ch": 11}, {"t": "18:37:12", "rssi": -62, "ch": 11}, {"t": "18:37:27", "rssi": -62, "ch": 11}, {"t": "18:37:42", "rssi": -62, "ch": 11}, {"t": "18:37:57", "rssi": -62, "ch": 11}, {"t": "18:38:12", "rssi": -68, "ch": 11}, {"t": "18:38:27", "rssi": -61, "ch": 11}, {"t": "18:38:42", "rssi": -61, "ch": 11}, {"t": "18:38:57", "rssi": -60, "ch": 11}, {"t": "18:39:12", "rssi": -62, "ch": 11}, {"t": "18:39:27", "rssi": -69, "ch": 11}, {"t": "18:39:42", "rssi": -62, "ch": 11}, {"t": "18:39:57", "rssi": -65, "ch": 11}, {"t": "18:40:12", "rssi": -66, "ch": 11}, {"t": "18:40:27", "rssi": -63, "ch": 11}, {"t": "18:40:42", "rssi": -70, "ch": 11}, {"t": "18:40:57", "rssi": -65, "ch": 11}, {"t": "18:41:12", "rssi": -64, "ch": 11}, {"t": "18:41:27", "rssi": -60, "ch": 11}, {"t": "18:41:42", "rssi": -61, "ch": 11}, {"t": "18:41:57", "rssi": -63, "ch": 11}, {"t": "18:49:25", "rssi": -64, "ch": 11}, {"t": "18:49:40", "rssi": -63, "ch": 11}, {"t": "18:49:55", "rssi": -62, "ch": 11}, {"t": "18:50:10", "rssi": -61, "ch": 11}, {"t": "18:50:25", "rssi": -63, "ch": 11}, {"t": "18:50:40", "rssi": -64, "ch": 11}, {"t": "18:50:55", "rssi": -63, "ch": 11}, {"t": "18:51:10", "rssi": -62, "ch": 11}, {"t": "18:51:25", "rssi": -62, "ch": 11}, {"t": "18:51:40", "rssi": -62, "ch": 11}, {"t": "18:51:55", "rssi": -63, "ch": 11}, {"t": "18:52:10", "rssi": -64, "ch": 11}, {"t": "18:52:25", "rssi": -62, "ch": 11}, {"t": "18:52:40", "rssi": -63, "ch": 11}, {"t": "18:52:55", "rssi": -64, "ch": 11}, {"t": "18:53:10", "rssi": -65, "ch": 11}, {"t": "18:53:25", "rssi": -64, "ch": 11}, {"t": "18:53:40", "rssi": -65, "ch": 11}, {"t": "18:53:55", "rssi": -63, "ch": 11}, {"t": "19:01:54", "rssi": -60, "ch": 11}, {"t": "19:02:09", "rssi": -61, "ch": 11}, {"t": "19:02:24", "rssi": -63, "ch": 11}, {"t": "19:02:39", "rssi": -64, "ch": 11}, {"t": "19:02:54", "rssi": -62, "ch": 11}, {"t": "19:03:09", "rssi": -64, "ch": 11}, {"t": "19:03:24", "rssi": -61, "ch": 11}, {"t": "19:03:39", "rssi": -65, "ch": 11}, {"t": "19:03:54", "rssi": -66, "ch": 11}, {"t": "19:04:09", "rssi": -62, "ch": 11}, {"t": "19:04:24", "rssi": -63, "ch": 11}, {"t": "19:04:39", "rssi": -64, "ch": 11}, {"t": "19:04:54", "rssi": -65, "ch": 11}, {"t": "19:05:09", "rssi": -64, "ch": 11}, {"t": "19:05:24", "rssi": -63, "ch": 11}, {"t": "19:05:39", "rssi": -63, "ch": 11}, {"t": "19:05:54", "rssi": -66, "ch": 11}, {"t": "19:06:09", "rssi": -66, "ch": 11}, {"t": "19:06:24", "rssi": -63, "ch": 11}], "canal_resumen": [{"canal": 6, "n": 137, "media": -71.59, "sigma": 4.15, "min": -80, "max": -58, "bajo70": 59.1}, {"canal": 11, "n": 772, "media": -62.24, "sigma": 2.89, "min": -75, "max": -56, "bajo70": 1.7}], "hist_c6": [{"dbm": -80, "n": 2, "pct": 1.5}, {"dbm": -79, "n": 2, "pct": 1.5}, {"dbm": -78, "n": 2, "pct": 1.5}, {"dbm": -77, "n": 8, "pct": 5.8}, {"dbm": -76, "n": 12, "pct": 8.8}, {"dbm": -75, "n": 12, "pct": 8.8}, {"dbm": -74, "n": 12, "pct": 8.8}, {"dbm": -73, "n": 12, "pct": 8.8}, {"dbm": -72, "n": 8, "pct": 5.8}, {"dbm": -71, "n": 11, "pct": 8.0}, {"dbm": -70, "n": 17, "pct": 12.4}, {"dbm": -69, "n": 11, "pct": 8.0}, {"dbm": -68, "n": 8, "pct": 5.8}, {"dbm": -67, "n": 7, "pct": 5.1}, {"dbm": -66, "n": 2, "pct": 1.5}, {"dbm": -65, "n": 3, "pct": 2.2}, {"dbm": -64, "n": 3, "pct": 2.2}, {"dbm": -62, "n": 2, "pct": 1.5}, {"dbm": -61, "n": 2, "pct": 1.5}, {"dbm": -58, "n": 1, "pct": 0.7}], "hist_c11": [{"dbm": -75, "n": 1, "pct": 0.1}, {"dbm": -74, "n": 1, "pct": 0.1}, {"dbm": -73, "n": 6, "pct": 0.8}, {"dbm": -72, "n": 1, "pct": 0.1}, {"dbm": -71, "n": 4, "pct": 0.5}, {"dbm": -70, "n": 6, "pct": 0.8}, {"dbm": -69, "n": 12, "pct": 1.6}, {"dbm": -68, "n": 10, "pct": 1.3}, {"dbm": -67, "n": 14, "pct": 1.8}, {"dbm": -66, "n": 32, "pct": 4.1}, {"dbm": -65, "n": 46, "pct": 6.0}, {"dbm": -64, "n": 76, "pct": 9.8}, {"dbm": -63, "n": 111, "pct": 14.4}, {"dbm": -62, "n": 118, "pct": 15.3}, {"dbm": -61, "n": 99, "pct": 12.8}, {"dbm": -60, "n": 108, "pct": 14.0}, {"dbm": -59, "n": 91, "pct": 11.8}, {"dbm": -58, "n": 27, "pct": 3.5}, {"dbm": -57, "n": 8, "pct": 1.0}, {"dbm": -56, "n": 1, "pct": 0.1}], "scan_antes": [{"ch": 1, "dbm": -43.0, "ssid": "DAMIAN"}, {"ch": 2, "dbm": -31.0, "ssid": "Claro_66D185"}, {"ch": 2, "dbm": -28.0, "ssid": "TP-Link_Tri"}, {"ch": 4, "dbm": -22.0, "ssid": "CLARO_WIFI04"}, {"ch": 1, "dbm": -43.0, "ssid": "(oculta)"}, {"ch": 6, "dbm": -63.0, "ssid": "HV-6AA9"}, {"ch": 8, "dbm": -48.0, "ssid": "CLARO_WIFI04"}, {"ch": 10, "dbm": -59.0, "ssid": "DAMIAN"}, {"ch": 11, "dbm": -61.0, "ssid": "FAMILIA_RODRIGUEZ_B"}, {"ch": 11, "dbm": -58.0, "ssid": "Estiven MH"}, {"ch": 11, "dbm": -70.0, "ssid": "Claro_02241B"}], "scan_despues": [{"ch": 1, "dbm": -43.0, "ssid": "DAMIAN"}, {"ch": 2, "dbm": -30.0, "ssid": "Claro_66D185"}, {"ch": 2, "dbm": -28.0, "ssid": "TP-Link_Tri"}, {"ch": 4, "dbm": -24.0, "ssid": "CLARO_WIFI04"}, {"ch": 6, "dbm": -60.0, "ssid": "HV-6AA9"}, {"ch": 8, "dbm": -49.0, "ssid": "CLARO_WIFI04"}, {"ch": 10, "dbm": -54.0, "ssid": "DAMIAN"}, {"ch": 11, "dbm": -61.0, "ssid": "FAMILIA_RODRIGUEZ_B"}, {"ch": 11, "dbm": -66.0, "ssid": "Estiven MH"}, {"ch": 2, "dbm": -27.0, "ssid": "(oculta)"}, {"ch": 1, "dbm": -73.0, "ssid": "Konoshiro_Lilo777"}, {"ch": 7, "dbm": -72.0, "ssid": "HV-ANTONY"}, {"ch": 9, "dbm": -70.0, "ssid": "Conectate-Alirio-2.4"}, {"ch": 11, "dbm": -74.0, "ssid": "Familia Abril"}, {"ch": 11, "dbm": -75.0, "ssid": "DAMIAM"}, {"ch": 10, "dbm": -55.0, "ssid": "(oculta)"}], "interferencia": [{"canal": 1, "redes": 6, "agregado": -20.6}, {"canal": 2, "redes": 7, "agregado": -20.6}, {"canal": 3, "redes": 8, "agregado": -20.6}, {"canal": 4, "redes": 9, "agregado": -20.6}, {"canal": 5, "redes": 10, "agregado": -20.6}, {"canal": 6, "redes": 10, "agregado": -20.7}, {"canal": 7, "redes": 11, "agregado": -24.0}, {"canal": 8, "redes": 11, "agregado": -24.0}, {"canal": 9, "redes": 10, "agregado": -46.6}, {"canal": 10, "redes": 10, "agregado": -46.6}, {"canal": 11, "redes": 9, "agregado": -46.8}, {"canal": 12, "redes": 8, "agregado": -46.8}, {"canal": 13, "redes": 7, "agregado": -50.8}], "latencias": [{"camino": "Pi → ESP32 (WiFi privada)", "medio": 100.9, "min": 8.6, "max": 220.9, "sigma": 61.1}, {"camino": "Pi → router LAN (ethernet)", "medio": 2.35, "min": 0.49, "max": 36.1, "sigma": 7.73}, {"camino": "Pi → internet (8.8.8.8)", "medio": 8.86, "min": 6.96, "max": 14.5, "sigma": 2.35}, {"camino": "Pi → nube (Vercel)", "medio": 9.68, "min": 7.52, "max": 23.2, "sigma": 4.54}], "capacidad": [{"n": 1, "desc": "TV · planta baja, 2 cuartos", "presencia": 97, "tasa": 69.2}, {"n": 2, "desc": "TV · cercano", "presencia": 97, "tasa": 48.1}, {"n": 3, "desc": "Móvil", "presencia": 97, "tasa": 41.7}, {"n": 4, "desc": "Móvil · encerrado y tapado", "presencia": 8, "tasa": 60.2}, {"n": 5, "desc": "Móvil · exterior, punto más lejano", "presencia": 97, "tasa": 24.5}], "alcance": [{"zona": "Piso 2 · donde está la Pi", "tasa": 68.6, "presencia": 94}, {"zona": "Piso 3 · donde está el ESP32", "tasa": 68.3, "presencia": 96}, {"zona": "Piso 1", "tasa": 68.2, "presencia": 96}, {"zona": "Exterior de la casa", "tasa": 25.2, "presencia": 84}], "carga_invitados": [{"tramo": "Antes", "estaciones": 1.5, "tasa_esp": 57.6, "fallos_min": 0.44, "paq_s": 1.449}, {"tramo": "Con 5 invitados", "estaciones": 5.6, "tasa_esp": 27.3, "fallos_min": 0.0, "paq_s": 1.514}, {"tramo": "Después", "estaciones": 1.8, "tasa_esp": 46.3, "fallos_min": 0.42, "paq_s": 1.51}], "recuperaciones": [{"evento": "Canal 6 → 11", "seg": 9.76, "tipo": "canal"}, {"evento": "Canal 11 → 6", "seg": 4.35, "tipo": "canal"}, {"evento": "Canal 6 → 11", "seg": 3.56, "tipo": "canal"}, {"evento": "Reinicio del servicio del gateway", "seg": 11.54, "tipo": "servicio"}, {"evento": "ESP32 apagado 3 min", "seg": 193.0, "tipo": "corte"}], "cortes": [{"prueba": "1 · ESP32 apagado", "dur_min": 3.2, "perdidas": 1, "buffer": 0, "riego": "Reanudó al arrancar"}, {"prueba": "2 · Sin internet", "dur_min": 21.0, "perdidas": 0, "buffer": 5, "riego": "Ciclo completo de 180 s"}, {"prueba": "3 · Pi sin energía", "dur_min": 6.0, "perdidas": 2, "buffer": 0, "riego": "Autónomo, sin gateway"}, {"prueba": "4 · Apagón total", "dur_min": 8.0, "perdidas": 2, "buffer": 0, "riego": "Reanudó al arrancar"}], "escalera": [{"hora": "18:19:22", "espera_min": 20.34}, {"hora": "18:24:22", "espera_min": 15.34}, {"hora": "18:29:22", "espera_min": 10.35}, {"hora": "18:34:22", "espera_min": 5.35}, {"hora": "18:39:22", "espera_min": 0.36}], "objetivos": [{"metrica": "Pérdida de mensajes", "obj": "< 1 %", "valor": "0,039 %", "cumple": true}, {"metrica": "RSSI medio (canal 11)", "obj": "> −70 dBm", "valor": "−61,3 dBm", "cumple": true}, {"metrica": "Latencia de subida", "obj": "< 1500 ms", "valor": "432 ms", "cumple": true}, {"metrica": "Jitter a 60 s", "obj": "caracterizar", "valor": "σ 0,157 s", "cumple": true}, {"metrica": "Recuperación tras corte", "obj": "< 90 s", "valor": "5,9 s", "cumple": true}, {"metrica": "Tiempo bajo −70 dBm", "obj": "mínimo", "valor": "0,0 %", "cumple": true}], "riego_hora": [0.88, 0.88, 0.88, 0.88, 0.88, 0.88, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.38, 1.12, 1.25, 1.88, 1.12, 0.88, 0.88], "nodo2_ficha": [{"c": "Identidad", "n1": "IoT-node-26.001", "n2": "IoT-node-26.002"}, {"c": "MAC", "n1": "38:18:2b:8a:12:7c", "n2": "84:cc:a8:66:91:dc"}, {"c": "Dirección", "n1": "10.42.0.26 (reserva fija)", "n2": "10.42.0.20 (DHCP)"}, {"c": "Topics", "n1": "cultivo/indoor/hierbabuena/*", "n2": "cultivo/indoor/lechuga/*"}, {"c": "Cliente MQTT", "n1": "agw-hydro-pub-01", "n2": "agw-sim-pub-02"}, {"c": "Origen del dato", "n1": "sensores físicos", "n2": "generado en el firmware"}, {"c": "Magnitudes", "n1": "temp · hum · EC · nivel", "n2": "temp · hum"}, {"c": "Actuadores", "n1": "bomba · 2 válvulas · luz", "n2": "ciclos sin relé conectado"}, {"c": "En las métricas §9", "n1": "cuenta", "n2": "excluido"}], "dos_nodos": [{"nodo": "26.001 · real", "rssi": -57.3, "tasa_tx": 70.8, "sigma_tasa": 2.9, "paq_s": 3.174, "kbits": 6.7, "fallos_min": 0.41}, {"nodo": "26.002 · simulado", "rssi": -74.5, "tasa_tx": 34.0, "sigma_tasa": 15.8, "paq_s": 0.609, "kbits": 0.43, "fallos_min": 5.83}], "impacto_nodo2": [{"tramo": "Antes del nodo 2", "n": 905, "tasa": 69.8, "sigma": 3.7, "fallos": 0.5, "paq_s": 3.058}, {"tramo": "Con el nodo 2", "n": 342, "tasa": 70.8, "sigma": 2.9, "fallos": 0.41, "paq_s": 3.174}], "aire_por_nodo": [{"nodo": "26.001 · real (carga histórica)", "pct": 0.063}, {"nodo": "26.002 · simulado, cadencia 60 s", "pct": 0.0207}], "capacidad_actualizada": [{"limite": "Tiempo de aire al 50 %", "nodos": 2376, "clase": "calculado"}, {"limite": "Direcciones DHCP configuradas", "nodos": 41, "clase": "manda"}, {"limite": "Medido con dos nodos", "nodos": 2, "clase": "sin degradación"}], "fallos_nodo2": [{"f": "Las órdenes iban al cultivo equivocado", "d": "El gateway se abrió a varios cultivos en la recepción pero no en el envío. `node_sync` publicaba siempre en el topic del primer cultivo, así que el nodo 2 no recibía su hora —se quedaba en modo degradado, regando con cadencia diurna de noche— mientras el nodo 1 recibía órdenes ajenas.", "e": "Corregido: la especie viaja desde el topic de llegada hasta el de respuesta."}, {"f": "Fecha de riego de tierra recalculada al arrancar", "d": "Al arrancar, antes de oír al nodo, el gateway calcula el próximo llenado desde su propio registro y envía 9 de septiembre en vez de 7. Se corrige solo 21 s después, cuando el nodo reporta su último llenado real.", "e": "Anotado. Ventana de 21 s con una fecha errónea en el nodo."}, {"f": "La simulación era un interruptor global", "d": "En el firmware original, activar `simulacion` encendía todos los sensores a la vez porque cada tarea lo comprobaba por su cuenta. Un nodo sin sonda habría publicado una conductividad inventada.", "e": "En la copia del nodo 2 la simulación queda sujeta al módulo de su propio sensor."}], "fog_bloque": {"huecos_causa": [{"causa": "Puesta en marcha", "huecos": 27, "minutos": 94.0, "tramas": 540, "cadencia": "10s", "desde": "08/08", "hasta": "09/08"}, {"causa": "Reflasheo a la version 2.3.0", "huecos": 4, "minutos": 97.5, "tramas": 94, "cadencia": "60s", "desde": "23/08", "hasta": "23/08"}, {"causa": "Primer llenado de sustrato", "huecos": 1, "minutos": 2.3, "tramas": 13, "cadencia": "10s", "desde": "18/08", "hasta": "18/08"}, {"causa": "Ensayos de corte provocado", "huecos": 3, "minutos": 32.6, "tramas": 12, "cadencia": "60s/300s", "desde": "30/08", "hasta": "30/08"}, {"causa": "Reflasheo de firmware", "huecos": 1, "minutos": 3.2, "tramas": 2, "cadencia": "60s", "desde": "12/08", "hasta": "12/08"}], "huecos": [{"desde": "08/08 17:12", "min": 1.8, "cad": 10, "perd": 9, "causa": "Puesta en marcha"}, {"desde": "08/08 17:15", "min": 0.6, "cad": 10, "perd": 3, "causa": "Puesta en marcha"}, {"desde": "08/08 17:18", "min": 2.3, "cad": 10, "perd": 13, "causa": "Puesta en marcha"}, {"desde": "08/08 17:22", "min": 1.8, "cad": 10, "perd": 10, "causa": "Puesta en marcha"}, {"desde": "08/08 17:52", "min": 9.2, "cad": 10, "perd": 54, "causa": "Puesta en marcha"}, {"desde": "08/08 18:02", "min": 0.6, "cad": 10, "perd": 2, "causa": "Puesta en marcha"}, {"desde": "08/08 18:05", "min": 6.9, "cad": 10, "perd": 41, "causa": "Puesta en marcha"}, {"desde": "08/08 18:12", "min": 2.5, "cad": 10, "perd": 14, "causa": "Puesta en marcha"}, {"desde": "08/08 18:16", "min": 3.6, "cad": 10, "perd": 21, "causa": "Puesta en marcha"}, {"desde": "08/08 18:20", "min": 0.6, "cad": 10, "perd": 2, "causa": "Puesta en marcha"}, {"desde": "08/08 19:58", "min": 4.1, "cad": 10, "perd": 24, "causa": "Puesta en marcha"}, {"desde": "08/08 20:14", "min": 3.7, "cad": 10, "perd": 21, "causa": "Puesta en marcha"}, {"desde": "08/08 20:22", "min": 16.0, "cad": 10, "perd": 95, "causa": "Puesta en marcha"}, {"desde": "08/08 20:38", "min": 1.8, "cad": 10, "perd": 10, "causa": "Puesta en marcha"}, {"desde": "08/08 20:45", "min": 8.9, "cad": 10, "perd": 53, "causa": "Puesta en marcha"}, {"desde": "08/08 20:53", "min": 1.9, "cad": 10, "perd": 10, "causa": "Puesta en marcha"}, {"desde": "08/08 21:13", "min": 6.4, "cad": 10, "perd": 37, "causa": "Puesta en marcha"}, {"desde": "08/08 21:19", "min": 1.9, "cad": 10, "perd": 11, "causa": "Puesta en marcha"}, {"desde": "08/08 21:31", "min": 2.1, "cad": 10, "perd": 12, "causa": "Puesta en marcha"}, {"desde": "08/08 22:46", "min": 2.4, "cad": 10, "perd": 14, "causa": "Puesta en marcha"}, {"desde": "08/08 22:49", "min": 2.5, "cad": 10, "perd": 14, "causa": "Puesta en marcha"}, {"desde": "08/08 23:00", "min": 3.6, "cad": 10, "perd": 21, "causa": "Puesta en marcha"}, {"desde": "08/08 23:04", "min": 1.4, "cad": 10, "perd": 8, "causa": "Puesta en marcha"}, {"desde": "08/08 23:05", "min": 2.6, "cad": 10, "perd": 14, "causa": "Puesta en marcha"}, {"desde": "08/08 23:11", "min": 1.8, "cad": 10, "perd": 10, "causa": "Puesta en marcha"}, {"desde": "09/08 21:31", "min": 2.2, "cad": 10, "perd": 12, "causa": "Puesta en marcha"}, {"desde": "09/08 22:36", "min": 1.0, "cad": 10, "perd": 5, "causa": "Puesta en marcha"}, {"desde": "12/08 09:40", "min": 3.2, "cad": 60, "perd": 2, "causa": "Reflasheo de firmware"}, {"desde": "18/08 22:52", "min": 2.3, "cad": 10, "perd": 13, "causa": "Primer llenado de sustrato"}, {"desde": "23/08 13:27", "min": 59.0, "cad": 60, "perd": 58, "causa": "Reflasheo a la version 2.3.0"}, {"desde": "23/08 16:47", "min": 28.5, "cad": 60, "perd": 28, "causa": "Reflasheo a la version 2.3.0"}, {"desde": "23/08 20:37", "min": 5.0, "cad": 60, "perd": 4, "causa": "Reflasheo a la version 2.3.0"}, {"desde": "23/08 20:45", "min": 5.0, "cad": 60, "perd": 4, "causa": "Reflasheo a la version 2.3.0"}, {"desde": "30/08 18:14", "min": 5.0, "cad": 60, "perd": 4, "causa": "Ensayos de corte provocado"}, {"desde": "30/08 18:39", "min": 22.6, "cad": 300, "perd": 4, "causa": "Ensayos de corte provocado"}, {"desde": "30/08 19:01", "min": 5.0, "cad": 60, "perd": 4, "causa": "Ensayos de corte provocado"}], "recibidas": 33127, "perdidas": 661, "que_sobrevive": [{"causa": "Puesta en marcha", "riego": "sin programa aún", "control": "en configuración", "nota": "El nodo se reiniciaba a mano decenas de veces. No es operación."}, {"causa": "Reflasheo a la versión 2.3.0", "riego": "reanudó al arrancar", "control": "recuperado en 61–168 s", "nota": "El programa vive en memoria no volátil: el nodo volvió con él intacto."}, {"causa": "Primer llenado de sustrato", "riego": "el llenado se ejecutó", "control": "sin interrupción", "nota": "La telemetría se cortó, el actuador no."}, {"causa": "Ensayos de corte provocado", "riego": "ciclo completo de 180 s", "control": "autónomo", "nota": "Provocados a propósito para medir. Ver la sección de resiliencia."}, {"causa": "Reflasheo de firmware", "riego": "reanudó al arrancar", "control": "recuperado", "nota": "Actualización menor de 12/08."}], "fog_recursos": [{"r": "Procesador", "v": "4 núcleos ARM Cortex-A72", "u": "carga media 1,07 de 4,00", "h": "27 % de un núcleo"}, {"r": "Memoria", "v": "3.794 MiB", "u": "300 MiB en uso", "h": "92 % libre"}, {"r": "Almacenamiento", "v": "6,9 GB", "u": "4,2 GB en uso", "h": "2,7 GB libres"}, {"r": "Temperatura", "v": "41,8 °C", "u": "sin limitación térmica", "h": "throttling 0x0"}], "fog_stack": [{"p": "edge_controller (Python)", "cpu": 0.1, "mem": 21.9, "q": "7 tareas asíncronas"}, {"p": "reconciliador (Python)", "cpu": 0.0, "mem": 11.7, "q": "sondeo del nodo cada 60 s"}, {"p": "mosquitto", "cpu": 0.0, "mem": 8.0, "q": "broker MQTT"}, {"p": "hostapd", "cpu": 0.0, "mem": 5.1, "q": "punto de acceso"}, {"p": "dnsmasq", "cpu": 0.0, "mem": 2.2, "q": "DHCP y DNS del cultivo"}], "fog_archivo": [{"t": "Telemetría", "filas": 33159, "q": "una por trama recibida"}, {"t": "Eventos", "filas": 873, "q": "decisiones del borde"}, {"t": "Instantáneas", "filas": 2054, "q": "estado completo del nodo cada 5 min"}, {"t": "Alertas", "filas": 7508, "q": "disparos del motor de reglas"}], "fog_autonomia": {"dias": 22.3, "tramas": 31781, "pct": 95.9, "ciclos": 434, "minutos": 1303.1, "mttr": 119, "peor": 182, "n_rec": 5}, "fog_decisiones": [{"evento": "riego_hidroponia_fin", "n": 434, "primero": "2026-08-24T01:40:07+00:00", "ultimo": "2026-08-31T02:26:03+00:00"}, {"evento": "riego_hidroponia_inicio", "n": 425, "primero": "2026-08-24T02:00:07+00:00", "ultimo": "2026-08-31T02:23:03+00:00"}, {"evento": "conectado", "n": 6, "primero": "2026-08-24T00:53:29+00:00", "ultimo": "2026-08-31T00:02:42+00:00"}, {"evento": "desconectado", "n": 5, "primero": "2026-08-24T00:52:29+00:00", "ultimo": "2026-08-30T23:12:06+00:00"}, {"evento": "corregido", "n": 1, "primero": "2026-08-23T23:09:54+00:00", "ultimo": "2026-08-23T23:09:54+00:00"}, {"evento": "discrepancia", "n": 1, "primero": "2026-08-23T23:09:54+00:00", "ultimo": "2026-08-23T23:09:54+00:00"}]}}</script>
 <script>
 (function () {
   "use strict";
@@ -1358,6 +1516,223 @@ caption { caption-side: bottom; padding: .55rem .85rem; text-align: left;
          <p>${f.d.replace(/`([^`]+)`/g, '<span class="mono">$1</span>')}</p>
          <p style="margin-top:.5rem;color:var(--tinta-3)"><b>Estado:</b> ${f.e}</p>
        </div>`));
+  })();
+
+
+  // ══════════════════════════════════════════════════════════
+  //  El nodo fog y la caída de datos
+  // ══════════════════════════════════════════════════════════
+
+  const F = D.fog_bloque;
+
+  // ── Huecos situados en el calendario ──────────────────────
+  //
+  //  Se dibujan sobre un eje de tiempo real y no como una lista
+  //  ordenada por duración. La pregunta que responde esta figura no es
+  //  "cuál fue el peor" —eso lo dice la tabla— sino "cuándo pasaron":
+  //  agrupados en un día apuntan a una causa concreta y datada;
+  //  repartidos, a un problema de fondo del enlace. Ordenarlos por
+  //  tamaño destruiría justo esa información.
+  (function () {
+    const svg = document.getElementById("g-huecos");
+    if (!svg) return;
+    const W = 900, H = 260, L = 52, R = 18, T = 22, B = 62;
+
+    const COLOR = {
+      "Puesta en marcha":              C("--s3"),
+      "Reflasheo de firmware":         C("--s2"),
+      "Reflasheo a la versión 2.3.0":  C("--s2"),
+      "Primer llenado de sustrato":    "#4a3aa7",
+      "Ensayos de corte provocado":    C("--s1"),
+    };
+
+    // Eje de tiempo: del 8 al 31 de agosto
+    const dia = s => parseInt(s.slice(0, 2), 10);
+    const hora = s => parseInt(s.slice(6, 8), 10) + parseInt(s.slice(9, 11), 10) / 60;
+    const d0 = 8, d1 = 31;
+    const X = h => L + ((dia(h.desde) + hora(h.desde) / 24 - d0) / (d1 - d0)) * (W - L - R);
+
+    const maxP = Math.max(...F.huecos.map(x => x.perd));
+    const Y = v => T + (1 - Math.sqrt(v / maxP)) * (H - T - B);
+
+    [0, 25, 50, 100, 200].filter(v => v <= maxP).forEach(v => {
+      svg.appendChild(el("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v),
+        stroke: C("--rejilla"), "stroke-width": 1 }));
+      svg.appendChild(txt(L - 7, Y(v) + 3.5, v, { anchor: "end" }));
+    });
+    svg.appendChild(txt(L - 7, T - 5, "tramas", { anchor: "end", size: 9.5 }));
+
+    F.huecos.forEach(h => {
+      // Ancho proporcional a la duracion real del hueco, con un minimo
+      // visible: un hueco de un minuto sobre 23 dias es medio pixel.
+      const w = Math.max(2.5, (h.min / 60 / 24) / (d1 - d0) * (W - L - R));
+      const y = Y(h.perd), alto = (H - B) - y;
+      const r = el("rect", { x: X(h) - w / 2, y, width: w, height: Math.max(2, alto),
+        fill: COLOR[h.causa] || C("--tinta-3"), rx: 1.5, opacity: .88 });
+      sensible(r, `<b>${h.desde}</b><br>${nf(h.min, 1)} min sin trama<br>` +
+        `~${h.perd} tramas a ${h.cad} s<br><span style="opacity:.75">${h.causa}</span>`);
+      svg.appendChild(r);
+    });
+
+    svg.appendChild(el("line", { x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1 }));
+    for (let d = d0; d <= d1; d += 3) {
+      const x = L + ((d - d0) / (d1 - d0)) * (W - L - R);
+      svg.appendChild(txt(x, H - B + 15, String(d).padStart(2, "0") + "/08",
+        { anchor: "middle", size: 9.5 }));
+    }
+
+    // Leyenda: el color es la unica forma de leer la causa aqui
+    let lx = L;
+    Object.entries(COLOR).forEach(([nom, c]) => {
+      if (!F.huecos.some(h => h.causa === nom)) return;
+      svg.appendChild(el("rect", { x: lx, y: H - 28, width: 9, height: 9, fill: c, rx: 2 }));
+      svg.appendChild(txt(lx + 13, H - 20, nom, { size: 9 }));
+      lx += nom.length * 5.2 + 26;
+    });
+  })();
+
+  // ── Proporción de lo perdido, por causa ───────────────────
+  (function () {
+    const svg = document.getElementById("g-perdida-causa");
+    if (!svg) return;
+    const W = 900, H = 190, L = 236, R = 80, T = 18, B = 34;
+    const d = F.huecos_causa;
+    const max = Math.max(...d.map(x => x.tramas)) * 1.12;
+    const bh = (H - T - B) / d.length;
+    const X = v => L + (v / max) * (W - L - R);
+    [0, 100, 200, 300, 400, 500].filter(v => v <= max).forEach(v => {
+      svg.appendChild(el("line", { x1: X(v), x2: X(v), y1: T, y2: H - B,
+        stroke: C("--rejilla"), "stroke-width": 1 }));
+      svg.appendChild(txt(X(v), H - B + 15, v, { anchor: "middle" }));
+    });
+    const COLOR = {
+      "Puesta en marcha": C("--s3"), "Reflasheo de firmware": C("--s2"),
+      "Reflasheo a la versión 2.3.0": C("--s2"),
+      "Primer llenado de sustrato": "#4a3aa7", "Ensayos de corte provocado": C("--s1"),
+    };
+    d.forEach((x, i) => {
+      const y = T + i * bh + 5, h = bh - 12;
+      const r = el("rect", { x: L, y, width: Math.max(2, X(x.tramas) - L), height: h,
+        fill: COLOR[x.causa] || C("--tinta-3"), rx: 3 });
+      sensible(r, `<b>${x.causa}</b><br>${x.tramas} tramas en ${x.huecos} huecos<br>` +
+        `${nf(x.minutos, 1)} min · cadencia ${x.cadencia}<br>${x.desde} → ${x.hasta}`);
+      svg.appendChild(r);
+      svg.appendChild(txt(L - 12, y + h / 2 + 4, x.causa,
+        { anchor: "end", size: 10.5, fill: C("--tinta-2") }));
+      svg.appendChild(txt(X(x.tramas) + 8, y + h / 2 + 4,
+        x.tramas + " tramas", { size: 10.5, fill: C("--tinta"), weight: 600 }));
+    });
+    svg.appendChild(txt((L + W - R) / 2, H - 6, "tramas no recibidas",
+      { anchor: "middle", size: 10 }));
+  })();
+
+  // ── Tablas ────────────────────────────────────────────────
+  (function () {
+    const tb = document.getElementById("t-huecos");
+    if (!tb) return;
+    const tot = F.perdidas;
+    F.huecos_causa.forEach(x => {
+      const pct = 100 * x.tramas / tot;
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td class="d">${x.causa}</td>
+         <td class="n">${x.desde} → ${x.hasta}</td>
+         <td class="n">${x.huecos}</td>
+         <td class="n">${nf(x.minutos, 1)} min</td>
+         <td class="n">${x.cadencia}</td>
+         <td class="n d">${x.tramas}</td>
+         <td class="n">${nf(pct, 1)} %</td></tr>`);
+    });
+    tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="d">TOTAL</td><td class="n">08/08 → 31/08</td>
+       <td class="n d">${F.huecos.length}</td>
+       <td class="n">${nf(F.huecos_causa.reduce((a, x) => a + x.minutos, 0), 1)} min</td>
+       <td class="n">—</td><td class="n d">${tot}</td><td class="n">100 %</td></tr>`);
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-sobrevive");
+    if (!tb) return;
+    F.que_sobrevive.forEach(x => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="d">${x.causa}</td><td>${x.riego}</td><td>${x.control}</td>
+       <td style="font-size:.82rem;color:var(--tinta-2)">${x.nota}</td></tr>`));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-fog-rec");
+    if (!tb) return;
+    F.fog_recursos.forEach(x => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="d">${x.r}</td><td class="n">${x.v}</td>
+       <td class="n">${x.u}</td><td>${x.h}</td></tr>`));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-fog-stack");
+    if (!tb) return;
+    let mem = 0;
+    F.fog_stack.forEach(x => {
+      mem += x.mem;
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td class="d">${x.p}</td><td class="n">${nf(x.cpu, 1)} %</td>
+         <td class="n">${nf(x.mem, 1)} MiB</td><td>${x.q}</td></tr>`);
+    });
+    tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="d">Todo el sistema</td><td class="n d">&lt; 1 %</td>
+       <td class="n d">${nf(mem, 1)} MiB</td>
+       <td>de 3.794 MiB disponibles — el 1,3 %</td></tr>`);
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-fog-archivo");
+    if (!tb) return;
+    F.fog_archivo.forEach(x => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="d">${x.t}</td><td class="n">${ent(x.filas)}</td><td>${x.q}</td></tr>`));
+  })();
+
+  // ── Consumo del archivo local frente a su tope ────────────
+  (function () {
+    const svg = document.getElementById("g-fog-archivo");
+    if (!svg) return;
+    const W = 900, H = 130, L = 150, R = 96, T = 26, B = 40;
+    const TOPE = 50000;
+    const filas = F.fog_archivo.map(x => x.filas);
+    const total = filas.reduce((a, b) => a + b, 0);
+    const X = v => L + (v / TOPE) * (W - L - R);
+    const COLS = [C("--s1"), C("--s2"), C("--s3"), "#4a3aa7"];
+
+    svg.appendChild(el("rect", { x: L, y: T, width: (W - L - R), height: 34,
+      fill: "none", stroke: C("--base"), "stroke-dasharray": "4 3", rx: 3 }));
+
+    let acum = 0;
+    F.fog_archivo.forEach((x, i) => {
+      const x0 = X(acum), w = Math.max(1.5, X(acum + x.filas) - x0);
+      // 2 px de aire entre segmentos, para que el apilado se lea
+      const r = el("rect", { x: x0, y: T, width: Math.max(1, w - 2), height: 34,
+        fill: COLS[i], rx: 2 });
+      sensible(r, `<b>${x.t}</b><br>${ent(x.filas)} filas<br>${nf(100 * x.filas / TOPE, 1)} % del tope`);
+      svg.appendChild(r);
+      acum += x.filas;
+    });
+
+    svg.appendChild(txt(L - 12, T + 21, "Archivo local", { anchor: "end", size: 11,
+      fill: C("--tinta-2"), weight: 600 }));
+    svg.appendChild(txt(X(acum) + 10, T + 21, ent(acum) + " de " + ent(TOPE),
+      { size: 10.5, fill: C("--tinta"), weight: 600 }));
+    svg.appendChild(txt(W - R + 10, T + 34, nf(100 * acum / TOPE, 0) + " %",
+      { size: 9.5, fill: C("--tinta-3") }));
+
+    [0, 12500, 25000, 37500, 50000].forEach(v =>
+      svg.appendChild(txt(X(v), H - B + 30, ent(v), { anchor: "middle", size: 9.5 })));
+    svg.appendChild(txt((L + W - R) / 2, H - 6,
+      "filas · el tope configurado da para cinco meses a la cadencia actual",
+      { anchor: "middle", size: 10 }));
+
+    let lx = L;
+    F.fog_archivo.forEach((x, i) => {
+      svg.appendChild(el("rect", { x: lx, y: T + 44, width: 9, height: 9, fill: COLS[i], rx: 2 }));
+      svg.appendChild(txt(lx + 13, T + 52, x.t, { size: 9 }));
+      lx += x.t.length * 5.6 + 26;
+    });
   })();
 
 })();
