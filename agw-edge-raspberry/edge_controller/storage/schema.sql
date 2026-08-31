@@ -69,7 +69,10 @@ CREATE TABLE IF NOT EXISTS node_events (
     evento     TEXT    NOT NULL,   -- conectado | desconectado | discrepancia
                                    -- | corregido | riego_tierra
     detalle    TEXT,               -- JSON con lo especifico del evento
-    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+    created_at INTEGER DEFAULT (strftime('%s', 'now')),
+    -- 0 = pendiente de subir a la nube. Los eventos no tenian
+    -- ruta de salida del borde; ahora la tienen.
+    synced     INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_created
@@ -117,3 +120,7 @@ CREATE INDEX IF NOT EXISTS idx_history_ts
 
 CREATE INDEX IF NOT EXISTS idx_history_node_ts
     ON node_history (node_id, ts DESC);
+
+
+CREATE INDEX IF NOT EXISTS idx_events_sync
+    ON node_events (synced, created_at);

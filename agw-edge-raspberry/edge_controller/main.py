@@ -14,6 +14,7 @@ from config_loader import load_config
 from mqtt.broker_client import MQTTClient
 from cloud.sync_telemetry import TelemetrySyncer
 from cloud.sync_commands import CommandPoller
+from cloud.sync_events import EventSyncer
 from cloud.node_sync import NodeSync
 from cloud.reconciler import Reconciler
 from rules.rules_engine import RulesEngine
@@ -73,6 +74,9 @@ async def main() -> None:
     telemetry_syncer = TelemetrySyncer(config, local_db)
     mqtt_client = MQTTClient(config, rules_engine, local_db, telemetry_syncer)
     command_poller = CommandPoller(config, mqtt_client)
+    # Los eventos del borde no tenian ruta de salida: se quedaban
+    # en SQLite y la nube mostraba cifras congeladas.
+    event_syncer = EventSyncer(config, local_db)
     node_sync = NodeSync(config, mqtt_client, local_db)
     ap_watcher = APWatcher(config, node_sync)
     reconciler = Reconciler(config, node_sync, local_db)
@@ -93,6 +97,7 @@ async def main() -> None:
         asyncio.create_task(mqtt_client.run(), name="mqtt-client"),
         asyncio.create_task(telemetry_syncer.run(), name="telemetry-syncer"),
         asyncio.create_task(command_poller.run(), name="command-poller"),
+        asyncio.create_task(event_syncer.run(), name="event-syncer"),
         asyncio.create_task(node_sync.run(), name="node-sync"),
         asyncio.create_task(ap_watcher.run(), name="ap-watcher"),
         asyncio.create_task(reconciler.run(), name="reconciler"),

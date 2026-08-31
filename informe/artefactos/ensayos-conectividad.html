@@ -1,0 +1,1364 @@
+<title>Ensayos de Conectividad AGW</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Serif:wght@500;600&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Tema único claro, por encargo: el destino es un informe
+   impreso. El fondo se pinta explícitamente para que la página
+   no herede el del visor.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --plano:      #f4f5f3;
+  --superficie: #ffffff;
+  --tinta:      #0b0b0b;
+  --tinta-2:    #52514e;
+  --tinta-3:    #898781;
+  --rejilla:    #e5e6e1;
+  --linea:      #d9dad4;
+  --base:       #c3c2b7;
+
+  /* Paleta categórica validada contra fondo blanco.
+     Orden fijo: nunca se cicla ni se reasigna por ranking. */
+  --s1: #2a78d6;   /* azul    */
+  --s2: #eb6834;   /* naranja */
+  --s3: #1baf7a;   /* aqua    */
+
+  /* Rampa secuencial de un solo tono, para magnitud continua. */
+  --q1: #cde2fb; --q2: #9ec5f4; --q3: #6da7ec;
+  --q4: #3987e5; --q5: #256abf; --q6: #184f95; --q7: #0d366b;
+
+  /* Estado: reservados, nunca reutilizados como serie. */
+  --ok:    #0ca30c;
+  --aviso: #fab219;
+  --grave: #ec835a;
+  --malo:  #d03b3b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--plano);
+  color: var(--tinta);
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  font-size: 15.5px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hoja { max-width: 63rem; margin: 0 auto; padding: 2.6rem 1.4rem 5rem; }
+
+/* ── Tipografía ───────────────────────────────────────────── */
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 {
+  font-family: 'IBM Plex Serif', Georgia, serif;
+  font-weight: 600; font-size: clamp(2rem, 4.6vw, 2.9rem);
+  line-height: 1.06; letter-spacing: -.015em;
+}
+h2 {
+  font-family: 'IBM Plex Serif', Georgia, serif;
+  font-weight: 600; font-size: clamp(1.35rem, 2.7vw, 1.72rem); line-height: 1.2;
+}
+h3 { font-size: 1rem; font-weight: 600; line-height: 1.35; }
+
+p { margin: 0; max-width: 64ch; }
+.prosa > * + * { margin-top: .85rem; }
+.guia { font-size: .92rem; color: var(--tinta-2); max-width: 66ch; }
+.pie  { font-size: .8rem; color: var(--tinta-3); max-width: 72ch; }
+
+.rotulo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: .67rem; font-weight: 500;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--tinta-3);
+}
+.mono, .num { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+
+/* ── Portada ──────────────────────────────────────────────── */
+.portada {
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 4px;
+  padding: 2.2rem 2rem 1.8rem;
+  display: flex; flex-direction: column; gap: 1rem;
+}
+.portada .meta {
+  display: flex; flex-wrap: wrap; gap: .4rem 1.6rem;
+  padding-top: 1rem; border-top: 1px solid var(--rejilla);
+  font-family: 'IBM Plex Mono', monospace; font-size: .74rem; color: var(--tinta-3);
+}
+
+/* ── Titulares ────────────────────────────────────────────── */
+.titulares {
+  display: grid; gap: .8rem; margin-top: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+.titular {
+  background: var(--superficie); border: 1px solid var(--linea);
+  border-radius: 4px; padding: .95rem 1rem;
+  display: flex; flex-direction: column; gap: .15rem;
+}
+.titular .k { font-family: 'IBM Plex Mono', monospace; font-size: .68rem;
+              letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-3); }
+.titular .v { font-size: 1.75rem; font-weight: 600; line-height: 1.08;
+              font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.titular .u { font-size: .85rem; font-weight: 500; color: var(--tinta-2); margin-left: .15em; }
+.titular .f { font-size: .76rem; color: var(--tinta-2); line-height: 1.4; }
+
+/* ── Secciones ────────────────────────────────────────────── */
+section { margin-top: 2.9rem; }
+.cabecera-sec {
+  display: grid; grid-template-columns: 2.6rem 1fr; gap: 0 1rem;
+  align-items: start; margin-bottom: 1.1rem;
+  padding-bottom: .75rem; border-bottom: 2px solid var(--tinta);
+}
+.cabecera-sec .num-exp {
+  font-family: 'IBM Plex Serif', serif; font-size: 1.72rem; font-weight: 600;
+  color: var(--tinta-3); line-height: 1; padding-top: .1rem;
+}
+.cabecera-sec .guia { grid-column: 2; margin-top: .35rem; }
+@media (max-width: 38rem) {
+  .cabecera-sec { grid-template-columns: 1fr; gap: .2rem; }
+  .cabecera-sec .guia { grid-column: 1; }
+}
+
+/* ── Figuras ──────────────────────────────────────────────── */
+figure {
+  margin: 1.2rem 0 0;
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 4px;
+  padding: 1.1rem 1.2rem 1rem;
+}
+figure > figcaption {
+  font-size: .93rem; font-weight: 600; margin-bottom: .15rem;
+}
+figure > .sub { font-size: .82rem; color: var(--tinta-2); margin-bottom: .9rem; max-width: 68ch; }
+.lienzo { position: relative; overflow-x: auto; }
+svg { display: block; max-width: 100%; height: auto; }
+svg text { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+
+.leyenda { display: flex; flex-wrap: wrap; gap: .3rem 1.1rem; margin: .7rem 0 .2rem; }
+.leyenda span { display: inline-flex; align-items: center; gap: .42em;
+                font-size: .78rem; color: var(--tinta-2); }
+.leyenda i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: none; }
+
+/* ── Tooltip ──────────────────────────────────────────────── */
+.pista {
+  position: fixed; pointer-events: none; z-index: 40;
+  background: var(--tinta); color: #fff;
+  border-radius: 4px; padding: .45rem .6rem;
+  font-family: 'IBM Plex Mono', monospace; font-size: .73rem; line-height: 1.5;
+  box-shadow: 0 6px 20px -6px rgba(0,0,0,.45);
+  opacity: 0; transition: opacity .1s;
+}
+.pista.on { opacity: 1; }
+.pista b { color: #fff; font-weight: 600; }
+
+/* ── Tablas ───────────────────────────────────────────────── */
+.tabla-caja { overflow-x: auto; margin-top: 1rem;
+              border: 1px solid var(--linea); border-radius: 4px; background: var(--superficie); }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; min-width: 30rem; }
+thead th {
+  text-align: left; font-family: 'IBM Plex Mono', monospace;
+  font-size: .67rem; font-weight: 500; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--tinta-3); padding: .62rem .85rem;
+  border-bottom: 1.5px solid var(--base); white-space: nowrap;
+}
+tbody td { padding: .55rem .85rem; border-bottom: 1px solid var(--rejilla); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) { background: #fafbfa; }
+td.n, th.n { text-align: right; font-family: 'IBM Plex Mono', monospace;
+             font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.destaca { font-weight: 600; }
+caption { caption-side: bottom; padding: .55rem .85rem; text-align: left;
+          font-size: .76rem; color: var(--tinta-3); }
+
+/* ── Marcas de estado ─────────────────────────────────────── */
+.marca {
+  display: inline-flex; align-items: center; gap: .35em;
+  font-family: 'IBM Plex Mono', monospace; font-size: .7rem; font-weight: 500;
+  padding: .12em .5em; border-radius: 3px; border: 1px solid; white-space: nowrap;
+}
+.m-ok    { color: #0a7a0a; border-color: #b5e3b5; background: #eefaee; }
+.m-aviso { color: #8a6100; border-color: #f0dfae; background: #fdf7e6; }
+.m-malo  { color: #a52c2c; border-color: #f0c2c2; background: #fdeded; }
+
+/* ── Hallazgo ─────────────────────────────────────────────── */
+.hallazgo {
+  margin-top: 1.1rem; padding: 1rem 1.15rem;
+  background: var(--superficie);
+  border: 1px solid var(--linea); border-left: 3px solid var(--s1);
+  border-radius: 4px;
+}
+.hallazgo h3 { margin-bottom: .3rem; }
+.hallazgo p { font-size: .9rem; color: var(--tinta-2); }
+.hallazgo.alerta { border-left-color: var(--malo); }
+
+.rejilla-2 { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
+
+.cierre {
+  margin-top: 3.4rem; padding-top: 1.1rem; border-top: 1px solid var(--linea);
+  font-family: 'IBM Plex Mono', monospace; font-size: .74rem; color: var(--tinta-3);
+  display: flex; flex-wrap: wrap; gap: .35rem 1.6rem;
+}
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media print {
+  body { background: #fff; }
+  figure, .titular, .portada, .tabla-caja { break-inside: avoid; }
+}
+</style>
+
+<div class="hoja">
+
+  <header class="portada">
+    <div class="rotulo">VitalCrop AGW · Fase 6 · MCD §9</div>
+    <h1>Ensayos de conectividad</h1>
+    <p class="guia">
+      Medición del enlace inalámbrico entre el nodo ESP32, el nodo fog y la nube,
+      sobre un cultivo en producción. Cada cifra de este documento procede de un
+      instrumento que quedó registrando en disco; ninguna es una estimación.
+    </p>
+    <div class="meta">
+      <span>30 de agosto de 2026</span>
+      <span>Nodo IoT-node-26.001 · fw 2.3.0</span>
+      <span>Gateway FOG_RPI_HIERBABUENA_01</span>
+      <span>10.077 muestras instrumentales · 2 nodos</span>
+    </div>
+  </header>
+
+  <div class="titulares">
+    <div class="titular">
+      <span class="k">Ganancia al cambiar de canal</span>
+      <span class="v" style="color:var(--s1)">+10,6<span class="u">dB</span></span>
+      <span class="f">Medido con diseño A/B/A/B</span>
+    </div>
+    <div class="titular">
+      <span class="k">Recuperación media</span>
+      <span class="v">5,9<span class="u">s</span></span>
+      <span class="f">Objetivo del §9: menos de 90 s</span>
+    </div>
+    <div class="titular">
+      <span class="k">Pérdida sin internet</span>
+      <span class="v" style="color:#0a7a0a">0</span>
+      <span class="f">21 minutos de corte, 5 tramas retenidas</span>
+    </div>
+    <div class="titular">
+      <span class="k">Carga de un nodo</span>
+      <span class="v">1,94<span class="u">kbit/s</span></span>
+      <span class="f">0,063 % del tiempo de aire</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">1</span>
+      <h2>El canal era el problema</h2>
+      <p class="guia">
+        El RSSI del nodo llevaba semanas entre −60 y −65 dBm. Al caer la tarde se
+        desplomó a −73 sin que nadie tocara nada. Un barrido del espectro encontró
+        cuatro redes nuevas solapando nuestro canal.
+      </p>
+    </div>
+
+    <figure>
+      <figcaption>Potencia recibida por el nodo, antes y después de cada cambio</figcaption>
+      <p class="sub">
+        Una sola magnitud sobre un eje. El fondo indica en qué canal emitía el punto de
+        acceso en cada instante; los cambios se hicieron en los dos sentidos para que la
+        mejora no pudiera confundirse con la deriva del entorno.
+      </p>
+      <div class="lienzo"><svg id="g-rssi" viewBox="0 0 920 300" role="img"
+        aria-label="Serie temporal de RSSI mostrando la mejora al pasar al canal 11"></svg></div>
+      <div class="leyenda">
+        <span><i style="background:#e8eef7"></i> Emitiendo en canal 6</span>
+        <span><i style="background:#e6f5ef"></i> Emitiendo en canal 11</span>
+        <span><i style="background:var(--s1)"></i> RSSI del nodo</span>
+        <span><i style="background:var(--malo)"></i> Objetivo §9: −70 dBm</span>
+      </div>
+    </figure>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Agregado de las cuatro fases. El tiempo bajo −70 dBm es el criterio del §9.</caption>
+        <thead><tr><th>Canal</th><th class="n">Muestras</th><th class="n">RSSI medio</th>
+          <th class="n">σ</th><th class="n">Mínimo</th><th class="n">Máximo</th>
+          <th class="n">Tiempo bajo −70</th><th>Veredicto</th></tr></thead>
+        <tbody id="t-canal"></tbody>
+      </table>
+    </div>
+
+    <figure>
+      <figcaption>Distribución de la potencia recibida</figcaption>
+      <p class="sub">
+        La media esconde la forma. En el canal 6 la distribución es ancha y cruza el
+        umbral; en el 11 se estrecha y se aleja de él por completo.
+      </p>
+      <div class="lienzo"><svg id="g-hist" viewBox="0 0 920 260" role="img"
+        aria-label="Histograma de RSSI comparando el canal 6 y el canal 11"></svg></div>
+      <div class="leyenda">
+        <span><i style="background:var(--s2)"></i> Canal 6</span>
+        <span><i style="background:var(--s1)"></i> Canal 11</span>
+      </div>
+    </figure>
+
+    <div class="hallazgo">
+      <h3>Por qué el canal 11 y no el 13</h3>
+      <p>
+        El canal 13 tenía aún menos interferencia agregada (−50,8 dBm frente a −46,8),
+        y el dominio regulatorio de Colombia lo permite. Se descartó porque el ESP32
+        podría no verlo si su configuración de país está en modo mundial, que limita el
+        barrido a los canales 1–11. La diferencia entre ambos era de 4 dB; el riesgo de
+        dejar el nodo sin encontrar la red, total.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">2</span>
+      <h2>El espectro alrededor del cultivo</h2>
+      <p class="guia">
+        Un canal de 20 MHz en la banda de 2,4 GHz se pisa con sus cuatro vecinos a cada
+        lado. Lo que daña no es el número de redes sino su potencia, así que se suman en
+        escala lineal y se expresa el total en dBm.
+      </p>
+    </div>
+
+    <figure>
+      <figcaption>Interferencia agregada sobre cada canal</figcaption>
+      <p class="sub">
+        Más a la derecha es peor. Cada barra suma la potencia de todas las redes que
+        solapan ese canal, medidas en el segundo barrido.
+      </p>
+      <div class="lienzo"><svg id="g-inter" viewBox="0 0 920 330" role="img"
+        aria-label="Interferencia agregada por canal en la banda de 2,4 GHz"></svg></div>
+    </figure>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Redes detectadas en el segundo barrido, ordenadas por potencia.</caption>
+        <thead><tr><th>Red</th><th class="n">Canal</th><th class="n">Potencia</th>
+          <th>Relación con el canal 11</th></tr></thead>
+        <tbody id="t-scan"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">3</span>
+      <h2>Latencia de cada tramo</h2>
+      <p class="guia">
+        Cuatro caminos, veinte paquetes cada uno, sin una sola pérdida. El tramo
+        inalámbrico es cuarenta veces más lento que la salida a internet, y no por
+        distancia.
+      </p>
+    </div>
+
+    <figure>
+      <figcaption>Tiempo de ida y vuelta por camino</figcaption>
+      <p class="sub">
+        Escala logarítmica: los valores abarcan tres órdenes de magnitud. La barra marca
+        el recorrido entre mínimo y máximo; el punto, la media.
+      </p>
+      <div class="lienzo"><svg id="g-lat" viewBox="0 0 920 220" role="img"
+        aria-label="Latencia de ida y vuelta de cuatro caminos de red"></svg></div>
+    </figure>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Veinte paquetes por camino, diez hacia la nube. Pérdida: 0 % en todos.</caption>
+        <thead><tr><th>Camino</th><th class="n">Medio</th><th class="n">Mínimo</th>
+          <th class="n">Máximo</th><th class="n">σ</th></tr></thead>
+        <tbody id="t-lat"></tbody>
+      </table>
+    </div>
+
+    <div class="hallazgo">
+      <h3>Los 61 ms de dispersión tienen una causa medida</h3>
+      <p>
+        El enlace al nodo son cinco metros y sin embargo su RTT varía entre 8,6 y 220,9 ms.
+        No es congestión: el ESP32 tiene el ahorro de energía activo y su radio duerme entre
+        balizas. El punto de acceso emite una baliza cada 100 ms con un DTIM de 2, así que
+        el nodo despierta cada 200 ms como mucho — y el máximo observado, 220,9 ms, es
+        exactamente un ciclo de DTIM más el tiempo de proceso.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">4</span>
+      <h2>Cuántos aparatos aguanta la red</h2>
+      <p class="guia">
+        Seis estaciones simultáneas sin un solo rechazo. La única que se caía era la que
+        se colocó a propósito encerrada y tapada — y no por distancia, porque cuando
+        lograba asociarse lo hacía a buena tasa.
+      </p>
+    </div>
+
+    <div class="rejilla-2">
+      <figure>
+        <figcaption>Permanencia de cada aparato</figcaption>
+        <p class="sub">Porcentaje del tiempo con la asociación mantenida.</p>
+        <div class="lienzo"><svg id="g-cap" viewBox="0 0 460 250" role="img"
+          aria-label="Permanencia de la asociación de cinco aparatos"></svg></div>
+      </figure>
+
+      <figure>
+        <figcaption>Alcance por planta</figcaption>
+        <p class="sub">Tasa negociada media durante el recorrido con un móvil.</p>
+        <div class="lienzo"><svg id="g-alc" viewBox="0 0 460 250" role="img"
+          aria-label="Tasa negociada en cuatro zonas de la vivienda"></svg></div>
+      </figure>
+    </div>
+
+    <div class="hallazgo">
+      <h3>Añadir cinco aparatos no le hizo nada a la telemetría</h3>
+      <p>
+        La tasa negociada del nodo del cultivo cayó a la mitad —de 57,6 a 27,3 Mbit/s—
+        mientras los cinco invitados competían por el canal. Su telemetría no se enteró:
+        siguió entregando 1,51 paquetes por segundo, y los fallos de transmisión bajaron
+        a cero porque el radio se replegó a una modulación más robusta. La telemetría
+        necesita 1,94 kbit/s; incluso 27 Mbit/s son catorce mil veces más de lo que pide.
+      </p>
+    </div>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>El enlace del cultivo, antes y durante la prueba de capacidad.</caption>
+        <thead><tr><th>Tramo</th><th class="n">Estaciones</th><th class="n">Tasa del nodo</th>
+          <th class="n">Fallos/min</th><th class="n">Paquetes/s</th></tr></thead>
+        <tbody id="t-carga"></tbody>
+      </table>
+    </div>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>El límite que manda hoy no es el caudal: es el pool de direcciones.</caption>
+        <thead><tr><th>Límite</th><th class="n">Nodos</th><th>Naturaleza</th></tr></thead>
+        <tbody>
+          <tr><td>Tiempo de aire al 50 %</td><td class="n">~780</td><td>calculado sobre la carga medida</td></tr>
+          <tr><td>Tiempo de aire al 30 %</td><td class="n">~460</td><td>con el canal ya ocupado</td></tr>
+          <tr><td class="destaca">Direcciones DHCP <span class="mono">10.42.0.10–50</span></td>
+              <td class="n destaca">41</td><td>configurado — es el que manda</td></tr>
+          <tr><td><span class="mono">hostapd</span> sin <span class="mono">max_num_sta</span></td>
+              <td class="n">2007</td><td>por defecto</td></tr>
+          <tr><td>Driver <span class="mono">brcmfmac</span> (BCM4345/6)</td>
+              <td class="n">desconocido</td><td>Broadcom no lo publica; solo se sabe probando</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">5</span>
+      <h2>Cuatro cortes provocados</h2>
+      <p class="guia">
+        Se apagó el nodo, se quitó el cable de internet, se cortó la energía de la
+        Raspberry, y por último ambas cosas a la vez. El cultivo siguió regándose en los
+        cuatro casos.
+      </p>
+    </div>
+
+    <figure>
+      <figcaption>Lo que esperó cada trama retenida durante el corte de internet</figcaption>
+      <p class="sub">
+        Veintiún minutos sin ruta a la nube. El nodo fog siguió recibiendo y archivando; al
+        volver la red subió las cinco en veintiún segundos. Cada barra es lo que esa trama
+        llevaba esperando — la escalera descendente es la firma del archivo local funcionando.
+      </p>
+      <div class="lienzo"><svg id="g-esc" viewBox="0 0 920 230" role="img"
+        aria-label="Espera de cada trama retenida en el buffer durante el corte de internet"></svg></div>
+    </figure>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Las cuatro pruebas. «Retenidas» son tramas guardadas y recuperadas sin pérdida.</caption>
+        <thead><tr><th>Prueba</th><th class="n">Duración</th><th class="n">Tramas perdidas</th>
+          <th class="n">Retenidas</th><th>Riego durante el corte</th></tr></thead>
+        <tbody id="t-cortes"></tbody>
+      </table>
+    </div>
+
+    <div class="hallazgo">
+      <h3>La asimetría es el resultado</h3>
+      <p>
+        Perder internet no cuesta ni una trama: el nodo fog archiva en SQLite antes de
+        transmitir, y al volver la red vacía el archivo. Perder el nodo fog sí cuesta datos,
+        en proporción al corte, porque el ESP32 publica en QoS 0 y no guarda nada para
+        después. En ambos casos el cultivo se regó igual — que es el punto que el proyecto
+        defiende: ninguna decisión que mantenga vivo el cultivo depende de la nube.
+      </p>
+    </div>
+
+    <div class="hallazgo alerta">
+      <h3>Dos cosas que el apagón dejó al descubierto</h3>
+      <p>
+        El registro de <span class="mono">systemd</span> no sobrevivía a los reinicios: la
+        narración del gateway de las tres primeras pruebas se perdió. Solo quedó lo que los
+        instrumentos habían escrito a disco forzando el volcado en cada línea. Ya está
+        corregido a almacenamiento persistente.
+      </p>
+      <p style="margin-top:.5rem">
+        Y la Raspberry no tiene reloj de tiempo real: tras cada corte arrancó con una hora
+        estimada y NTP la corrigió de golpe, con saltos de hasta 547 segundos. Durante esos
+        instantes <b>el reloj del ESP32 fue más fiable que el de la Raspberry</b>, porque el
+        nodo lo restaura de su memoria no volátil y el gateway se lo repone en cuanto vuelve.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">6</span>
+      <h2>Tiempos de recuperación</h2>
+      <p class="guia">
+        Siete eventos cronometrados: tres cambios de canal, un reinicio del servicio del
+        gateway y los cortes provocados. El criterio del §9 pide menos de 90 segundos.
+      </p>
+    </div>
+
+    <figure>
+      <figcaption>Del corte a estar sirviendo otra vez</figcaption>
+      <p class="sub">
+        Se mide hasta que el nodo responde por HTTP, no hasta que aparece asociado: estar
+        en la lista del punto de acceso no es lo mismo que ser útil, y entre una cosa y otra
+        hay DHCP y pila TCP.
+      </p>
+      <div class="lienzo"><svg id="g-rec" viewBox="0 0 920 250" role="img"
+        aria-label="Tiempo de recuperación de cinco eventos, contra el objetivo de 90 segundos"></svg></div>
+    </figure>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">7</span>
+      <h2>El cultivo, mientras tanto</h2>
+      <p class="guia">
+        Siete días de ciclos de riego contados por evento, no estimados del muestreo: un
+        ciclo de tres minutos cabe entero entre dos tramas de cinco.
+      </p>
+    </div>
+
+    <figure>
+      <figcaption>Ciclos de riego por hora del día</figcaption>
+      <p class="sub">
+        La frontera entre día y noche cae limpia en las 18:00 porque el firmware la lee del
+        programa y no de una constante. Ciento sesenta y ocho horas sin una sola desviación.
+      </p>
+      <div class="lienzo"><svg id="g-riego" viewBox="0 0 920 210" role="img"
+        aria-label="Ciclos de riego por hora del día, cuatro de día y uno de noche"></svg></div>
+      <div class="leyenda">
+        <span><i style="background:var(--s2)"></i> Fotoperiodo con luz · 06:00–17:59</span>
+        <span><i style="background:var(--s1)"></i> Oscuridad · 18:00–05:59</span>
+      </div>
+    </figure>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">8</span>
+      <h2>Contra los objetivos del §9</h2>
+    </div>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>
+          Los seis criterios evaluables, con el valor medido tras el cambio de canal.
+        </caption>
+        <thead><tr><th>Métrica</th><th>Objetivo</th><th class="n">Medido</th><th>Estado</th></tr></thead>
+        <tbody id="t-obj"></tbody>
+      </table>
+    </div>
+
+    <div class="hallazgo">
+      <h3>Lo que sigue sin instrumentar</h3>
+      <p>
+        La <b>latencia de extremo a extremo</b> exige que el ESP32 selle el instante de
+        publicación en cada trama; hoy solo se mide desde que el gateway la recibe. Las
+        <b>sondas activas</b> de ICMP, MQTT y HTTP se ejecutan pero no se persisten. Y el
+        <b>impacto del nivel de QoS</b> no se puede comparar porque la biblioteca MQTT del
+        firmware solo publica en QoS 0. Se declaran en vez de estimarse: un panel que pinta
+        cifras donde no midió afirma una medición que no existe.
+      </p>
+    </div>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">9</span>
+      <h2>Un segundo nodo en la misma red</h2>
+      <p class="guia">
+        Hasta aquí todo se midió con un solo aparato publicando. Se incorporó un segundo
+        ESP32 al mismo punto de acceso para comprobar sobre hardware —y no por cálculo—
+        qué le hace al enlace del cultivo tener compañía.
+      </p>
+    </div>
+
+    <div class="hallazgo">
+      <h3>Qué es exactamente este segundo nodo</h3>
+      <p>
+        Es un ESP32 real, asociado al punto de acceso real, publicando por MQTT real y
+        atravesando la misma cadena hasta la nube. Lo único sintético son las lecturas: no
+        tiene sensores conectados y el firmware genera la temperatura y la humedad mediante
+        un paseo aleatorio acotado. Sus tramas van marcadas en la base de datos y quedan
+        fuera de las métricas del §9 — promediar un generador de tráfico con un enlace
+        medido durante semanas daría una cifra que no describe a ninguno de los dos.
+      </p>
+    </div>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Los dos nodos, uno frente a otro. Firmware independiente, no una variante del mismo árbol.</caption>
+        <thead><tr><th>Concepto</th><th>Nodo 1 · hierbabuena</th><th>Nodo 2 · lechuga</th></tr></thead>
+        <tbody id="t-ficha"></tbody>
+      </table>
+    </div>
+
+    <figure>
+      <figcaption>Los dos enlaces medidos a la vez</figcaption>
+      <p class="sub">
+        Diecisiete decibelios separan a un nodo del otro: están en sitios distintos de la
+        casa. El mismo punto de acceso sostiene ambos sin que ninguno degrade al otro.
+      </p>
+      <div class="lienzo"><svg id="g-dos" viewBox="0 0 920 240" role="img"
+        aria-label="Comparación de potencia recibida y tasa negociada de los dos nodos"></svg></div>
+    </figure>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Medido con ambos nodos asociados simultáneamente, ventana de 12,2 minutos.</caption>
+        <thead><tr><th>Nodo</th><th class="n">RSSI</th><th class="n">Tasa tx</th>
+          <th class="n">σ de la tasa</th><th class="n">Paquetes/s</th><th class="n">Caudal</th>
+          <th class="n">Fallos/min</th></tr></thead>
+        <tbody id="t-dos"></tbody>
+      </table>
+    </div>
+
+    <div class="hallazgo">
+      <h3>El nodo débil absorbe su propia degradación</h3>
+      <p>
+        El segundo nodo está diecisiete decibelios más lejos, y su enlace lo refleja en todo:
+        negocia 34 Mbit/s frente a 70,8, con una dispersión de 15,8 frente a 2,9, y acumula
+        5,83 fallos de transmisión por minuto frente a 0,41 — catorce veces más.
+      </p>
+      <p style="margin-top:.5rem">
+        Lo relevante es que nada de eso se contagia. El punto de acceso adapta la modulación
+        de cada estación por separado, así que un nodo mal colocado paga su propio coste sin
+        arrastrar al que está bien. Es lo que permite ir añadiendo nodos en sitios difíciles
+        sin renegociar la calidad del enlace que ya funciona.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">10</span>
+      <h2>Qué le hizo al cultivo real</h2>
+      <p class="guia">
+        La pregunta que importaba. Se comparan los cuarenta minutos previos con el nodo solo
+        contra los minutos siguientes con el segundo ya asociado.
+      </p>
+    </div>
+
+    <figure>
+      <figcaption>El enlace del nodo del cultivo, antes y después</figcaption>
+      <p class="sub">
+        Tres magnitudes distintas, cada una en su propio panel con su propia escala.
+        Superponerlas sobre dos ejes haría que la comparación dependiera de dónde se
+        pusieran los ceros.
+      </p>
+      <div class="lienzo"><svg id="g-imp" viewBox="0 0 920 210" role="img"
+        aria-label="Comparación del enlace del nodo real antes y después de añadir el segundo nodo"></svg></div>
+    </figure>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>La tasa no bajó y el caudal de telemetría no se movió.</caption>
+        <thead><tr><th>Tramo</th><th class="n">Muestras</th><th class="n">Tasa media</th>
+          <th class="n">σ</th><th class="n">Fallos/min</th><th class="n">Paquetes/s</th></tr></thead>
+        <tbody id="t-imp"></tbody>
+      </table>
+    </div>
+
+    <div class="hallazgo">
+      <h3>Ninguna degradación medible</h3>
+      <p>
+        La tasa negociada del nodo del cultivo pasó de 69,8 a 70,8 Mbit/s —dentro del ruido—
+        y su dispersión mejoró, de 3,7 a 2,9. El caudal de telemetría se mantuvo clavado:
+        3,058 frente a 3,174 paquetes por segundo. Y los fallos de transmisión bajaron, de
+        0,50 a 0,41 por minuto.
+      </p>
+      <p style="margin-top:.5rem">
+        Una nota sobre cómo se llegó a esa cifra: con los primeros siete minutos de datos los
+        fallos salían en 0,72 por minuto, y parecía una degradación leve. Con doce minutos
+        quedan en 0,41. La primera lectura era ruido de una ventana corta, y conviene decirlo
+        porque es el tipo de cifra que se cita sin volver a comprobarla.
+      </p>
+      <p style="margin-top:.5rem">
+        Contrasta con la prueba de los cinco móviles, donde la tasa del nodo se desplomó a la
+        mitad. La diferencia está en la naturaleza del tráfico: cinco móviles descargando
+        ocupan aire de forma continua; dos nodos publican unos cientos de bytes cada pocos
+        minutos y dejan el canal libre el resto del tiempo.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">11</span>
+      <h2>La capacidad, ahora con dos medidas</h2>
+      <p class="guia">
+        El cálculo de cuántos nodos caben se apoyaba en la carga de un único aparato. Con el
+        segundo hay una medida independiente que confirma el orden de magnitud.
+      </p>
+    </div>
+
+    <figure>
+      <figcaption>Tiempo de aire consumido por cada nodo</figcaption>
+      <p class="sub">
+        Frente al 0,82 % que se lleva el punto de acceso solo con emitir sus balizas, que es
+        un coste fijo y se paga aunque no haya nadie conectado.
+      </p>
+      <div class="lienzo"><svg id="g-aire" viewBox="0 0 920 180" role="img"
+        aria-label="Tiempo de aire de cada nodo frente al coste fijo de las balizas"></svg></div>
+    </figure>
+
+    <div class="hallazgo">
+      <h3>Las balizas cuestan trece veces más que un nodo</h3>
+      <p>
+        El punto de acceso gasta el 0,82 % del tiempo de aire anunciándose, y cada nodo entre
+        el 0,02 y el 0,06 %. Dicho de otro modo: el coste de <em>tener</em> una red
+        inalámbrica es un orden de magnitud mayor que el de conectarle un nodo. Por eso el
+        ancho de banda nunca iba a ser el límite, y por eso el número que manda es el pool de
+        direcciones —cuarenta y una— que es una línea de configuración.
+      </p>
+    </div>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Con dos nodos reales asociados, la degradación medida es cero.</caption>
+        <thead><tr><th>Límite</th><th class="n">Nodos</th><th>Naturaleza</th></tr></thead>
+        <tbody id="t-cap2"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="cabecera-sec">
+      <span class="num-exp">12</span>
+      <h2>Tres fallos que solo aparecieron al haber dos nodos</h2>
+      <p class="guia">
+        Ninguno era visible con un solo aparato. Es el argumento para probar con dos aunque
+        el sistema esté pensado para uno.
+      </p>
+    </div>
+
+    <div id="lista-fallos"></div>
+
+    <div class="hallazgo">
+      <h3>Lo que el segundo nodo aporta al análisis</h3>
+      <p>
+        Tres cosas que antes solo estaban calculadas y ahora están medidas: que el punto de
+        acceso sostiene dos nodos sin degradar a ninguno, que la carga por nodo se confirma
+        en un aparato independiente, y que la cadena entera —asociación, DHCP, MQTT, gateway,
+        nube— funciona para un cultivo que no existía cuando se diseñó.
+      </p>
+      <p style="margin-top:.5rem">
+        Y una cuarta que no se buscaba: que el reparto de órdenes por cultivo estaba roto, y
+        habría seguido roto en silencio hasta el día en que hiciera falta.
+      </p>
+    </div>
+  </section>
+
+  <div class="cierre">
+    <span>VitalCrop AGW</span>
+    <span>Ensayos de conectividad · 30·08·2026</span>
+    <span>10.077 muestras · 2 nodos</span>
+  </div>
+</div>
+
+<div class="pista" id="pista"></div>
+
+<script id="datos" type="application/json">{"rssi_serie": [{"t": "17:32:33", "rssi": -71, "ch": 6}, {"t": "17:32:48", "rssi": -70, "ch": 6}, {"t": "17:33:03", "rssi": -70, "ch": 6}, {"t": "17:33:18", "rssi": -72, "ch": 6}, {"t": "17:33:33", "rssi": -71, "ch": 6}, {"t": "17:33:48", "rssi": -65, "ch": 6}, {"t": "17:34:03", "rssi": -72, "ch": 6}, {"t": "17:34:18", "rssi": -70, "ch": 6}, {"t": "17:34:33", "rssi": -68, "ch": 6}, {"t": "17:34:48", "rssi": -70, "ch": 6}, {"t": "17:35:03", "rssi": -73, "ch": 6}, {"t": "17:35:18", "rssi": -74, "ch": 6}, {"t": "17:35:33", "rssi": -77, "ch": 6}, {"t": "17:35:48", "rssi": -76, "ch": 6}, {"t": "17:36:03", "rssi": -75, "ch": 6}, {"t": "17:36:18", "rssi": -72, "ch": 6}, {"t": "17:36:33", "rssi": -74, "ch": 6}, {"t": "17:36:48", "rssi": -73, "ch": 6}, {"t": "17:37:03", "rssi": -75, "ch": 6}, {"t": "17:37:18", "rssi": -74, "ch": 6}, {"t": "17:37:33", "rssi": -76, "ch": 6}, {"t": "17:37:48", "rssi": -76, "ch": 6}, {"t": "17:38:03", "rssi": -73, "ch": 6}, {"t": "17:38:18", "rssi": -71, "ch": 6}, {"t": "17:38:33", "rssi": -75, "ch": 6}, {"t": "17:38:48", "rssi": -74, "ch": 6}, {"t": "17:39:03", "rssi": -76, "ch": 6}, {"t": "17:39:19", "rssi": -63, "ch": 11}, {"t": "17:39:34", "rssi": -68, "ch": 11}, {"t": "17:39:50", "rssi": -65, "ch": 11}, {"t": "17:40:05", "rssi": -59, "ch": 11}, {"t": "17:40:20", "rssi": -65, "ch": 11}, {"t": "17:40:35", "rssi": -63, "ch": 11}, {"t": "17:40:50", "rssi": -65, "ch": 11}, {"t": "17:41:05", "rssi": -61, "ch": 11}, {"t": "17:41:20", "rssi": -62, "ch": 11}, {"t": "17:41:35", "rssi": -63, "ch": 11}, {"t": "17:41:50", "rssi": -61, "ch": 11}, {"t": "17:42:05", "rssi": -61, "ch": 11}, {"t": "17:42:20", "rssi": -62, "ch": 11}, {"t": "17:42:35", "rssi": -64, "ch": 11}, {"t": "17:42:50", "rssi": -62, "ch": 11}, {"t": "17:43:05", "rssi": -62, "ch": 11}, {"t": "17:43:20", "rssi": -64, "ch": 11}, {"t": "17:43:35", "rssi": -62, "ch": 11}, {"t": "17:43:50", "rssi": -64, "ch": 11}, {"t": "17:44:05", "rssi": -61, "ch": 11}, {"t": "17:44:20", "rssi": -60, "ch": 11}, {"t": "17:44:35", "rssi": -60, "ch": 11}, {"t": "17:44:50", "rssi": -59, "ch": 11}, {"t": "17:45:05", "rssi": -73, "ch": 11}, {"t": "17:45:20", "rssi": -74, "ch": 6}, {"t": "17:45:35", "rssi": -76, "ch": 6}, {"t": "17:45:50", "rssi": -76, "ch": 6}, {"t": "17:46:05", "rssi": -69, "ch": 6}, {"t": "17:46:20", "rssi": -73, "ch": 6}, {"t": "17:46:35", "rssi": -69, "ch": 6}, {"t": "17:46:50", "rssi": -69, "ch": 6}, {"t": "17:47:05", "rssi": -69, "ch": 6}, {"t": "17:47:20", "rssi": -68, "ch": 6}, {"t": "17:47:35", "rssi": -73, "ch": 6}, {"t": "17:47:50", "rssi": -68, "ch": 6}, {"t": "17:48:05", "rssi": -71, "ch": 6}, {"t": "17:48:20", "rssi": -67, "ch": 6}, {"t": "17:48:35", "rssi": -67, "ch": 6}, {"t": "17:48:50", "rssi": -65, "ch": 6}, {"t": "17:49:05", "rssi": -67, "ch": 6}, {"t": "17:49:20", "rssi": -71, "ch": 6}, {"t": "17:49:35", "rssi": -66, "ch": 6}, {"t": "17:49:50", "rssi": -64, "ch": 6}, {"t": "17:50:05", "rssi": -63, "ch": 11}, {"t": "17:50:20", "rssi": -58, "ch": 11}, {"t": "17:50:35", "rssi": -61, "ch": 11}, {"t": "17:50:50", "rssi": -60, "ch": 11}, {"t": "17:51:05", "rssi": -62, "ch": 11}, {"t": "17:51:20", "rssi": -59, "ch": 11}, {"t": "17:51:35", "rssi": -63, "ch": 11}, {"t": "17:51:50", "rssi": -59, "ch": 11}, {"t": "17:52:05", "rssi": -59, "ch": 11}, {"t": "17:52:20", "rssi": -58, "ch": 11}, {"t": "17:52:35", "rssi": -58, "ch": 11}, {"t": "17:52:50", "rssi": -60, "ch": 11}, {"t": "17:53:05", "rssi": -60, "ch": 11}, {"t": "17:53:20", "rssi": -58, "ch": 11}, {"t": "17:53:35", "rssi": -58, "ch": 11}, {"t": "17:53:50", "rssi": -58, "ch": 11}, {"t": "17:54:05", "rssi": -57, "ch": 11}, {"t": "17:54:20", "rssi": -59, "ch": 11}, {"t": "17:54:35", "rssi": -59, "ch": 11}, {"t": "17:54:50", "rssi": -60, "ch": 11}, {"t": "17:55:05", "rssi": -61, "ch": 11}, {"t": "17:55:20", "rssi": -61, "ch": 11}, {"t": "17:55:35", "rssi": -60, "ch": 11}, {"t": "17:55:50", "rssi": -61, "ch": 11}, {"t": "17:56:05", "rssi": -61, "ch": 11}, {"t": "17:56:20", "rssi": -61, "ch": 11}, {"t": "17:56:35", "rssi": -61, "ch": 11}, {"t": "17:56:50", "rssi": -61, "ch": 11}, {"t": "17:57:05", "rssi": -61, "ch": 11}, {"t": "17:57:20", "rssi": -63, "ch": 11}, {"t": "17:57:35", "rssi": -59, "ch": 11}, {"t": "17:57:50", "rssi": -62, "ch": 11}, {"t": "17:58:05", "rssi": -64, "ch": 11}, {"t": "17:58:20", "rssi": -59, "ch": 11}, {"t": "17:58:35", "rssi": -62, "ch": 11}, {"t": "17:58:50", "rssi": -60, "ch": 11}, {"t": "17:59:05", "rssi": -63, "ch": 11}, {"t": "17:59:20", "rssi": -60, "ch": 11}, {"t": "17:59:35", "rssi": -60, "ch": 11}, {"t": "17:59:50", "rssi": -61, "ch": 11}, {"t": "18:00:05", "rssi": -59, "ch": 11}, {"t": "18:00:20", "rssi": -61, "ch": 11}, {"t": "18:00:35", "rssi": -57, "ch": 11}, {"t": "18:00:50", "rssi": -62, "ch": 11}, {"t": "18:01:05", "rssi": -59, "ch": 11}, {"t": "18:01:20", "rssi": -59, "ch": 11}, {"t": "18:01:35", "rssi": -59, "ch": 11}, {"t": "18:01:50", "rssi": -59, "ch": 11}, {"t": "18:02:05", "rssi": -59, "ch": 11}, {"t": "18:02:20", "rssi": -60, "ch": 11}, {"t": "18:02:35", "rssi": -57, "ch": 11}, {"t": "18:02:50", "rssi": -61, "ch": 11}, {"t": "18:03:05", "rssi": -60, "ch": 11}, {"t": "18:03:20", "rssi": -56, "ch": 11}, {"t": "18:03:35", "rssi": -63, "ch": 11}, {"t": "18:03:50", "rssi": -62, "ch": 11}, {"t": "18:04:05", "rssi": -63, "ch": 11}, {"t": "18:04:20", "rssi": -61, "ch": 11}, {"t": "18:04:35", "rssi": -59, "ch": 11}, {"t": "18:04:50", "rssi": -61, "ch": 11}, {"t": "18:05:05", "rssi": -61, "ch": 11}, {"t": "18:05:20", "rssi": -60, "ch": 11}, {"t": "18:05:35", "rssi": -61, "ch": 11}, {"t": "18:05:50", "rssi": -61, "ch": 11}, {"t": "18:06:05", "rssi": -64, "ch": 11}, {"t": "18:06:20", "rssi": -60, "ch": 11}, {"t": "18:06:35", "rssi": -60, "ch": 11}, {"t": "18:06:50", "rssi": -66, "ch": 11}, {"t": "18:07:05", "rssi": -67, "ch": 11}, {"t": "18:07:20", "rssi": -62, "ch": 11}, {"t": "18:07:35", "rssi": -62, "ch": 11}, {"t": "18:07:50", "rssi": -67, "ch": 11}, {"t": "18:08:05", "rssi": -74, "ch": 11}, {"t": "18:08:20", "rssi": -73, "ch": 11}, {"t": "18:08:35", "rssi": -69, "ch": 11}, {"t": "18:08:50", "rssi": -69, "ch": 11}, {"t": "18:09:05", "rssi": -68, "ch": 11}, {"t": "18:09:20", "rssi": -73, "ch": 11}, {"t": "18:09:37", "rssi": -69, "ch": 11}, {"t": "18:09:52", "rssi": -68, "ch": 11}, {"t": "18:10:07", "rssi": -61, "ch": 11}, {"t": "18:10:22", "rssi": -67, "ch": 11}, {"t": "18:10:37", "rssi": -67, "ch": 11}, {"t": "18:10:52", "rssi": -59, "ch": 11}, {"t": "18:14:25", "rssi": -58, "ch": 11}, {"t": "18:14:40", "rssi": -62, "ch": 11}, {"t": "18:14:55", "rssi": -64, "ch": 11}, {"t": "18:15:10", "rssi": -62, "ch": 11}, {"t": "18:15:25", "rssi": -63, "ch": 11}, {"t": "18:15:40", "rssi": -62, "ch": 11}, {"t": "18:15:55", "rssi": -62, "ch": 11}, {"t": "18:16:10", "rssi": -65, "ch": 11}, {"t": "18:16:25", "rssi": -60, "ch": 11}, {"t": "18:16:40", "rssi": -58, "ch": 11}, {"t": "18:16:55", "rssi": -58, "ch": 11}, {"t": "18:17:10", "rssi": -59, "ch": 11}, {"t": "18:17:25", "rssi": -66, "ch": 11}, {"t": "18:17:40", "rssi": -66, "ch": 11}, {"t": "18:17:55", "rssi": -66, "ch": 11}, {"t": "18:18:10", "rssi": -65, "ch": 11}, {"t": "18:18:25", "rssi": -61, "ch": 11}, {"t": "18:18:40", "rssi": -60, "ch": 11}, {"t": "18:18:55", "rssi": -61, "ch": 11}, {"t": "18:19:10", "rssi": -63, "ch": 11}, {"t": "18:19:25", "rssi": -59, "ch": 11}, {"t": "18:19:40", "rssi": -63, "ch": 11}, {"t": "18:19:55", "rssi": -65, "ch": 11}, {"t": "18:20:10", "rssi": -60, "ch": 11}, {"t": "18:20:25", "rssi": -59, "ch": 11}, {"t": "18:20:40", "rssi": -60, "ch": 11}, {"t": "18:20:55", "rssi": -61, "ch": 11}, {"t": "18:21:10", "rssi": -62, "ch": 11}, {"t": "18:21:25", "rssi": -62, "ch": 11}, {"t": "18:21:40", "rssi": -62, "ch": 11}, {"t": "18:21:55", "rssi": -61, "ch": 11}, {"t": "18:22:10", "rssi": -62, "ch": 11}, {"t": "18:22:25", "rssi": -66, "ch": 11}, {"t": "18:22:40", "rssi": -66, "ch": 11}, {"t": "18:22:55", "rssi": -61, "ch": 11}, {"t": "18:23:10", "rssi": -60, "ch": 11}, {"t": "18:23:25", "rssi": -66, "ch": 11}, {"t": "18:23:40", "rssi": -61, "ch": 11}, {"t": "18:23:55", "rssi": -59, "ch": 11}, {"t": "18:24:10", "rssi": -59, "ch": 11}, {"t": "18:24:25", "rssi": -60, "ch": 11}, {"t": "18:24:40", "rssi": -61, "ch": 11}, {"t": "18:24:55", "rssi": -60, "ch": 11}, {"t": "18:25:10", "rssi": -61, "ch": 11}, {"t": "18:25:25", "rssi": -59, "ch": 11}, {"t": "18:25:40", "rssi": -65, "ch": 11}, {"t": "18:25:55", "rssi": -64, "ch": 11}, {"t": "18:26:10", "rssi": -66, "ch": 11}, {"t": "18:26:25", "rssi": -64, "ch": 11}, {"t": "18:26:40", "rssi": -63, "ch": 11}, {"t": "18:26:55", "rssi": -64, "ch": 11}, {"t": "18:27:10", "rssi": -61, "ch": 11}, {"t": "18:27:25", "rssi": -64, "ch": 11}, {"t": "18:27:40", "rssi": -62, "ch": 11}, {"t": "18:27:55", "rssi": -65, "ch": 11}, {"t": "18:28:11", "rssi": -64, "ch": 11}, {"t": "18:28:26", "rssi": -63, "ch": 11}, {"t": "18:28:41", "rssi": -62, "ch": 11}, {"t": "18:28:56", "rssi": -63, "ch": 11}, {"t": "18:29:11", "rssi": -62, "ch": 11}, {"t": "18:29:26", "rssi": -62, "ch": 11}, {"t": "18:29:41", "rssi": -63, "ch": 11}, {"t": "18:29:56", "rssi": -60, "ch": 11}, {"t": "18:30:11", "rssi": -63, "ch": 11}, {"t": "18:30:26", "rssi": -62, "ch": 11}, {"t": "18:30:42", "rssi": -61, "ch": 11}, {"t": "18:30:57", "rssi": -62, "ch": 11}, {"t": "18:31:12", "rssi": -60, "ch": 11}, {"t": "18:31:27", "rssi": -61, "ch": 11}, {"t": "18:31:42", "rssi": -62, "ch": 11}, {"t": "18:31:57", "rssi": -62, "ch": 11}, {"t": "18:32:12", "rssi": -62, "ch": 11}, {"t": "18:32:27", "rssi": -63, "ch": 11}, {"t": "18:32:42", "rssi": -63, "ch": 11}, {"t": "18:32:57", "rssi": -63, "ch": 11}, {"t": "18:33:12", "rssi": -63, "ch": 11}, {"t": "18:33:27", "rssi": -65, "ch": 11}, {"t": "18:33:42", "rssi": -61, "ch": 11}, {"t": "18:33:57", "rssi": -64, "ch": 11}, {"t": "18:34:12", "rssi": -65, "ch": 11}, {"t": "18:34:27", "rssi": -64, "ch": 11}, {"t": "18:34:42", "rssi": -61, "ch": 11}, {"t": "18:34:57", "rssi": -63, "ch": 11}, {"t": "18:35:12", "rssi": -61, "ch": 11}, {"t": "18:35:27", "rssi": -61, "ch": 11}, {"t": "18:35:42", "rssi": -59, "ch": 11}, {"t": "18:35:57", "rssi": -60, "ch": 11}, {"t": "18:36:12", "rssi": -60, "ch": 11}, {"t": "18:36:27", "rssi": -60, "ch": 11}, {"t": "18:36:42", "rssi": -59, "ch": 11}, {"t": "18:36:57", "rssi": -60, "ch": 11}, {"t": "18:37:12", "rssi": -62, "ch": 11}, {"t": "18:37:27", "rssi": -62, "ch": 11}, {"t": "18:37:42", "rssi": -62, "ch": 11}, {"t": "18:37:57", "rssi": -62, "ch": 11}, {"t": "18:38:12", "rssi": -68, "ch": 11}, {"t": "18:38:27", "rssi": -61, "ch": 11}, {"t": "18:38:42", "rssi": -61, "ch": 11}, {"t": "18:38:57", "rssi": -60, "ch": 11}, {"t": "18:39:12", "rssi": -62, "ch": 11}, {"t": "18:39:27", "rssi": -69, "ch": 11}, {"t": "18:39:42", "rssi": -62, "ch": 11}, {"t": "18:39:57", "rssi": -65, "ch": 11}, {"t": "18:40:12", "rssi": -66, "ch": 11}, {"t": "18:40:27", "rssi": -63, "ch": 11}, {"t": "18:40:42", "rssi": -70, "ch": 11}, {"t": "18:40:57", "rssi": -65, "ch": 11}, {"t": "18:41:12", "rssi": -64, "ch": 11}, {"t": "18:41:27", "rssi": -60, "ch": 11}, {"t": "18:41:42", "rssi": -61, "ch": 11}, {"t": "18:41:57", "rssi": -63, "ch": 11}, {"t": "18:49:25", "rssi": -64, "ch": 11}, {"t": "18:49:40", "rssi": -63, "ch": 11}, {"t": "18:49:55", "rssi": -62, "ch": 11}, {"t": "18:50:10", "rssi": -61, "ch": 11}, {"t": "18:50:25", "rssi": -63, "ch": 11}, {"t": "18:50:40", "rssi": -64, "ch": 11}, {"t": "18:50:55", "rssi": -63, "ch": 11}, {"t": "18:51:10", "rssi": -62, "ch": 11}, {"t": "18:51:25", "rssi": -62, "ch": 11}, {"t": "18:51:40", "rssi": -62, "ch": 11}, {"t": "18:51:55", "rssi": -63, "ch": 11}, {"t": "18:52:10", "rssi": -64, "ch": 11}, {"t": "18:52:25", "rssi": -62, "ch": 11}, {"t": "18:52:40", "rssi": -63, "ch": 11}, {"t": "18:52:55", "rssi": -64, "ch": 11}, {"t": "18:53:10", "rssi": -65, "ch": 11}, {"t": "18:53:25", "rssi": -64, "ch": 11}, {"t": "18:53:40", "rssi": -65, "ch": 11}, {"t": "18:53:55", "rssi": -63, "ch": 11}, {"t": "19:01:54", "rssi": -60, "ch": 11}, {"t": "19:02:09", "rssi": -61, "ch": 11}, {"t": "19:02:24", "rssi": -63, "ch": 11}, {"t": "19:02:39", "rssi": -64, "ch": 11}, {"t": "19:02:54", "rssi": -62, "ch": 11}, {"t": "19:03:09", "rssi": -64, "ch": 11}, {"t": "19:03:24", "rssi": -61, "ch": 11}, {"t": "19:03:39", "rssi": -65, "ch": 11}, {"t": "19:03:54", "rssi": -66, "ch": 11}, {"t": "19:04:09", "rssi": -62, "ch": 11}, {"t": "19:04:24", "rssi": -63, "ch": 11}, {"t": "19:04:39", "rssi": -64, "ch": 11}, {"t": "19:04:54", "rssi": -65, "ch": 11}, {"t": "19:05:09", "rssi": -64, "ch": 11}, {"t": "19:05:24", "rssi": -63, "ch": 11}, {"t": "19:05:39", "rssi": -63, "ch": 11}, {"t": "19:05:54", "rssi": -66, "ch": 11}, {"t": "19:06:09", "rssi": -66, "ch": 11}, {"t": "19:06:24", "rssi": -63, "ch": 11}], "canal_resumen": [{"canal": 6, "n": 137, "media": -71.59, "sigma": 4.15, "min": -80, "max": -58, "bajo70": 59.1}, {"canal": 11, "n": 772, "media": -62.24, "sigma": 2.89, "min": -75, "max": -56, "bajo70": 1.7}], "hist_c6": [{"dbm": -80, "n": 2, "pct": 1.5}, {"dbm": -79, "n": 2, "pct": 1.5}, {"dbm": -78, "n": 2, "pct": 1.5}, {"dbm": -77, "n": 8, "pct": 5.8}, {"dbm": -76, "n": 12, "pct": 8.8}, {"dbm": -75, "n": 12, "pct": 8.8}, {"dbm": -74, "n": 12, "pct": 8.8}, {"dbm": -73, "n": 12, "pct": 8.8}, {"dbm": -72, "n": 8, "pct": 5.8}, {"dbm": -71, "n": 11, "pct": 8.0}, {"dbm": -70, "n": 17, "pct": 12.4}, {"dbm": -69, "n": 11, "pct": 8.0}, {"dbm": -68, "n": 8, "pct": 5.8}, {"dbm": -67, "n": 7, "pct": 5.1}, {"dbm": -66, "n": 2, "pct": 1.5}, {"dbm": -65, "n": 3, "pct": 2.2}, {"dbm": -64, "n": 3, "pct": 2.2}, {"dbm": -62, "n": 2, "pct": 1.5}, {"dbm": -61, "n": 2, "pct": 1.5}, {"dbm": -58, "n": 1, "pct": 0.7}], "hist_c11": [{"dbm": -75, "n": 1, "pct": 0.1}, {"dbm": -74, "n": 1, "pct": 0.1}, {"dbm": -73, "n": 6, "pct": 0.8}, {"dbm": -72, "n": 1, "pct": 0.1}, {"dbm": -71, "n": 4, "pct": 0.5}, {"dbm": -70, "n": 6, "pct": 0.8}, {"dbm": -69, "n": 12, "pct": 1.6}, {"dbm": -68, "n": 10, "pct": 1.3}, {"dbm": -67, "n": 14, "pct": 1.8}, {"dbm": -66, "n": 32, "pct": 4.1}, {"dbm": -65, "n": 46, "pct": 6.0}, {"dbm": -64, "n": 76, "pct": 9.8}, {"dbm": -63, "n": 111, "pct": 14.4}, {"dbm": -62, "n": 118, "pct": 15.3}, {"dbm": -61, "n": 99, "pct": 12.8}, {"dbm": -60, "n": 108, "pct": 14.0}, {"dbm": -59, "n": 91, "pct": 11.8}, {"dbm": -58, "n": 27, "pct": 3.5}, {"dbm": -57, "n": 8, "pct": 1.0}, {"dbm": -56, "n": 1, "pct": 0.1}], "scan_antes": [{"ch": 1, "dbm": -43.0, "ssid": "DAMIAN"}, {"ch": 2, "dbm": -31.0, "ssid": "Claro_66D185"}, {"ch": 2, "dbm": -28.0, "ssid": "TP-Link_Tri"}, {"ch": 4, "dbm": -22.0, "ssid": "CLARO_WIFI04"}, {"ch": 1, "dbm": -43.0, "ssid": "(oculta)"}, {"ch": 6, "dbm": -63.0, "ssid": "HV-6AA9"}, {"ch": 8, "dbm": -48.0, "ssid": "CLARO_WIFI04"}, {"ch": 10, "dbm": -59.0, "ssid": "DAMIAN"}, {"ch": 11, "dbm": -61.0, "ssid": "FAMILIA_RODRIGUEZ_B"}, {"ch": 11, "dbm": -58.0, "ssid": "Estiven MH"}, {"ch": 11, "dbm": -70.0, "ssid": "Claro_02241B"}], "scan_despues": [{"ch": 1, "dbm": -43.0, "ssid": "DAMIAN"}, {"ch": 2, "dbm": -30.0, "ssid": "Claro_66D185"}, {"ch": 2, "dbm": -28.0, "ssid": "TP-Link_Tri"}, {"ch": 4, "dbm": -24.0, "ssid": "CLARO_WIFI04"}, {"ch": 6, "dbm": -60.0, "ssid": "HV-6AA9"}, {"ch": 8, "dbm": -49.0, "ssid": "CLARO_WIFI04"}, {"ch": 10, "dbm": -54.0, "ssid": "DAMIAN"}, {"ch": 11, "dbm": -61.0, "ssid": "FAMILIA_RODRIGUEZ_B"}, {"ch": 11, "dbm": -66.0, "ssid": "Estiven MH"}, {"ch": 2, "dbm": -27.0, "ssid": "(oculta)"}, {"ch": 1, "dbm": -73.0, "ssid": "Konoshiro_Lilo777"}, {"ch": 7, "dbm": -72.0, "ssid": "HV-ANTONY"}, {"ch": 9, "dbm": -70.0, "ssid": "Conectate-Alirio-2.4"}, {"ch": 11, "dbm": -74.0, "ssid": "Familia Abril"}, {"ch": 11, "dbm": -75.0, "ssid": "DAMIAM"}, {"ch": 10, "dbm": -55.0, "ssid": "(oculta)"}], "interferencia": [{"canal": 1, "redes": 6, "agregado": -20.6}, {"canal": 2, "redes": 7, "agregado": -20.6}, {"canal": 3, "redes": 8, "agregado": -20.6}, {"canal": 4, "redes": 9, "agregado": -20.6}, {"canal": 5, "redes": 10, "agregado": -20.6}, {"canal": 6, "redes": 10, "agregado": -20.7}, {"canal": 7, "redes": 11, "agregado": -24.0}, {"canal": 8, "redes": 11, "agregado": -24.0}, {"canal": 9, "redes": 10, "agregado": -46.6}, {"canal": 10, "redes": 10, "agregado": -46.6}, {"canal": 11, "redes": 9, "agregado": -46.8}, {"canal": 12, "redes": 8, "agregado": -46.8}, {"canal": 13, "redes": 7, "agregado": -50.8}], "latencias": [{"camino": "Pi → ESP32 (WiFi privada)", "medio": 100.9, "min": 8.6, "max": 220.9, "sigma": 61.1}, {"camino": "Pi → router LAN (ethernet)", "medio": 2.35, "min": 0.49, "max": 36.1, "sigma": 7.73}, {"camino": "Pi → internet (8.8.8.8)", "medio": 8.86, "min": 6.96, "max": 14.5, "sigma": 2.35}, {"camino": "Pi → nube (Vercel)", "medio": 9.68, "min": 7.52, "max": 23.2, "sigma": 4.54}], "capacidad": [{"n": 1, "desc": "TV · planta baja, 2 cuartos", "presencia": 97, "tasa": 69.2}, {"n": 2, "desc": "TV · cercano", "presencia": 97, "tasa": 48.1}, {"n": 3, "desc": "Móvil", "presencia": 97, "tasa": 41.7}, {"n": 4, "desc": "Móvil · encerrado y tapado", "presencia": 8, "tasa": 60.2}, {"n": 5, "desc": "Móvil · exterior, punto más lejano", "presencia": 97, "tasa": 24.5}], "alcance": [{"zona": "Piso 2 · donde está la Pi", "tasa": 68.6, "presencia": 94}, {"zona": "Piso 3 · donde está el ESP32", "tasa": 68.3, "presencia": 96}, {"zona": "Piso 1", "tasa": 68.2, "presencia": 96}, {"zona": "Exterior de la casa", "tasa": 25.2, "presencia": 84}], "carga_invitados": [{"tramo": "Antes", "estaciones": 1.5, "tasa_esp": 57.6, "fallos_min": 0.44, "paq_s": 1.449}, {"tramo": "Con 5 invitados", "estaciones": 5.6, "tasa_esp": 27.3, "fallos_min": 0.0, "paq_s": 1.514}, {"tramo": "Después", "estaciones": 1.8, "tasa_esp": 46.3, "fallos_min": 0.42, "paq_s": 1.51}], "recuperaciones": [{"evento": "Canal 6 → 11", "seg": 9.76, "tipo": "canal"}, {"evento": "Canal 11 → 6", "seg": 4.35, "tipo": "canal"}, {"evento": "Canal 6 → 11", "seg": 3.56, "tipo": "canal"}, {"evento": "Reinicio del servicio del gateway", "seg": 11.54, "tipo": "servicio"}, {"evento": "ESP32 apagado 3 min", "seg": 193.0, "tipo": "corte"}], "cortes": [{"prueba": "1 · ESP32 apagado", "dur_min": 3.2, "perdidas": 1, "buffer": 0, "riego": "Reanudó al arrancar"}, {"prueba": "2 · Sin internet", "dur_min": 21.0, "perdidas": 0, "buffer": 5, "riego": "Ciclo completo de 180 s"}, {"prueba": "3 · Pi sin energía", "dur_min": 6.0, "perdidas": 2, "buffer": 0, "riego": "Autónomo, sin gateway"}, {"prueba": "4 · Apagón total", "dur_min": 8.0, "perdidas": 2, "buffer": 0, "riego": "Reanudó al arrancar"}], "escalera": [{"hora": "18:19:22", "espera_min": 20.34}, {"hora": "18:24:22", "espera_min": 15.34}, {"hora": "18:29:22", "espera_min": 10.35}, {"hora": "18:34:22", "espera_min": 5.35}, {"hora": "18:39:22", "espera_min": 0.36}], "objetivos": [{"metrica": "Pérdida de mensajes", "obj": "< 1 %", "valor": "0,039 %", "cumple": true}, {"metrica": "RSSI medio (canal 11)", "obj": "> −70 dBm", "valor": "−61,3 dBm", "cumple": true}, {"metrica": "Latencia de subida", "obj": "< 1500 ms", "valor": "432 ms", "cumple": true}, {"metrica": "Jitter a 60 s", "obj": "caracterizar", "valor": "σ 0,157 s", "cumple": true}, {"metrica": "Recuperación tras corte", "obj": "< 90 s", "valor": "5,9 s", "cumple": true}, {"metrica": "Tiempo bajo −70 dBm", "obj": "mínimo", "valor": "0,0 %", "cumple": true}], "riego_hora": [0.88, 0.88, 0.88, 0.88, 0.88, 0.88, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.38, 1.12, 1.25, 1.88, 1.12, 0.88, 0.88], "nodo2_ficha": [{"c": "Identidad", "n1": "IoT-node-26.001", "n2": "IoT-node-26.002"}, {"c": "MAC", "n1": "38:18:2b:8a:12:7c", "n2": "84:cc:a8:66:91:dc"}, {"c": "Dirección", "n1": "10.42.0.26 (reserva fija)", "n2": "10.42.0.20 (DHCP)"}, {"c": "Topics", "n1": "cultivo/indoor/hierbabuena/*", "n2": "cultivo/indoor/lechuga/*"}, {"c": "Cliente MQTT", "n1": "agw-hydro-pub-01", "n2": "agw-sim-pub-02"}, {"c": "Origen del dato", "n1": "sensores físicos", "n2": "generado en el firmware"}, {"c": "Magnitudes", "n1": "temp · hum · EC · nivel", "n2": "temp · hum"}, {"c": "Actuadores", "n1": "bomba · 2 válvulas · luz", "n2": "ciclos sin relé conectado"}, {"c": "En las métricas §9", "n1": "cuenta", "n2": "excluido"}], "dos_nodos": [{"nodo": "26.001 · real", "rssi": -57.3, "tasa_tx": 70.8, "sigma_tasa": 2.9, "paq_s": 3.174, "kbits": 6.7, "fallos_min": 0.41}, {"nodo": "26.002 · simulado", "rssi": -74.5, "tasa_tx": 34.0, "sigma_tasa": 15.8, "paq_s": 0.609, "kbits": 0.43, "fallos_min": 5.83}], "impacto_nodo2": [{"tramo": "Antes del nodo 2", "n": 905, "tasa": 69.8, "sigma": 3.7, "fallos": 0.5, "paq_s": 3.058}, {"tramo": "Con el nodo 2", "n": 342, "tasa": 70.8, "sigma": 2.9, "fallos": 0.41, "paq_s": 3.174}], "aire_por_nodo": [{"nodo": "26.001 · real (carga histórica)", "pct": 0.063}, {"nodo": "26.002 · simulado, cadencia 60 s", "pct": 0.0207}], "capacidad_actualizada": [{"limite": "Tiempo de aire al 50 %", "nodos": 2376, "clase": "calculado"}, {"limite": "Direcciones DHCP configuradas", "nodos": 41, "clase": "manda"}, {"limite": "Medido con dos nodos", "nodos": 2, "clase": "sin degradación"}], "fallos_nodo2": [{"f": "Las órdenes iban al cultivo equivocado", "d": "El gateway se abrió a varios cultivos en la recepción pero no en el envío. `node_sync` publicaba siempre en el topic del primer cultivo, así que el nodo 2 no recibía su hora —se quedaba en modo degradado, regando con cadencia diurna de noche— mientras el nodo 1 recibía órdenes ajenas.", "e": "Corregido: la especie viaja desde el topic de llegada hasta el de respuesta."}, {"f": "Fecha de riego de tierra recalculada al arrancar", "d": "Al arrancar, antes de oír al nodo, el gateway calcula el próximo llenado desde su propio registro y envía 9 de septiembre en vez de 7. Se corrige solo 21 s después, cuando el nodo reporta su último llenado real.", "e": "Anotado. Ventana de 21 s con una fecha errónea en el nodo."}, {"f": "La simulación era un interruptor global", "d": "En el firmware original, activar `simulacion` encendía todos los sensores a la vez porque cada tarea lo comprobaba por su cuenta. Un nodo sin sonda habría publicado una conductividad inventada.", "e": "En la copia del nodo 2 la simulación queda sujeta al módulo de su propio sensor."}]}</script>
+<script>
+(function () {
+  "use strict";
+  const D = JSON.parse(document.getElementById("datos").textContent);
+  const S = getComputedStyle(document.documentElement);
+  const C = n => S.getPropertyValue(n).trim();
+  const NS = "http://www.w3.org/2000/svg";
+  const pista = document.getElementById("pista");
+
+  const el = (t, a) => {
+    const e = document.createElementNS(NS, t);
+    for (const k in a) if (a[k] !== undefined && a[k] !== null) e.setAttribute(k, a[k]);
+    return e;
+  };
+  const txt = (x, y, s, o = {}) => {
+    const e = el("text", {
+      x, y, fill: o.fill || C("--tinta-3"), "font-size": o.size || 11,
+      "text-anchor": o.anchor || "start", "font-weight": o.weight || 400,
+      transform: o.rot
+    });
+    e.textContent = s;
+    return e;
+  };
+  const nf = (v, d = 1) => v.toLocaleString("es", {minimumFractionDigits: d, maximumFractionDigits: d});
+
+  // Un tooltip para todas las gráficas. El puntero se mueve, la caja
+  // le sigue; nada de una caja por marca.
+  function sensible(nodo, html) {
+    nodo.style.cursor = "crosshair";
+    const ver = ev => {
+      pista.innerHTML = html;
+      pista.classList.add("on");
+      const r = pista.getBoundingClientRect();
+      let x = ev.clientX + 14, y = ev.clientY - r.height - 10;
+      if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+      if (y < 8) y = ev.clientY + 18;
+      pista.style.left = x + "px";
+      pista.style.top = y + "px";
+    };
+    nodo.addEventListener("pointerenter", ver);
+    nodo.addEventListener("pointermove", ver);
+    nodo.addEventListener("pointerleave", () => pista.classList.remove("on"));
+  }
+
+  // ── 1 · RSSI en el tiempo, con bandas de canal ────────────
+  (function () {
+    const svg = document.getElementById("g-rssi");
+    const W = 920, H = 300, L = 46, R = 14, T = 14, B = 34;
+    const d = D.rssi_serie;
+    const vals = d.map(p => p.rssi);
+    const y0 = Math.min(...vals) - 2, y1 = Math.max(...vals) + 2;
+    const X = i => L + (i / (d.length - 1)) * (W - L - R);
+    const Y = v => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
+
+    // Bandas de fondo: el canal es un estado, no una serie.
+    let ini = 0;
+    for (let i = 1; i <= d.length; i++) {
+      if (i === d.length || d[i].ch !== d[ini].ch) {
+        svg.appendChild(el("rect", {
+          x: X(ini), y: T, width: Math.max(1, X(i - 1) - X(ini)), height: H - T - B,
+          fill: d[ini].ch === 6 ? "#e8eef7" : "#e6f5ef"
+        }));
+        const mx = (X(ini) + X(i - 1)) / 2;
+        if (X(i - 1) - X(ini) > 60)
+          svg.appendChild(txt(mx, T + 15, "canal " + d[ini].ch,
+            {anchor: "middle", size: 10, fill: C("--tinta-3"), weight: 500}));
+        ini = i;
+      }
+    }
+
+    for (let v = Math.ceil(y0 / 5) * 5; v <= y1; v += 5) {
+      svg.appendChild(el("line", {x1: L, x2: W - R, y1: Y(v), y2: Y(v),
+        stroke: C("--rejilla"), "stroke-width": 1}));
+      svg.appendChild(txt(L - 7, Y(v) + 3.5, v, {anchor: "end"}));
+    }
+    svg.appendChild(txt(L - 7, T - 2, "dBm", {anchor: "end", size: 9.5}));
+
+    // Umbral del §9
+    if (-70 > y0 && -70 < y1) {
+      svg.appendChild(el("line", {x1: L, x2: W - R, y1: Y(-70), y2: Y(-70),
+        stroke: C("--malo"), "stroke-width": 1.5, "stroke-dasharray": "5 4"}));
+      svg.appendChild(txt(W - R - 3, Y(-70) - 5, "objetivo −70 dBm",
+        {anchor: "end", size: 10, fill: C("--malo"), weight: 500}));
+    }
+
+    svg.appendChild(el("path", {
+      d: d.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p.rssi).toFixed(1)).join(" "),
+      fill: "none", stroke: C("--s1"), "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round"
+    }));
+
+    [0, Math.floor(d.length / 4), Math.floor(d.length / 2),
+     Math.floor(3 * d.length / 4), d.length - 1].forEach(i =>
+      svg.appendChild(txt(X(i), H - 12, d[i].t.slice(0, 5),
+        {anchor: i === 0 ? "start" : i === d.length - 1 ? "end" : "middle"})));
+
+    // Franja invisible por punto para el puntero
+    d.forEach((p, i) => {
+      const w = (W - L - R) / d.length;
+      const r = el("rect", {x: X(i) - w / 2, y: T, width: w, height: H - T - B,
+        fill: "transparent"});
+      sensible(r, `<b>${p.rssi} dBm</b><br>${p.t}<br>canal ${p.ch}`);
+      svg.appendChild(r);
+    });
+  })();
+
+  // ── Tabla del canal ───────────────────────────────────────
+  (function () {
+    const tb = document.getElementById("t-canal");
+    D.canal_resumen.forEach(r => {
+      const cumple = r.bajo70 < 5;
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td class="destaca">Canal ${r.canal}</td><td class="n">${r.n}</td>
+         <td class="n destaca">${nf(r.media, 2)} dBm</td><td class="n">${nf(r.sigma, 2)}</td>
+         <td class="n">${r.min}</td><td class="n">${r.max}</td>
+         <td class="n destaca">${nf(r.bajo70, 1)} %</td>
+         <td><span class="marca ${cumple ? "m-ok" : "m-malo"}">${cumple ? "✓ cumple" : "✕ incumple"}</span></td></tr>`);
+    });
+  })();
+
+  // ── 2 · Histograma por canal ──────────────────────────────
+  (function () {
+    const svg = document.getElementById("g-hist");
+    const W = 920, H = 260, L = 46, R = 14, T = 16, B = 36;
+    const todos = [...D.hist_c6, ...D.hist_c11];
+    const x0 = Math.min(...todos.map(b => b.dbm)), x1 = Math.max(...todos.map(b => b.dbm));
+    const ym = Math.max(...todos.map(b => b.pct));
+    const X = v => L + ((v - x0) / (x1 - x0)) * (W - L - R);
+    const Y = v => T + (1 - v / ym) * (H - T - B);
+    const bw = Math.max(3, (W - L - R) / (x1 - x0 + 1) / 2 - 1.5);
+
+    for (let p = 0; p <= ym; p += 5) {
+      svg.appendChild(el("line", {x1: L, x2: W - R, y1: Y(p), y2: Y(p),
+        stroke: C("--rejilla"), "stroke-width": 1}));
+      svg.appendChild(txt(L - 7, Y(p) + 3.5, p + "%", {anchor: "end"}));
+    }
+    if (-70 >= x0 && -70 <= x1) {
+      svg.appendChild(el("line", {x1: X(-70), x2: X(-70), y1: T, y2: H - B,
+        stroke: C("--malo"), "stroke-width": 1.5, "stroke-dasharray": "5 4"}));
+      svg.appendChild(txt(X(-70) - 5, T + 11, "−70 dBm",
+        {anchor: "end", size: 10, fill: C("--malo"), weight: 500}));
+    }
+
+    [["hist_c6", C("--s2"), -1, "Canal 6"], ["hist_c11", C("--s1"), 0, "Canal 11"]]
+      .forEach(([k, col, off, nom]) => {
+        D[k].forEach(b => {
+          const h = Math.max(1.5, (H - B) - Y(b.pct));
+          const r = el("rect", {
+            x: X(b.dbm) + off * (bw + 1.5), y: Y(b.pct), width: bw, height: h,
+            fill: col, rx: 2
+          });
+          sensible(r, `<b>${nom}</b><br>${b.dbm} dBm<br>${nf(b.pct, 1)} % · ${b.n} muestras`);
+          svg.appendChild(r);
+        });
+      });
+
+    svg.appendChild(el("line", {x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1}));
+    for (let v = Math.ceil(x0 / 5) * 5; v <= x1; v += 5)
+      svg.appendChild(txt(X(v), H - B + 16, v, {anchor: "middle"}));
+    svg.appendChild(txt((L + W - R) / 2, H - 6, "potencia recibida (dBm)",
+      {anchor: "middle", size: 10}));
+  })();
+
+  // ── 3 · Interferencia por canal ───────────────────────────
+  (function () {
+    const svg = document.getElementById("g-inter");
+    const W = 920, H = 330, L = 56, R = 90, T = 16, B = 34;
+    const d = D.interferencia.filter(x => x.agregado !== null);
+    const v0 = Math.min(...d.map(x => x.agregado)), v1 = Math.max(...d.map(x => x.agregado));
+    const bh = (H - T - B) / d.length;
+    // Cuanto más cerca de 0 dBm, peor: la rampa crece con el daño.
+    const ramp = ["--q1", "--q2", "--q3", "--q4", "--q5", "--q6", "--q7"].map(C);
+    const col = v => ramp[Math.min(6, Math.max(0, Math.round((v - v0) / (v1 - v0) * 6)))];
+    const X = v => L + ((v - v0) / (v1 - v0)) * (W - L - R);
+
+    d.forEach((x, i) => {
+      const y = T + i * bh + 3, h = bh - 6;
+      const nuestro = x.canal === 11, antiguo = x.canal === 6;
+      const r = el("rect", {x: L, y, width: Math.max(2, X(x.agregado) - L), height: h,
+        fill: col(x.agregado), rx: 3});
+      sensible(r, `<b>Canal ${x.canal}</b><br>${nf(x.agregado, 1)} dBm agregados<br>${x.redes} redes solapando`);
+      svg.appendChild(r);
+      svg.appendChild(txt(L - 8, y + h / 2 + 4, x.canal,
+        {anchor: "end", size: 11.5, fill: nuestro || antiguo ? C("--tinta") : C("--tinta-3"),
+         weight: nuestro || antiguo ? 600 : 400}));
+      svg.appendChild(txt(X(x.agregado) + 7, y + h / 2 + 4,
+        nf(x.agregado, 1) + " dBm · " + x.redes + " redes",
+        {size: 10.5, fill: C("--tinta-2")}));
+      if (nuestro) svg.appendChild(txt(L + 8, y + h / 2 + 4, "AHORA",
+        {size: 9.5, fill: "#fff", weight: 600}));
+      if (antiguo) svg.appendChild(txt(L + 8, y + h / 2 + 4, "ANTES",
+        {size: 9.5, fill: "#fff", weight: 600}));
+    });
+    svg.appendChild(txt(L - 8, T - 3, "canal", {anchor: "end", size: 9.5}));
+    svg.appendChild(txt(L, H - 8, "← menos interferencia            más interferencia →",
+      {size: 10, fill: C("--tinta-3")}));
+  })();
+
+  // ── Tabla del barrido ─────────────────────────────────────
+  (function () {
+    const tb = document.getElementById("t-scan");
+    [...D.scan_despues].sort((a, b) => b.dbm - a.dbm).forEach(r => {
+      const sol = Math.abs(r.ch - 11) <= 4;
+      const rel = r.ch === 11 ? '<span class="marca m-malo">mismo canal</span>'
+        : sol ? '<span class="marca m-aviso">solapa</span>'
+        : '<span class="marca m-ok">no solapa</span>';
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td>${r.ssid}</td><td class="n">${r.ch}</td>
+         <td class="n destaca">${r.dbm.toFixed(0)} dBm</td><td>${rel}</td></tr>`);
+    });
+  })();
+
+  // ── 4 · Latencias, escala log ─────────────────────────────
+  (function () {
+    const svg = document.getElementById("g-lat");
+    const W = 920, H = 220, L = 210, R = 60, T = 20, B = 38;
+    const d = D.latencias;
+    const lo = 0.3, hi = 300;
+    const X = v => L + (Math.log10(Math.max(v, lo)) - Math.log10(lo)) /
+                       (Math.log10(hi) - Math.log10(lo)) * (W - L - R);
+    const bh = (H - T - B) / d.length;
+
+    [0.5, 1, 5, 10, 50, 100, 300].forEach(t => {
+      svg.appendChild(el("line", {x1: X(t), x2: X(t), y1: T, y2: H - B,
+        stroke: C("--rejilla"), "stroke-width": 1}));
+      svg.appendChild(txt(X(t), H - B + 15, t < 1 ? t : t + "", {anchor: "middle"}));
+    });
+    svg.appendChild(txt((L + W - R) / 2, H - 6, "milisegundos (escala logarítmica)",
+      {anchor: "middle", size: 10}));
+
+    d.forEach((r, i) => {
+      const y = T + i * bh + bh / 2;
+      svg.appendChild(el("line", {x1: X(r.min), x2: X(r.max), y1: y, y2: y,
+        stroke: C("--s1"), "stroke-width": 5, "stroke-linecap": "round", opacity: .28}));
+      const p = el("circle", {cx: X(r.medio), cy: y, r: 5.5, fill: C("--s1"),
+        stroke: "#fff", "stroke-width": 2});
+      sensible(p, `<b>${r.camino}</b><br>medio ${nf(r.medio, 2)} ms<br>` +
+                  `min ${nf(r.min, 2)} · max ${nf(r.max, 1)}<br>σ ${nf(r.sigma, 2)}`);
+      svg.appendChild(p);
+      svg.appendChild(txt(L - 12, y + 4, r.camino, {anchor: "end", size: 11,
+        fill: C("--tinta-2")}));
+      svg.appendChild(txt(X(r.max) + 10, y + 4, nf(r.medio, 1) + " ms",
+        {size: 10.5, fill: C("--tinta"), weight: 600}));
+    });
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-lat");
+    D.latencias.forEach(r => tb.insertAdjacentHTML("beforeend",
+      `<tr><td>${r.camino}</td><td class="n destaca">${nf(r.medio, 2)} ms</td>
+       <td class="n">${nf(r.min, 2)}</td><td class="n">${nf(r.max, 1)}</td>
+       <td class="n">${nf(r.sigma, 2)}</td></tr>`));
+  })();
+
+  // ── 5 · Capacidad y alcance ───────────────────────────────
+  function barras(id, datos, etiqueta, valor, unidad, maxv, color) {
+    const svg = document.getElementById(id);
+    const W = 460, H = 250, L = 12, R = 12, T = 12, B = 22;
+    const bh = (H - T - B) / datos.length;
+    datos.forEach((x, i) => {
+      const y = T + i * bh;
+      const v = valor(x), w = Math.max(2, (v / maxv) * (W - L - R));
+      const col = typeof color === "function" ? color(x) : color;
+      svg.appendChild(txt(L, y + 13, etiqueta(x), {size: 10.5, fill: C("--tinta-2")}));
+      const r = el("rect", {x: L, y: y + 18, width: w, height: bh - 30, fill: col, rx: 3});
+      sensible(r, `<b>${etiqueta(x)}</b><br>${nf(v, 1)} ${unidad}`);
+      svg.appendChild(r);
+      svg.appendChild(txt(Math.min(w + L + 7, W - R - 46), y + 18 + (bh - 30) / 2 + 4,
+        nf(v, 1) + " " + unidad, {size: 10.5, fill: C("--tinta"), weight: 600}));
+    });
+  }
+  barras("g-cap", D.capacidad, x => x.desc, x => x.presencia, "%", 100,
+    x => x.presencia < 50 ? C("--s2") : C("--s1"));
+  barras("g-alc", D.alcance, x => x.zona, x => x.tasa, "Mb/s", 75,
+    x => x.tasa < 40 ? C("--s2") : C("--s1"));
+
+  (function () {
+    const tb = document.getElementById("t-carga");
+    D.carga_invitados.forEach(r => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="${r.estaciones > 3 ? "destaca" : ""}">${r.tramo}</td>
+       <td class="n">${nf(r.estaciones, 1)}</td>
+       <td class="n destaca">${nf(r.tasa_esp, 1)} Mb/s</td>
+       <td class="n">${nf(r.fallos_min, 2)}</td>
+       <td class="n">${nf(r.paq_s, 3)}</td></tr>`));
+  })();
+
+  // ── 6 · La escalera del buffer ────────────────────────────
+  (function () {
+    const svg = document.getElementById("g-esc");
+    const W = 920, H = 230, L = 56, R = 20, T = 18, B = 42;
+    const d = D.escalera, ym = 22;
+    const bw = (W - L - R) / d.length;
+    const Y = v => T + (1 - v / ym) * (H - T - B);
+    for (let v = 0; v <= ym; v += 5) {
+      svg.appendChild(el("line", {x1: L, x2: W - R, y1: Y(v), y2: Y(v),
+        stroke: C("--rejilla"), "stroke-width": 1}));
+      svg.appendChild(txt(L - 8, Y(v) + 3.5, v, {anchor: "end"}));
+    }
+    svg.appendChild(txt(L - 8, T - 3, "min", {anchor: "end", size: 9.5}));
+    d.forEach((x, i) => {
+      const h = (H - B) - Y(x.espera_min);
+      const r = el("rect", {x: L + i * bw + bw * .18, y: Y(x.espera_min),
+        width: bw * .64, height: Math.max(2, h), fill: C("--s1"), rx: 4});
+      sensible(r, `<b>Trama de las ${x.hora}</b><br>esperó ${nf(x.espera_min, 2)} min en el buffer`);
+      svg.appendChild(r);
+      svg.appendChild(txt(L + i * bw + bw / 2, Y(x.espera_min) - 7,
+        nf(x.espera_min, 1) + " min", {anchor: "middle", size: 10.5,
+        fill: C("--tinta"), weight: 600}));
+      svg.appendChild(txt(L + i * bw + bw / 2, H - B + 16, x.hora,
+        {anchor: "middle", size: 10}));
+    });
+    svg.appendChild(el("line", {x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1}));
+    svg.appendChild(txt((L + W - R) / 2, H - 8,
+      "instante en que el nodo publicó la trama · todas se subieron a las 18:39:43",
+      {anchor: "middle", size: 10}));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-cortes");
+    D.cortes.forEach(r => {
+      const ok = r.perdidas === 0;
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td class="destaca">${r.prueba}</td><td class="n">${nf(r.dur_min, 1)} min</td>
+         <td class="n"><span class="marca ${ok ? "m-ok" : "m-aviso"}">${r.perdidas}</span></td>
+         <td class="n">${r.buffer}</td><td>${r.riego}</td></tr>`);
+    });
+  })();
+
+  // ── 7 · Recuperaciones ────────────────────────────────────
+  (function () {
+    const svg = document.getElementById("g-rec");
+    const W = 920, H = 250, L = 250, R = 70, T = 16, B = 40;
+    const d = D.recuperaciones, ym = 200;
+    const bh = (H - T - B) / d.length;
+    const X = v => L + (v / ym) * (W - L - R);
+    for (let v = 0; v <= ym; v += 50) {
+      svg.appendChild(el("line", {x1: X(v), x2: X(v), y1: T, y2: H - B,
+        stroke: C("--rejilla"), "stroke-width": 1}));
+      svg.appendChild(txt(X(v), H - B + 15, v, {anchor: "middle"}));
+    }
+    svg.appendChild(el("line", {x1: X(90), x2: X(90), y1: T, y2: H - B,
+      stroke: C("--malo"), "stroke-width": 1.5, "stroke-dasharray": "5 4"}));
+    svg.appendChild(txt(X(90) + 6, T + 11, "objetivo §9: 90 s",
+      {size: 10, fill: C("--malo"), weight: 500}));
+    d.forEach((x, i) => {
+      const y = T + i * bh + 5, h = bh - 12;
+      const dentro = x.seg <= 90;
+      const r = el("rect", {x: L, y, width: Math.max(2, X(x.seg) - L), height: h,
+        fill: dentro ? C("--s1") : C("--s2"), rx: 3});
+      sensible(r, `<b>${x.evento}</b><br>${nf(x.seg, 2)} s hasta volver a servir`);
+      svg.appendChild(r);
+      svg.appendChild(txt(L - 12, y + h / 2 + 4, x.evento,
+        {anchor: "end", size: 11, fill: C("--tinta-2")}));
+      svg.appendChild(txt(X(x.seg) + 8, y + h / 2 + 4, nf(x.seg, 2) + " s",
+        {size: 10.5, fill: C("--tinta"), weight: 600}));
+    });
+    svg.appendChild(txt((L + W - R) / 2, H - 8, "segundos hasta responder por HTTP",
+      {anchor: "middle", size: 10}));
+  })();
+
+  // ── 8 · Riego por hora ────────────────────────────────────
+  (function () {
+    const svg = document.getElementById("g-riego");
+    const W = 920, H = 210, L = 40, R = 16, T = 18, B = 40;
+    const d = D.riego_hora, ym = 5;
+    // Valores con decimal: los ciclos por hora son un promedio sobre los
+    // dias observados, no un recuento.
+    const bw = (W - L - R) / 24;
+    const Y = v => T + (1 - v / ym) * (H - T - B);
+    for (let v = 0; v <= ym; v++) {
+      svg.appendChild(el("line", {x1: L, x2: W - R, y1: Y(v), y2: Y(v),
+        stroke: C("--rejilla"), "stroke-width": 1}));
+      svg.appendChild(txt(L - 8, Y(v) + 3.5, v, {anchor: "end"}));
+    }
+    svg.appendChild(txt(L - 8, T - 3, "ciclos", {anchor: "end", size: 9.5}));
+    d.forEach((v, hr) => {
+      const dia = hr >= 6 && hr < 18;
+      const r = el("rect", {x: L + hr * bw + bw * .16, y: Y(v),
+        width: bw * .68, height: Math.max(2, (H - B) - Y(v)),
+        fill: dia ? C("--s2") : C("--s1"), rx: 3});
+      sensible(r, `<b>${String(hr).padStart(2, "0")}:00</b><br>${nf(v, 2)} ciclos/hora<br>` +
+                  (dia ? "fotoperiodo con luz" : "oscuridad"));
+      svg.appendChild(r);
+      if (hr % 3 === 0)
+        svg.appendChild(txt(L + hr * bw + bw / 2, H - B + 16,
+          String(hr).padStart(2, "0"), {anchor: "middle"}));
+    });
+    svg.appendChild(el("line", {x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1}));
+    svg.appendChild(txt((L + W - R) / 2, H - 8, "hora del día",
+      {anchor: "middle", size: 10}));
+  })();
+
+  // ── Tabla de objetivos ────────────────────────────────────
+  (function () {
+    const tb = document.getElementById("t-obj");
+    D.objetivos.forEach(r => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="destaca">${r.metrica}</td><td class="mono">${r.obj}</td>
+       <td class="n destaca">${r.valor}</td>
+       <td><span class="marca ${r.cumple ? "m-ok" : "m-malo"}">${r.cumple ? "✓ cumple" : "✕ incumple"}</span></td></tr>`));
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  //  9 a 12 · El segundo nodo
+  // ══════════════════════════════════════════════════════════
+
+  (function () {
+    const tb = document.getElementById("t-ficha");
+    if (!tb) return;
+    D.nodo2_ficha.forEach(r => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="destaca">${r.c}</td><td class="mono" style="font-size:.82rem">${r.n1}</td>
+       <td class="mono" style="font-size:.82rem">${r.n2}</td></tr>`));
+  })();
+
+  // ── Los dos enlaces, en paneles separados ─────────────────
+  // Dos magnitudes de escalas distintas (dBm y Mbit/s) van en dos
+  // paneles con su propio eje. En uno solo, la comparación dependería
+  // de dónde se pusieran los ceros.
+  (function () {
+    const svg = document.getElementById("g-dos");
+    if (!svg) return;
+    const W = 920, H = 240, T = 30, B = 40, PAD = 60;
+    const pw = (W - PAD) / 2;
+    const d = D.dos_nodos;
+    const cols = [C("--s1"), C("--s2")];
+
+    const panel = (x0, titulo, valor, unidad, min0, max0, fmt) => {
+      const L = x0 + 52, R = x0 + pw - 16;
+      svg.appendChild(txt(x0 + 52, 14, titulo, {size: 11, fill: C("--tinta-2"), weight: 600}));
+      const lo = Math.min(min0, ...d.map(valor)), hi = Math.max(max0, ...d.map(valor));
+      const X = v => L + ((v - lo) / (hi - lo || 1)) * (R - L);
+      const bh = (H - T - B) / d.length;
+      d.forEach((r, i) => {
+        const y = T + i * bh + 8, h = bh - 26;
+        const w = Math.max(3, X(valor(r)) - L);
+        const rect = el("rect", {x: L, y, width: w, height: h, fill: cols[i], rx: 3});
+        sensible(rect, `<b>${r.nodo}</b><br>${titulo}: ${fmt(valor(r))} ${unidad}`);
+        svg.appendChild(rect);
+        svg.appendChild(txt(L - 8, y + h / 2 + 4, r.nodo.split(" ")[0],
+          {anchor: "end", size: 10.5, fill: C("--tinta-2")}));
+        svg.appendChild(txt(L + w + 7, y + h / 2 + 4, fmt(valor(r)) + " " + unidad,
+          {size: 10.5, fill: C("--tinta"), weight: 600}));
+      });
+      svg.appendChild(el("line", {x1: L, x2: R, y1: H - B + 4, y2: H - B + 4,
+        stroke: C("--base"), "stroke-width": 1}));
+    };
+
+    panel(0, "Potencia recibida", r => Math.abs(r.rssi), "dBm", 0, 80, v => "−" + v.toFixed(1));
+    panel(PAD + pw, "Tasa negociada de bajada", r => r.tasa_tx, "Mb/s", 0, 80, v => v.toFixed(1));
+
+    svg.appendChild(txt(W / 2, H - 8,
+      "el nodo 2 está 17 dB más lejos, y el enlace se adapta bajando la modulación",
+      {anchor: "middle", size: 10, fill: C("--tinta-3")}));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-dos");
+    if (!tb) return;
+    D.dos_nodos.forEach(r => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="destaca">${r.nodo}</td><td class="n">${nf(r.rssi, 1)} dBm</td>
+       <td class="n">${nf(r.tasa_tx, 1)} Mb/s</td><td class="n">${nf(r.sigma_tasa, 1)}</td>
+       <td class="n">${nf(r.paq_s, 3)}</td><td class="n destaca">${nf(r.kbits, 2)} kbit/s</td>
+       <td class="n">${nf(r.fallos_min, 2)}</td></tr>`));
+  })();
+
+  // ── Impacto: tres paneles, una magnitud cada uno ──────────
+  (function () {
+    const svg = document.getElementById("g-imp");
+    if (!svg) return;
+    const W = 920, H = 210, T = 32, B = 34;
+    const d = D.impacto_nodo2;
+    const paneles = [
+      ["Tasa negociada", r => r.tasa, "Mb/s", 80, v => v.toFixed(1)],
+      ["Fallos por minuto", r => r.fallos, "", 1.2, v => v.toFixed(2)],
+      ["Paquetes por segundo", r => r.paq_s, "", 4, v => v.toFixed(3)],
+    ];
+    const pw = W / 3;
+    paneles.forEach(([titulo, val, unidad, max, fmt], p) => {
+      const x0 = p * pw, L = x0 + 26, R = x0 + pw - 40;
+      svg.appendChild(txt(x0 + 26, 15, titulo, {size: 11, fill: C("--tinta-2"), weight: 600}));
+      const bw = (R - L) / 2;
+      d.forEach((r, i) => {
+        const v = val(r), h = (v / max) * (H - T - B);
+        const x = L + i * bw + bw * .18, w = bw * .64;
+        const rect = el("rect", {x, y: H - B - h, width: w, height: Math.max(2, h),
+          fill: i ? C("--s2") : C("--s1"), rx: 3});
+        sensible(rect, `<b>${r.tramo}</b><br>${titulo}: ${fmt(v)} ${unidad}`);
+        svg.appendChild(rect);
+        svg.appendChild(txt(x + w / 2, H - B - h - 7, fmt(v),
+          {anchor: "middle", size: 10.5, fill: C("--tinta"), weight: 600}));
+        svg.appendChild(txt(x + w / 2, H - B + 15, i ? "con nodo 2" : "solo",
+          {anchor: "middle", size: 9.5}));
+      });
+      svg.appendChild(el("line", {x1: L, x2: R, y1: H - B, y2: H - B,
+        stroke: C("--base"), "stroke-width": 1}));
+    });
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-imp");
+    if (!tb) return;
+    D.impacto_nodo2.forEach(r => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="destaca">${r.tramo}</td><td class="n">${r.n}</td>
+       <td class="n destaca">${nf(r.tasa, 1)} Mb/s</td><td class="n">${nf(r.sigma, 1)}</td>
+       <td class="n">${nf(r.fallos, 2)}</td><td class="n">${nf(r.paq_s, 3)}</td></tr>`));
+  })();
+
+  // ── Tiempo de aire ────────────────────────────────────────
+  (function () {
+    const svg = document.getElementById("g-aire");
+    if (!svg) return;
+    const W = 920, H = 180, L = 250, R = 80, T = 18, B = 34;
+    const filas = [...D.aire_por_nodo, {nodo: "Balizas del punto de acceso", pct: 0.82, fijo: true}];
+    const max = 0.9;
+    const bh = (H - T - B) / filas.length;
+    const X = v => L + (v / max) * (W - L - R);
+    [0, .2, .4, .6, .8].forEach(t => {
+      svg.appendChild(el("line", {x1: X(t), x2: X(t), y1: T, y2: H - B,
+        stroke: C("--rejilla"), "stroke-width": 1}));
+      svg.appendChild(txt(X(t), H - B + 15, t.toFixed(1) + " %", {anchor: "middle"}));
+    });
+    filas.forEach((r, i) => {
+      const y = T + i * bh + 5, h = bh - 12;
+      const rect = el("rect", {x: L, y, width: Math.max(2, X(r.pct) - L), height: h,
+        fill: r.fijo ? C("--s3") : C("--s1"), rx: 3});
+      sensible(rect, `<b>${r.nodo}</b><br>${r.pct.toFixed(4)} % del tiempo de aire`);
+      svg.appendChild(rect);
+      svg.appendChild(txt(L - 12, y + h / 2 + 4, r.nodo,
+        {anchor: "end", size: 10.5, fill: C("--tinta-2")}));
+      svg.appendChild(txt(X(r.pct) + 8, y + h / 2 + 4, r.pct.toFixed(4) + " %",
+        {size: 10.5, fill: C("--tinta"), weight: 600}));
+    });
+    svg.appendChild(txt((L + W - R) / 2, H - 6, "porcentaje del tiempo de aire del canal",
+      {anchor: "middle", size: 10}));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-cap2");
+    if (!tb) return;
+    D.capacidad_actualizada.forEach(r => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="${r.clase === "manda" ? "destaca" : ""}">${r.limite}</td>
+       <td class="n ${r.clase === "manda" ? "destaca" : ""}">${r.nodos}</td>
+       <td>${r.clase === "manda" ? "configurado — es el que manda"
+            : r.clase === "sin degradación" ? "comprobado sobre hardware, sin degradación"
+            : "calculado sobre la carga medida"}</td></tr>`));
+  })();
+
+  // ── Los tres fallos ───────────────────────────────────────
+  (function () {
+    const cont = document.getElementById("lista-fallos");
+    if (!cont) return;
+    D.fallos_nodo2.forEach((f, i) => cont.insertAdjacentHTML("beforeend",
+      `<div class="hallazgo${i === 0 ? " alerta" : ""}" style="margin-top:${i ? ".8rem" : "0"}">
+         <h3>${f.f}</h3>
+         <p>${f.d.replace(/`([^`]+)`/g, '<span class="mono">$1</span>')}</p>
+         <p style="margin-top:.5rem;color:var(--tinta-3)"><b>Estado:</b> ${f.e}</p>
+       </div>`));
+  })();
+
+})();
+</script>

@@ -224,6 +224,47 @@ class LocalDB:
         )
         await self._db.commit()
 
+    # ── Subida de eventos a la nube ───────────────────────────────
+    #
+    #  Los eventos vivian solo aqui: no habia ruta que los sacara del
+    #  borde. Estas dos funciones son el minimo para que un remitente
+    #  pueda vaciarlos sin repetir ni saltarse ninguno.
+
+    async def eventos_sin_sincronizar(self, limite: int = 250) -> list[dict]:
+        """
+        Los mas antiguos primero.
+
+        El orden importa: si la subida se corta a la mitad, lo que queda
+        pendiente es lo mas reciente, que es lo que menos duele tener
+        esperando un minuto mas.
+        """
+        async with self._db.execute(
+            """
+            SELECT id, node_id, evento, detalle, created_at
+            FROM node_events
+            WHERE synced = 0
+            ORDER BY created_at ASC, id ASC
+            LIMIT ?
+            """,
+            (limite,),
+        ) as cursor:
+            filas = await cursor.fetchall()
+        return [dict(f) for f in filas]
+
+    async def marcar_eventos_sincronizados(self, ids: list[int]) -> None:
+        """
+        Marcar es seguro aunque la confirmacion se pierda: la nube
+        rechaza los repetidos por su restriccion de unicidad, asi que un
+        reenvio no duplica. Lo unico que se arriesga es reenviar de mas.
+        """
+        if not ids:
+            return
+        marcas = ",".join("?" * len(ids))
+        await self._db.execute(
+            f"UPDATE node_events SET synced = 1 WHERE id IN ({marcas})", ids
+        )
+        await self._db.commit()
+
     async def guardar_snapshot(self, node_id: str, e: dict) -> None:
         """
         Una fila del histórico a partir de un /estado del nodo.

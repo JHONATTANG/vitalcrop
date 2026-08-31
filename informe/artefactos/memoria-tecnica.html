@@ -1,0 +1,1664 @@
+<title>Memoria Técnica VitalCrop AGW</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Documento de una sola cara clara: el destino es un informe
+   impreso. Todo color se pinta explicitamente para que la pagina
+   no herede el fondo del visor.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --plano:      #f2f3f1;
+  --papel:      #ffffff;
+  --tinta:      #0b0b0b;
+  --tinta-2:    #4d4c49;
+  --tinta-3:    #85837d;
+  --rejilla:    #e5e6e1;
+  --linea:      #d7d8d2;
+  --base:       #bfbeb4;
+
+  --s1: #2a78d6;  --s2: #eb6834;  --s3: #1baf7a;
+  --q1: #cde2fb; --q2: #9ec5f4; --q3: #6da7ec;
+  --q4: #3987e5; --q5: #256abf; --q6: #184f95; --q7: #0d366b;
+  --ok: #0ca30c; --aviso: #fab219; --malo: #d03b3b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--plano);
+  color: var(--tinta);
+  font-family: 'IBM Plex Serif', Georgia, serif;
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hoja { max-width: 64rem; margin: 0 auto; padding: 2.4rem 1.3rem 5rem; }
+
+h1, h2, h3, h4, .rot, .num, th, .marca, figcaption, .chip {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.95rem, 4.4vw, 2.75rem); font-weight: 700; line-height: 1.06; letter-spacing: -.02em; }
+h2 { font-size: clamp(1.3rem, 2.6vw, 1.6rem); font-weight: 700; line-height: 1.22; letter-spacing: -.01em; }
+h3 { font-size: 1.02rem; font-weight: 600; line-height: 1.35; }
+h4 { font-size: .9rem; font-weight: 600; }
+
+p { margin: 0; max-width: 68ch; }
+.prosa > * + * { margin-top: .9rem; }
+.guia { color: var(--tinta-2); max-width: 70ch; }
+.pie  { font-size: .84rem; color: var(--tinta-3); max-width: 74ch; font-style: italic; }
+
+.rot {
+  font-size: .68rem; font-weight: 600; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--tinta-3);
+}
+.mono, .n, .dato { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+code { font-family: 'IBM Plex Mono', monospace; font-size: .86em;
+       background: #f4f5f3; border: 1px solid var(--rejilla);
+       border-radius: 3px; padding: .06em .32em; }
+
+/* ── Portada ──────────────────────────────────────────────── */
+.portada {
+  background: var(--papel); border: 1px solid var(--linea); border-radius: 3px;
+  padding: 2.4rem 2rem 1.7rem; display: flex; flex-direction: column; gap: .95rem;
+}
+.portada .meta {
+  display: grid; gap: .3rem 1.6rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  padding-top: 1.1rem; border-top: 1px solid var(--rejilla);
+  font-family: 'IBM Plex Mono', monospace; font-size: .73rem; color: var(--tinta-3);
+}
+
+/* ── Índice ───────────────────────────────────────────────── */
+.indice {
+  background: var(--papel); border: 1px solid var(--linea); border-radius: 3px;
+  padding: 1.2rem 1.4rem; margin-top: 1rem;
+}
+.indice ol { margin: .6rem 0 0; padding-left: 0; list-style: none;
+             columns: 2; column-gap: 2.4rem; font-size: .88rem; }
+.indice li { break-inside: avoid; padding: .16rem 0; }
+.indice a { color: var(--tinta-2); text-decoration: none; display: flex; gap: .6rem; }
+.indice a:hover { color: var(--s1); }
+.indice .r { font-family: 'IBM Plex Mono', monospace; color: var(--tinta-3);
+             font-size: .78rem; min-width: 2.2rem; }
+@media (max-width: 44rem) { .indice ol { columns: 1; } }
+
+/* ── Cuadro de mando ──────────────────────────────────────── */
+.mando { display: grid; gap: .7rem; margin-top: 1rem;
+         grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); }
+.kpi { background: var(--papel); border: 1px solid var(--linea); border-radius: 3px;
+       padding: .85rem .95rem; display: flex; flex-direction: column; gap: .1rem; }
+.kpi .k { font-family: 'IBM Plex Sans', sans-serif; font-size: .66rem; font-weight: 600;
+          letter-spacing: .09em; text-transform: uppercase; color: var(--tinta-3); }
+.kpi .v { font-family: 'IBM Plex Sans', sans-serif; font-size: 1.62rem; font-weight: 700;
+          line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.kpi .u { font-size: .8rem; font-weight: 500; color: var(--tinta-2); margin-left: .12em; }
+.kpi .f { font-size: .74rem; color: var(--tinta-2); line-height: 1.4;
+          font-family: 'IBM Plex Sans', sans-serif; }
+
+/* ── Secciones ────────────────────────────────────────────── */
+section { margin-top: 3rem; scroll-margin-top: 1rem; }
+.cab {
+  display: grid; grid-template-columns: 3.4rem 1fr; gap: 0 1rem; align-items: start;
+  padding-bottom: .7rem; border-bottom: 2px solid var(--tinta); margin-bottom: 1.2rem;
+}
+.cab .r { font-family: 'IBM Plex Sans', sans-serif; font-size: 1.35rem; font-weight: 700;
+          color: var(--tinta-3); line-height: 1.35; letter-spacing: -.02em; }
+.cab .guia { grid-column: 2; margin-top: .4rem; font-size: .95rem; }
+@media (max-width: 38rem) {
+  .cab { grid-template-columns: 1fr; gap: .15rem; }
+  .cab .guia { grid-column: 1; }
+}
+h3.sub { margin: 1.7rem 0 .6rem; padding-bottom: .3rem; border-bottom: 1px solid var(--rejilla); }
+
+/* ── Figuras ──────────────────────────────────────────────── */
+figure { margin: 1.1rem 0 0; background: var(--papel); border: 1px solid var(--linea);
+         border-radius: 3px; padding: 1rem 1.15rem .9rem; }
+figcaption { font-size: .9rem; font-weight: 600; margin-bottom: .12rem; }
+figure > .sub2 { font-family: 'IBM Plex Serif', serif; font-size: .84rem;
+                 color: var(--tinta-2); margin-bottom: .85rem; max-width: 72ch; }
+.lienzo { position: relative; overflow-x: auto; }
+svg { display: block; max-width: 100%; height: auto; }
+svg text { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+
+.leyenda { display: flex; flex-wrap: wrap; gap: .28rem 1.05rem; margin: .65rem 0 .1rem;
+           font-family: 'IBM Plex Sans', sans-serif; }
+.leyenda span { display: inline-flex; align-items: center; gap: .4em;
+                font-size: .76rem; color: var(--tinta-2); }
+.leyenda i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: none; }
+
+/* ── Tooltip ──────────────────────────────────────────────── */
+.pista { position: fixed; pointer-events: none; z-index: 50;
+         background: var(--tinta); color: #fff; border-radius: 3px; padding: .42rem .58rem;
+         font-family: 'IBM Plex Mono', monospace; font-size: .72rem; line-height: 1.5;
+         box-shadow: 0 6px 20px -6px rgba(0,0,0,.5); opacity: 0; transition: opacity .1s; }
+.pista.on { opacity: 1; }
+
+/* ── Tablas ───────────────────────────────────────────────── */
+.tbl { overflow-x: auto; margin-top: .95rem; border: 1px solid var(--linea);
+       border-radius: 3px; background: var(--papel); }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; min-width: 28rem;
+        font-family: 'IBM Plex Sans', sans-serif; }
+thead th { text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: .655rem;
+           font-weight: 500; letter-spacing: .11em; text-transform: uppercase;
+           color: var(--tinta-3); padding: .58rem .8rem;
+           border-bottom: 1.5px solid var(--base); white-space: nowrap; }
+tbody td { padding: .5rem .8rem; border-bottom: 1px solid var(--rejilla); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) { background: #fafbf9; }
+td.n, th.n { text-align: right; font-family: 'IBM Plex Mono', monospace;
+             font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.d { font-weight: 600; }
+caption { caption-side: bottom; padding: .5rem .8rem; text-align: left;
+          font-family: 'IBM Plex Serif', serif; font-style: italic;
+          font-size: .78rem; color: var(--tinta-3); }
+
+/* ── Marcas ───────────────────────────────────────────────── */
+.chip { display: inline-flex; align-items: center; gap: .3em; font-size: .69rem;
+        font-weight: 600; padding: .1em .48em; border-radius: 3px; border: 1px solid;
+        white-space: nowrap; }
+.c-ok { color: #0a7a0a; border-color: #b5e3b5; background: #eefaee; }
+.c-av { color: #8a6100; border-color: #f0dfae; background: #fdf7e6; }
+.c-no { color: #a52c2c; border-color: #f0c2c2; background: #fdeded; }
+.c-mu { color: var(--tinta-3); border-color: var(--linea); background: #f6f7f5; }
+
+/* ── Notas ────────────────────────────────────────────────── */
+.nota { margin-top: 1rem; padding: .9rem 1.1rem; background: var(--papel);
+        border: 1px solid var(--linea); border-left: 3px solid var(--s1); border-radius: 3px; }
+.nota h4 { margin-bottom: .25rem; }
+.nota p { font-size: .89rem; color: var(--tinta-2); }
+.nota.rojo  { border-left-color: var(--malo); }
+.nota.ambar { border-left-color: var(--aviso); }
+.nota.verde { border-left-color: var(--ok); }
+
+.dos { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
+
+.cierre { margin-top: 3.2rem; padding-top: 1rem; border-top: 1px solid var(--linea);
+          font-family: 'IBM Plex Mono', monospace; font-size: .72rem; color: var(--tinta-3);
+          display: flex; flex-wrap: wrap; gap: .3rem 1.5rem; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media print {
+  body { background: #fff; }
+  figure, .kpi, .portada, .tbl, .nota { break-inside: avoid; }
+  .indice { break-after: page; }
+  section { break-inside: auto; }
+}
+</style>
+
+<div class="hoja">
+
+<header class="portada">
+  <div class="rot">Trabajo de grado · Fase 6 · Memoria de resultados</div>
+  <h1>VitalCrop AGW</h1>
+  <p class="guia" style="font-size:1.05rem">
+    Sistema de monitoreo y control para cultivo en ambiente controlado sobre arquitectura
+    de niebla. Memoria de lo construido, lo medido y lo que las mediciones permiten
+    afirmar — con la trazabilidad de dónde sale cada cifra.
+  </p>
+  <div class="meta">
+    <span>Nodo <b>IoT-node-26.001</b> · firmware 2.3.0</span>
+    <span>Nodo fog <b>FOG_RPI_HIERBABUENA_01</b></span>
+    <span>Cultivo: hierbabuena · hidroponía y sustrato</span>
+    <span>Serie: 8 → 30 de agosto de 2026</span>
+    <span id="m-tramas">—</span>
+    <span>Cierre: 30 de agosto de 2026</span>
+  </div>
+</header>
+
+<nav class="indice">
+  <div class="rot">Contenido</div>
+  <ol>
+    <li><a href="#s1"><span class="r">I</span> El sistema y el reparto de decisiones</a></li>
+    <li><a href="#s2"><span class="r">II</span> Metodología e instrumentos</a></li>
+    <li><a href="#s3"><span class="r">III</span> Cobertura del conjunto de datos</a></li>
+    <li><a href="#s4"><span class="r">IV</span> Calidad del enlace inalámbrico</a></li>
+    <li><a href="#s5"><span class="r">V</span> Regularidad de la cadencia</a></li>
+    <li><a href="#s6"><span class="r">VI</span> Patrones horarios y estacionales</a></li>
+    <li><a href="#s7"><span class="r">VII</span> Caudal, tiempo de aire y capacidad</a></li>
+    <li><a href="#s8"><span class="r">VIII</span> Resiliencia y autonomía del borde</a></li>
+    <li><a href="#s9"><span class="r">IX</span> El cultivo como carga de trabajo</a></li>
+    <li><a href="#s10"><span class="r">X</span> Cruces entre variables</a></li>
+    <li><a href="#s11"><span class="r">XI</span> Contraste con los objetivos</a></li>
+    <li><a href="#s12"><span class="r">XII</span> Limitaciones y deuda técnica</a></li>
+  </ol>
+</nav>
+
+<div class="mando" id="mando"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s1">
+  <div class="cab">
+    <span class="r">I</span>
+    <h2>El sistema y el reparto de decisiones</h2>
+    <p class="guia">
+      La arquitectura no es un organigrama: es un reparto de qué se decide dónde, y ese
+      reparto determina qué sobrevive a cada fallo. Conviene leerlo antes que cualquier
+      cifra, porque explica por qué las cifras se agrupan como se agrupan.
+    </p>
+  </div>
+
+  <figure>
+    <figcaption>Recorrido de un dato, y qué lo detiene</figcaption>
+    <p class="sub2">
+      Las dos fronteras marcadas son los únicos puntos donde el sistema puede perder
+      información, y cada una cuesta algo distinto. Es la diferencia que sostiene el
+      argumento de resiliencia de toda la memoria.
+    </p>
+    <div class="lienzo">
+      <svg viewBox="0 0 900 320" role="img"
+           aria-label="Recorrido del dato desde los sensores del ESP32 hasta la nube, con las dos fronteras donde puede perderse: entre nodo y gateway no hay retención, entre gateway y nube sí">
+        <defs>
+          <marker id="f" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- Capa 1 · Nodo -->
+        <rect x="18" y="86" width="196" height="150" rx="4" fill="#f4f8fd"
+              stroke="#2a78d6" stroke-width="1.5"/>
+        <text x="116" y="76" text-anchor="middle" font-size="12" font-weight="600"
+              fill="#2a78d6">NODO ESP32</text>
+        <text x="116" y="110" text-anchor="middle" font-size="11" fill="currentColor">Sensores</text>
+        <text x="116" y="128" text-anchor="middle" font-size="10" fill="#85837d">HDC1080 · TDS · nivel</text>
+        <line x1="46" y1="142" x2="186" y2="142" stroke="#d7d8d2"/>
+        <text x="116" y="162" text-anchor="middle" font-size="11" fill="currentColor">Programa en NVS</text>
+        <text x="116" y="179" text-anchor="middle" font-size="10" fill="#85837d">riego · fotoperiodo</text>
+        <text x="116" y="196" text-anchor="middle" font-size="10" fill="#85837d">corte por sensor</text>
+        <text x="116" y="220" text-anchor="middle" font-size="10" fill="#0a7a0a"
+              font-weight="600">decide en ≤ 1 s</text>
+
+        <!-- Capa 2 · Gateway -->
+        <rect x="352" y="86" width="196" height="150" rx="4" fill="#f4f8fd"
+              stroke="#2a78d6" stroke-width="1.5"/>
+        <text x="450" y="76" text-anchor="middle" font-size="12" font-weight="600"
+              fill="#2a78d6">NODO FOG · RASPBERRY</text>
+        <text x="450" y="110" text-anchor="middle" font-size="11" fill="currentColor">Broker MQTT · reglas</text>
+        <line x1="380" y1="126" x2="520" y2="126" stroke="#d7d8d2"/>
+        <rect x="380" y="138" width="140" height="46" rx="3" fill="#e6f5ef" stroke="#1baf7a"/>
+        <text x="450" y="157" text-anchor="middle" font-size="11" font-weight="600"
+              fill="#0a7a0a">Archivo SQLite</text>
+        <text x="450" y="173" text-anchor="middle" font-size="9.5" fill="#4d4c49">escribe antes de enviar</text>
+        <text x="450" y="205" text-anchor="middle" font-size="10" fill="#85837d">punto de acceso privado</text>
+        <text x="450" y="222" text-anchor="middle" font-size="10" fill="#0a7a0a"
+              font-weight="600">decide en ≤ 60 s</text>
+
+        <!-- Capa 3 · Nube -->
+        <rect x="686" y="86" width="196" height="150" rx="4" fill="#f7f7f6"
+              stroke="#bfbeb4" stroke-width="1.5"/>
+        <text x="784" y="76" text-anchor="middle" font-size="12" font-weight="600"
+              fill="#85837d">NUBE</text>
+        <text x="784" y="112" text-anchor="middle" font-size="11" fill="currentColor">API · PostgreSQL</text>
+        <text x="784" y="132" text-anchor="middle" font-size="10" fill="#85837d">histórico y analítica</text>
+        <text x="784" y="152" text-anchor="middle" font-size="10" fill="#85837d">panel de consulta</text>
+        <text x="784" y="172" text-anchor="middle" font-size="10" fill="#85837d">cola de órdenes</text>
+        <text x="784" y="212" text-anchor="middle" font-size="10" fill="#85837d"
+              font-weight="600">ninguna decisión</text>
+        <text x="784" y="227" text-anchor="middle" font-size="10" fill="#85837d"
+              font-weight="600">del cultivo depende de ella</text>
+
+        <!-- Flujo -->
+        <line x1="214" y1="150" x2="344" y2="150" stroke="currentColor" stroke-width="1.6"
+              marker-end="url(#f)"/>
+        <text x="279" y="142" text-anchor="middle" font-size="10.5" fill="currentColor">MQTT · QoS 0</text>
+        <text x="279" y="166" text-anchor="middle" font-size="9.5" fill="#85837d">cada 300 s</text>
+
+        <line x1="548" y1="150" x2="678" y2="150" stroke="currentColor" stroke-width="1.6"
+              marker-end="url(#f)"/>
+        <text x="613" y="142" text-anchor="middle" font-size="10.5" fill="currentColor">HTTPS</text>
+        <text x="613" y="166" text-anchor="middle" font-size="9.5" fill="#85837d">432 ms de media</text>
+
+        <!-- Frontera 1 -->
+        <line x1="279" y1="40" x2="279" y2="266" stroke="#d03b3b" stroke-width="1.4"
+              stroke-dasharray="6 4"/>
+        <text x="279" y="30" text-anchor="middle" font-size="10.5" font-weight="600"
+              fill="#d03b3b">frontera 1</text>
+        <text x="279" y="286" text-anchor="middle" font-size="10" fill="#d03b3b"
+              font-weight="600">sin retención</text>
+        <text x="279" y="301" text-anchor="middle" font-size="9.5" fill="#4d4c49">se pierde lo publicado</text>
+        <text x="279" y="314" text-anchor="middle" font-size="9.5" fill="#4d4c49">durante el corte</text>
+
+        <!-- Frontera 2 -->
+        <line x1="613" y1="40" x2="613" y2="266" stroke="#0ca30c" stroke-width="1.4"
+              stroke-dasharray="6 4"/>
+        <text x="613" y="30" text-anchor="middle" font-size="10.5" font-weight="600"
+              fill="#0a7a0a">frontera 2</text>
+        <text x="613" y="286" text-anchor="middle" font-size="10" fill="#0a7a0a"
+              font-weight="600">con retención</text>
+        <text x="613" y="301" text-anchor="middle" font-size="9.5" fill="#4d4c49">no se pierde nada:</text>
+        <text x="613" y="314" text-anchor="middle" font-size="9.5" fill="#4d4c49">se sube al volver</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="nota">
+    <h4>Por qué las dos fronteras no cuestan lo mismo</h4>
+    <p>
+      El nodo publica en QoS 0 y no guarda lo que envía. Si el gateway no está, esa trama
+      no existe en ningún sitio: se pierde en proporción exacta a la duración del corte.
+      El gateway, en cambio, escribe en SQLite <em>antes</em> de intentar transmitir, así
+      que un corte de internet no cuesta un solo dato. Las dos fronteras se midieron por
+      separado y la asimetría quedó confirmada — <a href="#s8" style="color:var(--s1)">sección VIII</a>.
+    </p>
+  </div>
+
+  <div class="tbl">
+    <table>
+      <caption>Reparto de responsabilidades. Cuanto más abajo vive una decisión, de menos depende.</caption>
+      <thead><tr><th>Capa</th><th>Decide</th><th class="n">Latencia</th><th>Sobrevive a</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="d">Nodo ESP32</td>
+          <td>Corte del llenado por sensor · ciclos de riego · fotoperiodo · enclavamientos</td>
+          <td class="n">≤ 1 s</td>
+          <td>La desaparición permanente del gateway</td>
+        </tr>
+        <tr>
+          <td class="d">Nodo fog</td>
+          <td>Reposición de hora y programa · verificación · motor de reglas · archivo</td>
+          <td class="n">≤ 60 s</td>
+          <td>La pérdida de internet, indefinidamente</td>
+        </tr>
+        <tr>
+          <td class="d">Nube</td>
+          <td>Histórico · analítica · consulta remota · cola de órdenes</td>
+          <td class="n">—</td>
+          <td>No aplica: nada del cultivo depende de ella</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s2">
+  <div class="cab">
+    <span class="r">II</span>
+    <h2>Metodología e instrumentos</h2>
+    <p class="guia">
+      Toda cifra de esta memoria procede de un instrumento que quedó registrando. Esta
+      sección dice cuál, con qué cadencia y con qué limitación, para que cualquier número
+      pueda rastrearse hasta su origen.
+    </p>
+  </div>
+
+  <div class="tbl">
+    <table>
+      <caption>Instrumentos activos durante el periodo de medida.</caption>
+      <thead><tr><th>Instrumento</th><th>Qué registra</th><th class="n">Cadencia</th><th>Persistencia</th></tr></thead>
+      <tbody>
+        <tr><td class="d">Telemetría del nodo</td><td>Sensores, RSSI, tiempo en marcha, cadencia</td>
+            <td class="n">300 s</td><td>SQLite en el borde + PostgreSQL en la nube</td></tr>
+        <tr><td class="d">Eventos del nodo</td><td>Inicio y fin de cada ciclo de riego, con su duración real</td>
+            <td class="n">asíncrono</td><td>SQLite en el borde</td></tr>
+        <tr><td class="d">Vigilante del punto de acceso</td><td>Asociación y pérdida del nodo en la red</td>
+            <td class="n">10 s</td><td>SQLite en el borde</td></tr>
+        <tr><td class="d">Reconciliador</td><td>Instantánea del estado completo del nodo por HTTP</td>
+            <td class="n">60 s</td><td>SQLite en el borde</td></tr>
+        <tr><td class="d">Muestreador del AP</td><td>Tasa, bytes, paquetes y fallos por estación</td>
+            <td class="n">2 s</td><td>JSONL con volcado forzado por línea</td></tr>
+        <tr><td class="d">Muestreador del nodo</td><td>RSSI, reloj, memoria libre y estado del nodo</td>
+            <td class="n">5 s</td><td>JSONL con volcado forzado por línea</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota verde">
+    <h4>Por qué los muestreadores fuerzan el volcado en cada línea</h4>
+    <p>
+      Escriben con <code>fsync</code> tras cada registro, que es lento y deliberado. Las
+      pruebas de esta memoria incluyen cortar la energía de la Raspberry, y el instante que
+      interesa de esa prueba es justo el anterior al corte. Un búfer en memoria se lo habría
+      llevado. La decisión se validó por la vía dura: el registro de <code>systemd</code>,
+      que no tenía almacenamiento persistente, perdió la narración de tres de las cuatro
+      pruebas de corte; los muestreadores conservaron todo.
+    </p>
+  </div>
+
+  <div class="nota rojo">
+    <h4>Dos correcciones aplicadas a esta memoria</h4>
+    <p>
+      La primera versión extraía la hora con <code>EXTRACT(HOUR FROM t_rx)</code> sobre una
+      sesión de base de datos en GMT, de modo que <b>todo el análisis horario estaba en UTC</b>:
+      el perfil del día tipo, los dos mapas de calor, el color por hora de las nubes de puntos
+      y los cortes de día del balance salían corridos cinco horas. Costaba verlo porque la
+      <em>forma</em> era correcta —doce horas de riego intenso seguidas de doce flojas— y solo
+      al contrastar la banda con el horario programado se nota que no encajan. Las nueve
+      consultas afectadas convierten ahora a <code>America/Bogota</code> de forma explícita.
+    </p>
+    <p style="margin-top:.5rem">
+      La segunda: los ciclos por hora se dividían entre un número de días deducido del recuento
+      de muestras, suponiendo cadencia constante. Como la cadencia cambió tres veces durante el
+      periodo, el divisor se disparaba y salían <b>0,04 ciclos por hora donde son 4</b>. La API
+      informa ahora los días observados en vez de dejar que el cliente los adivine.
+    </p>
+  </div>
+
+  <div class="nota ambar">
+    <h4>Lo que el instrumento no puede ver</h4>
+    <p>
+      El controlador inalámbrico de la Raspberry —<code>brcmfmac</code> sobre un BCM4345/6—
+      no expone la potencia recibida por estación cuando la interfaz trabaja como punto de
+      acceso. El RSSI que aparece en esta memoria es siempre el que <em>el nodo</em> mide y
+      reporta de la señal del punto de acceso, no al revés. Para las estaciones invitadas,
+      donde no hay firmware propio que pregunte, se usó como indicador la tasa negociada,
+      que es lo que el radio adapta a la calidad del enlace.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s3">
+  <div class="cab">
+    <span class="r">III</span>
+    <h2>Cobertura del conjunto de datos</h2>
+    <p class="guia">
+      Antes de interpretar nada conviene saber cuánto hay, de cuándo, y con qué huecos.
+      Una métrica calculada sobre una serie con lagunas no avisa de que las tiene.
+    </p>
+  </div>
+
+  <div class="mando" id="cobertura" style="margin-top:0"></div>
+
+  <figure>
+    <figcaption>Tramas recibidas y esperadas, día a día</figcaption>
+    <p class="sub2">
+      Las barras se apilan hasta la expectativa del día, de modo que el segmento rojo se lee
+      como fracción de ella. La expectativa no es constante: la cadencia pasó de 10 s a 60 s
+      y a 300 s durante el periodo, y se calcula con el valor que el propio nodo reportó
+      estar usando cada día.
+    </p>
+    <div class="lienzo"><svg id="g-cob" viewBox="0 0 900 300" role="img"
+      aria-label="Tramas recibidas y perdidas por día, apiladas hasta la expectativa"></svg></div>
+    <div class="leyenda">
+      <span><i style="background:#2a78d6"></i> Recibidas</span>
+      <span><i style="background:#d03b3b"></i> No recibidas</span>
+    </div>
+  </figure>
+
+  <div class="tbl">
+    <table>
+      <caption>Los tres cambios de cadencia y lo que implican para el volumen de datos.</caption>
+      <thead><tr><th>Cadencia</th><th class="n">Tramas por día</th><th class="n">Volumen diario</th>
+        <th>Motivo del cambio</th></tr></thead>
+      <tbody>
+        <tr><td class="d">10 s</td><td class="n">8 640</td><td class="n">≈ 2,4 MB</td>
+            <td>Puesta en marcha: máxima resolución para depurar</td></tr>
+        <tr><td class="d">60 s</td><td class="n">1 440</td><td class="n">≈ 0,4 MB</td>
+            <td>Operación normal durante la validación del borde</td></tr>
+        <tr><td class="d">300 s</td><td class="n">288</td><td class="n">≈ 0,08 MB</td>
+            <td>Régimen de producción: un cultivo no cambia en cinco minutos</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s4">
+  <div class="cab">
+    <span class="r">IV</span>
+    <h2>Calidad del enlace inalámbrico</h2>
+    <p class="guia">
+      Tres preguntas distintas que no se sustituyen entre sí: si llega todo lo que se
+      publica, con cuánto margen de señal, y cuánto tarda. Un enlace puede tener señal
+      excelente y perder mensajes, o no perder ninguno y llegar tarde.
+    </p>
+  </div>
+
+  <h3 class="sub">IV.1 · Potencia recibida</h3>
+
+  <figure>
+    <figcaption>Distribución de la potencia recibida y su acumulada</figcaption>
+    <p class="sub2">
+      El histograma dice dónde vive la señal; la curva acumulada responde la pregunta del
+      criterio: qué porcentaje del tiempo estuvo por debajo del umbral. Una media no
+      responde eso.
+    </p>
+    <div class="lienzo"><svg id="g-rssi-dist" viewBox="0 0 900 280" role="img"
+      aria-label="Histograma y curva acumulada de la potencia recibida"></svg></div>
+    <div class="leyenda">
+      <span><i style="background:#2a78d6"></i> Frecuencia por nivel</span>
+      <span><i style="background:#eb6834"></i> Acumulada</span>
+      <span><i style="background:#d03b3b"></i> Umbral de −70 dBm</span>
+    </div>
+  </figure>
+
+  <div class="tbl">
+    <table>
+      <caption>Potencia recibida en dos ventanas. La de 30 días incluye el periodo previo al cambio de canal.</caption>
+      <thead><tr><th>Ventana</th><th class="n">Muestras</th><th class="n">Media</th><th class="n">σ</th>
+        <th class="n">p05</th><th class="n">Mediana</th><th class="n">p95</th>
+        <th class="n">Bajo −70 dBm</th></tr></thead>
+      <tbody id="t-rssi"></tbody>
+    </table>
+  </div>
+
+  <h3 class="sub">IV.2 · Pérdida de mensajes</h3>
+
+  <div class="tbl">
+    <table>
+      <caption>Se cuenta contra la expectativa derivada de la cadencia reportada por el nodo.</caption>
+      <thead><tr><th>Ventana</th><th class="n">Esperadas</th><th class="n">Recibidas</th>
+        <th class="n">Perdidas</th><th class="n">Tasa</th><th>Criterio</th></tr></thead>
+      <tbody id="t-perdida"></tbody>
+    </table>
+  </div>
+
+  <h3 class="sub">IV.3 · Latencia de subida</h3>
+
+  <div class="nota">
+    <h4>Dos poblaciones que no se pueden promediar</h4>
+    <p>
+      Una trama que sube en caliente tarda unos cientos de milisegundos; una que estuvo
+      horas retenida en el archivo local esperando que volviera la red tarda esas horas.
+      Promediarlas daba 4,5 horas de «latencia», una cifra que no describe ninguno de los
+      dos caminos. Se separan por umbral —el remitente en vivo publica en cuanto recibe, así
+      que nada del camino caliente llega al minuto— y se reportan aparte.
+    </p>
+  </div>
+
+  <div class="tbl">
+    <table>
+      <caption>Camino en vivo frente a recuperación del archivo local.</caption>
+      <thead><tr><th>Población</th><th class="n">Muestras</th><th class="n">Media</th>
+        <th class="n">Mínimo</th><th class="n">Mediana</th><th class="n">p95</th></tr></thead>
+      <tbody id="t-lat2"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s5">
+  <div class="cab">
+    <span class="r">V</span>
+    <h2>Regularidad de la cadencia</h2>
+    <p class="guia">
+      El jitter mide si las tramas llegan a ritmo o a rachas. El anteproyecto lo dejaba
+      «por caracterizar»; estas son las cifras, y tienen una lectura que la media esconde.
+    </p>
+  </div>
+
+  <figure>
+    <figcaption>Dispersión del intervalo de llegada, por cadencia programada</figcaption>
+    <p class="sub2">
+      Dos paneles porque son dos magnitudes distintas: la desviación en segundos crece con
+      el periodo, pero en proporción al periodo cae. Superponerlas sobre un eje común
+      obligaría a elegir cuál de las dos lecturas se privilegia.
+    </p>
+    <div class="lienzo"><svg id="g-jitter" viewBox="0 0 900 230" role="img"
+      aria-label="Dispersión del intervalo de llegada en valor absoluto y como porcentaje del periodo"></svg></div>
+  </figure>
+
+  <div class="tbl">
+    <table>
+      <caption>Intervalos limpios, excluyendo los que atraviesan un reinicio o un corte.</caption>
+      <thead><tr><th>Cadencia programada</th><th class="n">Intervalos</th><th class="n">Media</th>
+        <th class="n">σ</th><th class="n">Mínimo</th><th class="n">Máximo</th>
+        <th class="n">σ / periodo</th></tr></thead>
+      <tbody id="t-jitter"></tbody>
+    </table>
+  </div>
+
+  <div class="nota">
+    <h4>Un reloj que no deriva</h4>
+    <p>
+      Que la desviación crezca en valor absoluto pero caiga en proporción es el
+      comportamiento de un temporizador con error fijo por ciclo, no acumulativo. Si el
+      reloj derivara, la proporción se mantendría o crecería. Es una propiedad del
+      planificador de FreeRTOS, y sostiene que la cadencia puede subirse sin que la
+      regularidad se degrade.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s6">
+  <div class="cab">
+    <span class="r">VI</span>
+    <h2>Patrones horarios y estacionales</h2>
+    <p class="guia">
+      Plegar el tiempo sobre sí mismo revela lo que una serie de treinta mil puntos
+      esconde. Una banda vertical en estos mapas significa «ocurre a esa hora todos los
+      días», y eso apunta a una causa con horario.
+    </p>
+  </div>
+
+  <figure>
+    <figcaption>Temperatura del aire · hora contra día</figcaption>
+    <p class="sub2">
+      El fotoperiodo se lee sin necesidad de marcarlo: la banda cálida empieza a las 06:00 y
+      termina a las 18:00, que son exactamente las horas de encendido y apagado programadas.
+      Las horas son de Colombia: la primera versión de esta memoria las extraía en UTC y la
+      banda salía corrida cinco horas, entre las 11:00 y las 23:00.
+    </p>
+    <div class="lienzo"><svg id="g-heat-temp" viewBox="0 0 900 300" role="img"
+      aria-label="Mapa de calor de la temperatura del aire por hora y día"></svg></div>
+  </figure>
+
+  <figure>
+    <figcaption>Potencia recibida · hora contra día</figcaption>
+    <p class="sub2">
+      El mismo plegado sobre la señal. Las bandas verticales delatan degradación con
+      horario; los cortes horizontales, días concretos con incidencias.
+    </p>
+    <div class="lienzo"><svg id="g-heat-rssi" viewBox="0 0 900 300" role="img"
+      aria-label="Mapa de calor de la potencia recibida por hora y día"></svg></div>
+  </figure>
+
+  <figure>
+    <figcaption>El día tipo: cuatro magnitudes sobre el mismo reloj</figcaption>
+    <p class="sub2">
+      Veintiún días colapsados en veinticuatro horas. Cada panel tiene su propia escala
+      porque las magnitudes no son comparables entre sí; lo que se compara es la
+      <em>forma</em> de cada una a lo largo del día.
+    </p>
+    <div class="lienzo"><svg id="g-perfil" viewBox="0 0 900 330" role="img"
+      aria-label="Perfil horario de temperatura, humedad, potencia recibida y ciclos de riego"></svg></div>
+  </figure>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s7">
+  <div class="cab">
+    <span class="r">VII</span>
+    <h2>Caudal, tiempo de aire y capacidad</h2>
+    <p class="guia">
+      Cuánto consume realmente un nodo, y qué limita el número de nodos que la instalación
+      admite. La respuesta no es la que se espera: el ancho de banda no aparece por ninguna
+      parte.
+    </p>
+  </div>
+
+  <figure>
+    <figcaption>Tiempo de aire: lo que cuesta cada pieza</figcaption>
+    <p class="sub2">
+      El coste de <em>tener</em> la red —las balizas que el punto de acceso emite diez veces
+      por segundo— frente al de conectarle un nodo. Se paga aunque no haya nadie asociado.
+    </p>
+    <div class="lienzo"><svg id="g-aire2" viewBox="0 0 900 190" role="img"
+      aria-label="Tiempo de aire consumido por las balizas del punto de acceso frente al de cada nodo"></svg></div>
+  </figure>
+
+  <div class="tbl">
+    <table>
+      <caption>Los cinco límites, ordenados por cuál se alcanza antes.</caption>
+      <thead><tr><th>Límite</th><th class="n">Nodos</th><th>Naturaleza</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td class="d">Comprobado sobre hardware</td><td class="n">2</td>
+            <td>Dos ESP32 asociados simultáneamente</td>
+            <td><span class="chip c-ok">sin degradación medible</span></td></tr>
+        <tr><td class="d">Direcciones DHCP configuradas</td><td class="n">41</td>
+            <td>Rango <code>10.42.0.10–50</code> en dnsmasq</td>
+            <td><span class="chip c-av">es el que manda hoy</span></td></tr>
+        <tr><td class="d">Tiempo de aire al 30 %</td><td class="n">≈ 460</td>
+            <td>Calculado sobre la carga medida, con el canal ya ocupado</td>
+            <td><span class="chip c-mu">calculado</span></td></tr>
+        <tr><td class="d">Tiempo de aire al 50 %</td><td class="n">≈ 780</td>
+            <td>Presupuesto prudente sobre canal limpio</td>
+            <td><span class="chip c-mu">calculado</span></td></tr>
+        <tr><td class="d">Controlador brcmfmac</td><td class="n">desconocido</td>
+            <td>Broadcom no publica el máximo de estaciones en modo AP</td>
+            <td><span class="chip c-no">solo se sabe probando</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota">
+    <h4>La conclusión práctica</h4>
+    <p>
+      Un nodo consume entre el 0,02 y el 0,06 % del tiempo de aire; las balizas del punto de
+      acceso, el 0,82 %. Tener la red cuesta más de un orden de magnitud que conectarle un
+      aparato. El límite real de la instalación es una línea de configuración —el rango
+      DHCP— y por debajo de ella está el del controlador, que no se publica y que habría que
+      encontrar empíricamente si alguna vez se necesitaran decenas de nodos.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s8">
+  <div class="cab">
+    <span class="r">VIII</span>
+    <h2>Resiliencia y autonomía del borde</h2>
+    <p class="guia">
+      El aporte que el proyecto declara como innovador. La forma verificable de la
+      afirmación es: durante casi todo el periodo de datos la nube estuvo apagada, y el
+      cultivo se regó, se iluminó y se corrigió solo. Cada decisión dejó un evento.
+    </p>
+  </div>
+
+  <div class="mando" id="fog-kpi" style="margin-top:0"></div>
+
+  <figure>
+    <figcaption>Lo que el borde fue acumulando</figcaption>
+    <p class="sub2">
+      El área bajo la curva es literalmente el dato que no se perdió. Las barras son lo
+      generado cada día; la línea, el total retenido hasta ese momento.
+    </p>
+    <div class="lienzo"><svg id="g-autonomia" viewBox="0 0 900 280" role="img"
+      aria-label="Tramas acumuladas en el borde y generadas cada día"></svg></div>
+    <div class="leyenda">
+      <span><i style="background:#2a78d6"></i> Acumulado retenido</span>
+      <span><i style="background:#1baf7a"></i> Generadas ese día</span>
+    </div>
+  </figure>
+
+  <div class="tbl">
+    <table>
+      <caption>Las cuatro pruebas de corte provocado, con lo que costó cada una.</caption>
+      <thead><tr><th>Prueba</th><th class="n">Duración</th><th class="n">Perdidas</th>
+        <th class="n">Retenidas</th><th>El cultivo</th><th>Frontera</th></tr></thead>
+      <tbody>
+        <tr><td class="d">Nodo apagado</td><td class="n">3,2 min</td><td class="n">1</td><td class="n">0</td>
+            <td>Reanudó al arrancar</td><td><span class="chip c-no">1 · sin retención</span></td></tr>
+        <tr><td class="d">Sin internet</td><td class="n">21 min</td>
+            <td class="n"><span class="chip c-ok">0</span></td><td class="n">5</td>
+            <td>Ciclo completo de 180 s</td><td><span class="chip c-ok">2 · con retención</span></td></tr>
+        <tr><td class="d">Gateway sin energía</td><td class="n">6 min</td><td class="n">2</td><td class="n">0</td>
+            <td>Autónomo desde su memoria</td><td><span class="chip c-no">1 · sin retención</span></td></tr>
+        <tr><td class="d">Apagón total</td><td class="n">8 min</td><td class="n">2</td><td class="n">0</td>
+            <td>Reanudó al arrancar</td><td><span class="chip c-no">1 · sin retención</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <figcaption>La firma del archivo local funcionando</figcaption>
+    <p class="sub2">
+      Veintiún minutos sin ruta a la nube. Cada barra es lo que esa trama llevaba esperando
+      cuando volvió la red. La escalera descendente no se puede fingir: es el archivo
+      vaciándose en orden.
+    </p>
+    <div class="lienzo"><svg id="g-escalera2" viewBox="0 0 900 220" role="img"
+      aria-label="Espera de cada trama retenida durante el corte de internet"></svg></div>
+  </figure>
+
+  <div class="tbl">
+    <table>
+      <caption>Tiempos de recuperación cronometrados hasta que el nodo vuelve a responder por HTTP.</caption>
+      <thead><tr><th>Evento</th><th class="n">Segundos</th><th>Criterio §9: menos de 90 s</th></tr></thead>
+      <tbody id="t-rec2"></tbody>
+    </table>
+  </div>
+
+  <div class="nota rojo">
+    <h4>Dos fragilidades que las pruebas destaparon</h4>
+    <p>
+      El registro del sistema no tenía almacenamiento persistente y perdió la narración del
+      gateway en tres de las cuatro pruebas. Y la Raspberry no lleva reloj de tiempo real:
+      tras cada corte arrancó con una hora estimada que el servicio de tiempo corrigió de
+      golpe, con saltos de hasta 547 segundos. Durante esos instantes el reloj del ESP32
+      —restaurado de su memoria no volátil y repuesto por el gateway— fue el más fiable de
+      los dos. Ambas cosas quedaron corregidas; la segunda solo puede mitigarse, no
+      resolverse, sin añadir un módulo de reloj.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s9">
+  <div class="cab">
+    <span class="r">IX</span>
+    <h2>El cultivo como carga de trabajo</h2>
+    <p class="guia">
+      El cultivo no es el objeto de estudio: es lo que hace que las cifras del enlace
+      signifiquen algo. Un sistema midiendo sobre un banco de pruebas no responde la misma
+      pregunta que uno que lleva semanas regando de verdad.
+    </p>
+  </div>
+
+  <figure>
+    <figcaption>Ciclos de riego por hora del día</figcaption>
+    <p class="sub2">
+      Contados por evento y no estimados del muestreo: un ciclo de tres minutos cabe entero
+      entre dos tramas de cinco. La frontera cae limpia en las 18:00 porque el firmware la
+      lee del programa y no de una constante.
+    </p>
+    <div class="lienzo"><svg id="g-riego2" viewBox="0 0 900 210" role="img"
+      aria-label="Ciclos de riego por hora del día, cuatro de día y uno de noche"></svg></div>
+    <div class="leyenda">
+      <span><i style="background:#eb6834"></i> Fotoperiodo con luz · 06:00–17:59</span>
+      <span><i style="background:#2a78d6"></i> Oscuridad · 18:00–05:59</span>
+    </div>
+  </figure>
+
+  <div class="dos">
+    <div class="tbl" style="margin-top:1rem">
+      <table>
+        <caption>Duración real de cada ciclo, medida por el nodo.</caption>
+        <thead><tr><th class="n">Segundos</th><th class="n">Ciclos</th><th>Lectura</th></tr></thead>
+        <tbody id="t-dur"></tbody>
+      </table>
+    </div>
+    <div class="tbl" style="margin-top:1rem">
+      <table>
+        <caption>Decisiones que el borde tomó sin consultar a nadie.</caption>
+        <thead><tr><th>Decisión</th><th class="n">Veces</th></tr></thead>
+        <tbody id="t-decisiones"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="nota verde">
+    <h4>El llenado del sustrato, y por qué es el resultado más difícil de obtener</h4>
+    <p>
+      La regla es llenar hasta que el sensor de nivel acuse agua, cada diez días. El único
+      llenado con registro completo duró <b>72 segundos</b> y <b>cortó por sensor</b>, no por
+      el tope de seguridad de 600 s: la lectura del convertidor cayó de 4095 a 3123 cuentas,
+      una caída de 972 confirmada tres veces seguidas. La conductividad pasó de 867 a 1013
+      µS/cm entre el antes y el después.
+    </p>
+    <p style="margin-top:.5rem">
+      Ese registro vive solo en memoria volátil y se perdió en el siguiente corte de energía.
+      Existe porque se leyó antes. Es la evidencia de que el corte por sensor funciona, y
+      también la razón por la que persistirlo está en la lista de deuda.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s10">
+  <div class="cab">
+    <span class="r">X</span>
+    <h2>Cruces entre variables</h2>
+    <p class="guia">
+      Lo que una serie temporal esconde: si dos cosas suben juntas por relación o por
+      coincidencia. El color de cada punto es la hora del día, y ahí está casi siempre la
+      respuesta.
+    </p>
+  </div>
+
+  <div class="dos">
+    <figure>
+      <figcaption>Temperatura contra conductividad</figcaption>
+      <p class="sub2">
+        La conductividad de una solución depende de su temperatura. Este cruce dice si la
+        deriva de la EC se explica por ahí o por evaporación real del tanque.
+      </p>
+      <div class="lienzo"><svg id="g-corr1" viewBox="0 0 440 320" role="img"
+        aria-label="Nube de puntos entre temperatura y conductividad"></svg></div>
+      <p class="pie" id="p-corr1"></p>
+    </figure>
+
+    <figure>
+      <figcaption>Temperatura contra potencia recibida</figcaption>
+      <p class="sub2">
+        Si el enlace se degradara con el calor —o con lo que enciende a la vez que el
+        calor— aparecería aquí como una pendiente.
+      </p>
+      <div class="lienzo"><svg id="g-corr2" viewBox="0 0 440 320" role="img"
+        aria-label="Nube de puntos entre temperatura y potencia recibida"></svg></div>
+      <p class="pie" id="p-corr2"></p>
+    </figure>
+  </div>
+
+  <figure>
+    <figcaption>Cuatro magnitudes en catorce días</figcaption>
+    <p class="sub2">
+      Cuatro paneles apilados sobre el mismo eje de tiempo, cada uno con su escala. Es la
+      forma honesta de comparar magnitudes que no comparten unidades: superponerlas sobre
+      dos ejes haría que la relación aparente dependiera de dónde se pusieran los ceros.
+    </p>
+    <div class="lienzo"><svg id="g-multi" viewBox="0 0 900 460" role="img"
+      aria-label="Series de temperatura, humedad, conductividad y potencia recibida en catorce días"></svg></div>
+  </figure>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s11">
+  <div class="cab">
+    <span class="r">XI</span>
+    <h2>Contraste con los objetivos</h2>
+    <p class="guia">
+      Los criterios evaluables del anteproyecto, con el valor medido y la referencia de
+      dónde sale.
+    </p>
+  </div>
+
+  <div class="tbl">
+    <table>
+      <caption>Estado al cierre del periodo de medida, tras el cambio de canal.</caption>
+      <thead><tr><th>Criterio</th><th>Objetivo</th><th class="n">Medido</th>
+        <th>Sección</th><th>Estado</th></tr></thead>
+      <tbody id="t-obj2"></tbody>
+    </table>
+  </div>
+
+  <div class="nota">
+    <h4>Sobre el tiempo de recuperación</h4>
+    <p>
+      El criterio de 90 segundos se evalúa contra dos poblaciones distintas. Las
+      recuperaciones provocadas en las pruebas de esta memoria —cambios de canal, reinicio
+      del servicio— quedan entre 3,6 y 11,5 segundos. Las cuatro recuperaciones históricas
+      que dan un promedio de 103 segundos proceden todas de reflasheos del firmware, no de
+      fallos del enlace, y una sola de ellas —168 segundos— arrastra la media por encima del
+      objetivo. Conviene declarar ambas cifras y decir de dónde sale cada una.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="s12">
+  <div class="cab">
+    <span class="r">XII</span>
+    <h2>Limitaciones y deuda técnica</h2>
+    <p class="guia">
+      Lo que no se midió, por qué, y qué haría falta para medirlo. Declararlo es preferible
+      a estimarlo: un panel que pinta cifras donde no midió afirma una medición que no
+      existe.
+    </p>
+  </div>
+
+  <div class="tbl">
+    <table>
+      <caption>Deuda ordenada por lo que impide afirmar.</caption>
+      <thead><tr><th>Asunto</th><th>Qué impide</th><th>Qué haría falta</th><th>Alcance</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="d">Latencia de extremo a extremo</td>
+          <td>Solo se mide desde que el gateway recibe, no desde que el nodo publica</td>
+          <td>Que el firmware selle el instante de publicación en cada trama</td>
+          <td><span class="chip c-av">reflasheo</span></td>
+        </tr>
+        <tr>
+          <td class="d">Sondas activas de red</td>
+          <td>No hay serie histórica de RTT por protocolo</td>
+          <td>Persistir en la tabla que ya existe y está vacía</td>
+          <td><span class="chip c-mu">software del borde</span></td>
+        </tr>
+        <tr>
+          <td class="d">Impacto del nivel de QoS</td>
+          <td>No se puede comparar QoS 0 contra 1 ni 2</td>
+          <td>Una biblioteca MQTT del firmware que publique por encima de QoS 0</td>
+          <td><span class="chip c-no">cambio de dependencia</span></td>
+        </tr>
+        <tr>
+          <td class="d">Eventos hacia la nube</td>
+          <td>No había ruta de subida: la nube tenía 131 eventos y el borde 872</td>
+          <td>Endpoint idempotente de ingesta y remitente en el gateway</td>
+          <td><span class="chip c-ok">resuelto</span></td>
+        </tr>
+        <tr>
+          <td class="d">Registro del llenado</td>
+          <td>El detalle del llenado de sustrato se pierde en cada reinicio</td>
+          <td>Persistirlo en memoria no volátil o archivarlo al recibir el evento</td>
+          <td><span class="chip c-av">firmware o borde</span></td>
+        </tr>
+        <tr>
+          <td class="d">Calibración del sensor de nivel</td>
+          <td>La referencia en seco quedó en el valor de fábrica, muy por debajo del real</td>
+          <td>Ejecutar la calibración con el sustrato seco, por consola serie</td>
+          <td><span class="chip c-ok">un comando</span></td>
+        </tr>
+        <tr>
+          <td class="d">Máximo de estaciones del controlador</td>
+          <td>No se conoce el techo real de asociaciones simultáneas</td>
+          <td>Asociar nodos hasta que el punto de acceso rechace</td>
+          <td><span class="chip c-mu">ensayo</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota ambar">
+    <h4>Sobre el segundo nodo del banco de pruebas</h4>
+    <p>
+      La instalación incorpora un segundo ESP32 cuyos sensores no existen: el firmware genera
+      la temperatura y la humedad. Es un aparato real sobre la red real y sirve para medir la
+      capacidad multinodo, pero sus tramas están marcadas en la base de datos y quedan fuera
+      de todas las cifras de esta memoria. Promediar un generador de tráfico con un enlace
+      medido durante semanas produciría un número que no describe a ninguno de los dos.
+    </p>
+  </div>
+</section>
+
+<div class="cierre">
+  <span>VitalCrop AGW</span>
+  <span>Memoria técnica</span>
+  <span>30 · 08 · 2026</span>
+  <span id="c-total">—</span>
+</div>
+</div>
+
+<div class="pista" id="pista"></div>
+
+<script id="datos" type="application/json">{"r7": {"ventana_dias": 7, "cobertura": {"tramas": 2012, "desde": "2026-08-24T02:45:41.234403+00:00", "hasta": "2026-08-31T02:41:57.473074+00:00", "nodos": 1, "versiones_fw": 1}, "rssi": {"media": -63.2, "minimo": -80, "maximo": -52, "sigma": 3.6, "p05": -70.0, "p50": -63.0, "p95": -59.0, "pct_bajo_umbral": 4.3, "objetivo_dbm": -70}, "perdida": {"esperadas": 2009, "recibidas": 2009, "perdidas": 0, "pct": 0.0, "objetivo_pct": 1.0}, "jitter_por_cadencia": [{"cadencia_s": 60, "n": 5, "media_s": 60.01, "sigma_s": 0.009, "min_s": 60.0, "max_s": 60.02}, {"cadencia_s": 300, "n": 2029, "media_s": 300.02, "sigma_s": 0.155, "min_s": 297.36, "max_s": 302.68}], "reinicios_nodo": {"n": 2, "ultimo": "2026-08-31T00:01:56.259501+00:00"}, "latencia_subida": {"n": 1262, "media_ms": 440.3, "minimo_ms": 173.4, "p50_ms": 359.709, "p95_ms": 492.55434999999994, "objetivo_ms": 1500, "umbral_en_vivo_ms": 60000, "estado": "medible"}, "recuperacion_de_buffer": {"n": 112, "peor_horas": 9.2}, "no_instrumentado": {"latencia_extremo_a_extremo": "requiere que el ESP32 selle t_pub en cada trama", "rtt_icmp_mqtt_http": "sondas activas del gateway, aun no persistidas en net_muestras", "impacto_qos": "PubSubClient solo publica QoS 0 (deuda 7.22)"}}, "r30": {"ventana_dias": 30, "cobertura": {"tramas": 33125, "desde": "2026-08-08T19:06:09.876672+00:00", "hasta": "2026-08-31T02:41:57.473074+00:00", "nodos": 1, "versiones_fw": 5}, "rssi": {"media": -64.6, "minimo": -87, "maximo": -26, "sigma": 7.1, "p05": -72.0, "p50": -65.0, "p95": -58.0, "pct_bajo_umbral": 9.4, "objetivo_dbm": -70}, "perdida": {"esperadas": 33140, "recibidas": 33092, "perdidas": 48, "pct": 0.145, "objetivo_pct": 1.0}, "jitter_por_cadencia": [{"cadencia_s": 10, "n": 11136, "media_s": 10.02, "sigma_s": 0.146, "min_s": 4.68, "max_s": 13.71}, {"cadencia_s": 60, "n": 19926, "media_s": 60.02, "sigma_s": 0.395, "min_s": 32.1, "max_s": 82.01}, {"cadencia_s": 300, "n": 2041, "media_s": 300.02, "sigma_s": 0.156, "min_s": 297.36, "max_s": 302.68}], "reinicios_nodo": {"n": 31, "ultimo": "2026-08-31T00:01:56.259501+00:00"}, "latencia_subida": {"n": 1262, "media_ms": 440.3, "minimo_ms": 173.4, "p50_ms": 359.709, "p95_ms": 492.55434999999994, "objetivo_ms": 1500, "umbral_en_vivo_ms": 60000, "estado": "medible"}, "recuperacion_de_buffer": {"n": 112, "peor_horas": 9.2}, "no_instrumentado": {"latencia_extremo_a_extremo": "requiere que el ESP32 selle t_pub en cada trama", "rtt_icmp_mqtt_http": "sondas activas del gateway, aun no persistidas en net_muestras", "impacto_qos": "PubSubClient solo publica QoS 0 (deuda 7.22)"}}, "fog": {"ventana": {"desde": "2026-08-08T19:06:09.876672+00:00", "hasta": "2026-08-31T02:41:57.473074+00:00", "dias": 22.31652310650463, "sin_nube": 31781, "con_nube": 1344}, "autonomia": {"dias_sin_nube": 22.3, "tramas_generadas_sin_nube": 31781, "pct_del_historico_sin_nube": 95.9}, "decisiones_del_borde": [{"evento": "riego_hidroponia_fin", "n": 434, "primero": "2026-08-24T01:40:07+00:00", "ultimo": "2026-08-31T02:26:03+00:00"}, {"evento": "riego_hidroponia_inicio", "n": 425, "primero": "2026-08-24T02:00:07+00:00", "ultimo": "2026-08-31T02:23:03+00:00"}, {"evento": "conectado", "n": 6, "primero": "2026-08-24T00:53:29+00:00", "ultimo": "2026-08-31T00:02:42+00:00"}, {"evento": "desconectado", "n": 5, "primero": "2026-08-24T00:52:29+00:00", "ultimo": "2026-08-30T23:12:06+00:00"}, {"evento": "corregido", "n": 1, "primero": "2026-08-23T23:09:54+00:00", "ultimo": "2026-08-23T23:09:54+00:00"}, {"evento": "discrepancia", "n": 1, "primero": "2026-08-23T23:09:54+00:00", "ultimo": "2026-08-23T23:09:54+00:00"}], "riego_autonomo": {"ciclos": 434, "minutos_bomba": 1303.1, "dias_con_riego": 8}, "recuperaciones": {"n": 5, "mttr_s": 119, "peor_s": 182, "mejor_s": 60, "objetivo_s": 90, "detalle": [{"caida": "2026-08-30T23:12:06+00:00", "vuelta": "2026-08-30T23:15:08+00:00", "segundos": 182}, {"caida": "2026-08-26T00:20:34+00:00", "vuelta": "2026-08-26T00:21:35+00:00", "segundos": 61}, {"caida": "2026-08-24T01:44:33+00:00", "vuelta": "2026-08-24T01:46:35+00:00", "segundos": 122}, {"caida": "2026-08-24T01:34:38+00:00", "vuelta": "2026-08-24T01:37:26+00:00", "segundos": 168}, {"caida": "2026-08-24T00:52:29+00:00", "vuelta": "2026-08-24T00:53:29+00:00", "segundos": 60}]}, "huecos_de_datos": [{"desde": "2026-08-23T18:27:40.236166+00:00", "hasta": "2026-08-23T19:26:39.123266+00:00", "segundos": 3539}, {"desde": "2026-08-23T21:47:41.804051+00:00", "hasta": "2026-08-23T22:16:12.322928+00:00", "segundos": 1711}, {"desde": "2026-08-30T23:39:22.759206+00:00", "hasta": "2026-08-31T00:01:56.259501+00:00", "segundos": 1354}, {"desde": "2026-08-09T01:22:23.018656+00:00", "hasta": "2026-08-09T01:38:21.197741+00:00", "segundos": 958}, {"desde": "2026-08-08T22:52:49.368524+00:00", "hasta": "2026-08-08T23:01:58.255683+00:00", "segundos": 549}, {"desde": "2026-08-09T01:45:00.597741+00:00", "hasta": "2026-08-09T01:53:55.918563+00:00", "segundos": 535}, {"desde": "2026-08-30T23:06:13.497093+00:00", "hasta": "2026-08-30T23:14:22.602599+00:00", "segundos": 489}, {"desde": "2026-08-08T23:05:21.382691+00:00", "hasta": "2026-08-08T23:12:17.031733+00:00", "segundos": 416}, {"desde": "2026-08-09T02:13:19.166627+00:00", "hasta": "2026-08-09T02:19:42.860912+00:00", "segundos": 384}]}, "diario": [{"dia": "2026-08-08T00:00:00", "tramas": 3036, "rssi_medio": -53.2, "rssi_min": -87, "temp_media": 14.01, "hum_media": 34.44, "ec_media": 1085.7, "periodo_ms": 10000, "tramas_rssi_bajo": 266, "reinicios": 18, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 8640}, {"dia": "2026-08-09T00:00:00", "tramas": 8194, "rssi_medio": -67.3, "rssi_min": -83, "temp_media": 24.06, "hum_media": 62.39, "ec_media": 1813.0, "periodo_ms": 10506, "tramas_rssi_bajo": 662, "reinicios": 1, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 8224}, {"dia": "2026-08-10T00:00:00", "tramas": 1440, "rssi_medio": -63.5, "rssi_min": -71, "temp_media": 19.79, "hum_media": 67.24, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 2, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-11T00:00:00", "tramas": 1440, "rssi_medio": -63.0, "rssi_min": -74, "temp_media": 18.21, "hum_media": 76.88, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 4, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-12T00:00:00", "tramas": 1437, "rssi_medio": -64.9, "rssi_min": -79, "temp_media": 18.93, "hum_media": 74.55, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 78, "reinicios": 1, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-13T00:00:00", "tramas": 1439, "rssi_medio": -63.5, "rssi_min": -74, "temp_media": 19.07, "hum_media": 75.48, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 3, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-14T00:00:00", "tramas": 1440, "rssi_medio": -65.6, "rssi_min": -77, "temp_media": 20.12, "hum_media": 76.46, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 73, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-15T00:00:00", "tramas": 1440, "rssi_medio": -66.1, "rssi_min": -82, "temp_media": 20.36, "hum_media": 75.85, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 108, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-16T00:00:00", "tramas": 1439, "rssi_medio": -68.7, "rssi_min": -82, "temp_media": 19.63, "hum_media": 82.14, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 510, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-17T00:00:00", "tramas": 1440, "rssi_medio": -66.9, "rssi_min": -78, "temp_media": 19.04, "hum_media": 81.76, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 147, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-18T00:00:00", "tramas": 1449, "rssi_medio": -64.3, "rssi_min": -81, "temp_media": 18.98, "hum_media": 78.4, "ec_media": 0.3, "periodo_ms": 59310, "tramas_rssi_bajo": 24, "reinicios": 5, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1457}, {"dia": "2026-08-19T00:00:00", "tramas": 1439, "rssi_medio": -62.9, "rssi_min": -87, "temp_media": 19.47, "hum_media": 74.31, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 77, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-20T00:00:00", "tramas": 1440, "rssi_medio": -69.7, "rssi_min": -87, "temp_media": 19.63, "hum_media": 75.82, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 568, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-21T00:00:00", "tramas": 1440, "rssi_medio": -69.7, "rssi_min": -85, "temp_media": 19.79, "hum_media": 79.85, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 493, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-22T00:00:00", "tramas": 1439, "rssi_medio": -62.9, "rssi_min": -80, "temp_media": 19.32, "hum_media": 83.61, "ec_media": 0.0, "periodo_ms": 60000, "tramas_rssi_bajo": 11, "reinicios": 0, "ciclos_riego": 0, "min_bomba": 0, "esperadas": 1440}, {"dia": "2026-08-23T00:00:00", "tramas": 1188, "rssi_medio": -62.3, "rssi_min": -79, "temp_media": 19.16, "hum_media": 82.63, "ec_media": 36.6, "periodo_ms": 67879, "tramas_rssi_bajo": 9, "reinicios": 4, "ciclos_riego": 5, "min_bomba": 15.0, "esperadas": 1273}, {"dia": "2026-08-24T00:00:00", "tramas": 288, "rssi_medio": -65.1, "rssi_min": -71, "temp_media": 19.28, "hum_media": 78.98, "ec_media": 754.7, "periodo_ms": 300000, "tramas_rssi_bajo": 2, "reinicios": 0, "ciclos_riego": 60, "min_bomba": 180.0, "esperadas": 288}, {"dia": "2026-08-25T00:00:00", "tramas": 288, "rssi_medio": -63.4, "rssi_min": -75, "temp_media": 18.77, "hum_media": 78.18, "ec_media": 825.0, "periodo_ms": 300000, "tramas_rssi_bajo": 13, "reinicios": 0, "ciclos_riego": 60, "min_bomba": 180.0, "esperadas": 288}, {"dia": "2026-08-26T00:00:00", "tramas": 288, "rssi_medio": -66.9, "rssi_min": -80, "temp_media": 20.5, "hum_media": 79.85, "ec_media": 834.6, "periodo_ms": 300000, "tramas_rssi_bajo": 51, "reinicios": 0, "ciclos_riego": 60, "min_bomba": 180.0, "esperadas": 288}, {"dia": "2026-08-27T00:00:00", "tramas": 288, "rssi_medio": -61.4, "rssi_min": -69, "temp_media": 19.46, "hum_media": 80.48, "ec_media": 861.0, "periodo_ms": 300000, "tramas_rssi_bajo": 0, "reinicios": 0, "ciclos_riego": 60, "min_bomba": 180.0, "esperadas": 288}, {"dia": "2026-08-28T00:00:00", "tramas": 288, "rssi_medio": -61.3, "rssi_min": -67, "temp_media": 20.46, "hum_media": 77.78, "ec_media": 859.2, "periodo_ms": 300000, "tramas_rssi_bajo": 0, "reinicios": 0, "ciclos_riego": 60, "min_bomba": 180.0, "esperadas": 288}, {"dia": "2026-08-29T00:00:00", "tramas": 288, "rssi_medio": -61.8, "rssi_min": -67, "temp_media": 19.94, "hum_media": 84.46, "ec_media": 870.0, "periodo_ms": 300000, "tramas_rssi_bajo": 0, "reinicios": 0, "ciclos_riego": 60, "min_bomba": 180.0, "esperadas": 288}, {"dia": "2026-08-30T00:00:00", "tramas": 257, "rssi_medio": -62.2, "rssi_min": -78, "temp_media": 19.42, "hum_media": 84.42, "ec_media": 876.0, "periodo_ms": 298132, "tramas_rssi_bajo": 16, "reinicios": 2, "ciclos_riego": 69, "min_bomba": 208.1, "esperadas": 290}], "perfil": {"dias_observados": 22, "dias_con_riego": 8, "zona": "America/Bogota", "horas": [{"hora": 0, "n": 924, "temperatura": 16.97, "humedad": 89.78, "ec": 77.7, "rssi": -64.4, "rssi_sigma": 3.73, "rssi_bajo": 67}, {"hora": 1, "n": 923, "temperatura": 16.83, "humedad": 90.75, "ec": 78.0, "rssi": -64.7, "rssi_sigma": 3.89, "rssi_bajo": 64}, {"hora": 2, "n": 924, "temperatura": 16.56, "humedad": 91.04, "ec": 78.1, "rssi": -64.7, "rssi_sigma": 3.68, "rssi_bajo": 50}, {"hora": 3, "n": 924, "temperatura": 16.34, "humedad": 91.56, "ec": 78.1, "rssi": -64.3, "rssi_sigma": 3.65, "rssi_bajo": 26}, {"hora": 4, "n": 924, "temperatura": 16.19, "humedad": 92.28, "ec": 78.1, "rssi": -64.6, "rssi_sigma": 4.04, "rssi_bajo": 72}, {"hora": 5, "n": 923, "temperatura": 16.05, "humedad": 93.17, "ec": 78.3, "rssi": -64.4, "rssi_sigma": 3.68, "rssi_bajo": 36}, {"hora": 6, "n": 923, "temperatura": 17.06, "humedad": 85.0, "ec": 79.3, "rssi": -64.7, "rssi_sigma": 3.48, "rssi_bajo": 48}, {"hora": 7, "n": 924, "temperatura": 18.04, "humedad": 80.42, "ec": 77.1, "rssi": -65.1, "rssi_sigma": 3.45, "rssi_bajo": 47}, {"hora": 8, "n": 924, "temperatura": 19.51, "humedad": 74.81, "ec": 73.4, "rssi": -65.4, "rssi_sigma": 3.69, "rssi_bajo": 66}, {"hora": 9, "n": 922, "temperatura": 21.14, "humedad": 69.16, "ec": 71.9, "rssi": -65.3, "rssi_sigma": 4.09, "rssi_bajo": 110}, {"hora": 10, "n": 923, "temperatura": 22.64, "humedad": 64.76, "ec": 71.6, "rssi": -65.4, "rssi_sigma": 3.67, "rssi_bajo": 104}, {"hora": 11, "n": 924, "temperatura": 23.55, "humedad": 62.0, "ec": 71.4, "rssi": -65.6, "rssi_sigma": 3.62, "rssi_bajo": 101}, {"hora": 12, "n": 924, "temperatura": 24.17, "humedad": 60.26, "ec": 70.4, "rssi": -65.6, "rssi_sigma": 4.52, "rssi_bajo": 151}, {"hora": 13, "n": 892, "temperatura": 24.24, "humedad": 59.59, "ec": 73.1, "rssi": -65.7, "rssi_sigma": 4.86, "rssi_bajo": 156}, {"hora": 14, "n": 898, "temperatura": 23.89, "humedad": 60.1, "ec": 72.9, "rssi": -66.6, "rssi_sigma": 4.98, "rssi_bajo": 184}, {"hora": 15, "n": 924, "temperatura": 23.06, "humedad": 62.05, "ec": 89.5, "rssi": -65.9, "rssi_sigma": 4.39, "rssi_bajo": 148}, {"hora": 16, "n": 912, "temperatura": 21.9, "humedad": 64.04, "ec": 76.9, "rssi": -66.0, "rssi_sigma": 4.22, "rssi_bajo": 139}, {"hora": 17, "n": 908, "temperatura": 20.61, "humedad": 68.29, "ec": 80.4, "rssi": -65.4, "rssi_sigma": 4.25, "rssi_bajo": 124}, {"hora": 18, "n": 920, "temperatura": 19.15, "humedad": 78.49, "ec": 75.3, "rssi": -64.8, "rssi_sigma": 3.89, "rssi_bajo": 84}, {"hora": 19, "n": 922, "temperatura": 18.34, "humedad": 81.67, "ec": 79.9, "rssi": -64.9, "rssi_sigma": 3.68, "rssi_bajo": 59}, {"hora": 20, "n": 903, "temperatura": 17.76, "humedad": 84.45, "ec": 87.0, "rssi": -64.5, "rssi_sigma": 3.55, "rssi_bajo": 49}, {"hora": 21, "n": 967, "temperatura": 18.32, "humedad": 82.79, "ec": 210.4, "rssi": -65.2, "rssi_sigma": 4.08, "rssi_bajo": 99}, {"hora": 22, "n": 1116, "temperatura": 19.48, "humedad": 79.92, "ec": 247.7, "rssi": -66.0, "rssi_sigma": 4.44, "rssi_bajo": 168}, {"hora": 23, "n": 923, "temperatura": 17.16, "humedad": 88.43, "ec": 77.3, "rssi": -64.6, "rssi_sigma": 3.66, "rssi_bajo": 72}], "riego_por_hora": [{"hora": 0, "ciclos": 7}, {"hora": 1, "ciclos": 7}, {"hora": 2, "ciclos": 7}, {"hora": 3, "ciclos": 7}, {"hora": 4, "ciclos": 7}, {"hora": 5, "ciclos": 7}, {"hora": 6, "ciclos": 28}, {"hora": 7, "ciclos": 28}, {"hora": 8, "ciclos": 28}, {"hora": 9, "ciclos": 28}, {"hora": 10, "ciclos": 28}, {"hora": 11, "ciclos": 28}, {"hora": 12, "ciclos": 28}, {"hora": 13, "ciclos": 28}, {"hora": 14, "ciclos": 28}, {"hora": 15, "ciclos": 28}, {"hora": 16, "ciclos": 28}, {"hora": 17, "ciclos": 27}, {"hora": 18, "ciclos": 9}, {"hora": 19, "ciclos": 10}, {"hora": 20, "ciclos": 15}, {"hora": 21, "ciclos": 9}, {"hora": 22, "ciclos": 7}, {"hora": 23, "ciclos": 7}]}, "riego": [{"dia": "2026-08-23", "ciclos": 5, "min_bomba": 15.0, "s_min": 180, "s_max": 180}, {"dia": "2026-08-24", "ciclos": 60, "min_bomba": 180.0, "s_min": 180, "s_max": 180}, {"dia": "2026-08-25", "ciclos": 60, "min_bomba": 180.0, "s_min": 180, "s_max": 180}, {"dia": "2026-08-26", "ciclos": 60, "min_bomba": 180.0, "s_min": 180, "s_max": 180}, {"dia": "2026-08-27", "ciclos": 60, "min_bomba": 180.0, "s_min": 180, "s_max": 180}, {"dia": "2026-08-28", "ciclos": 60, "min_bomba": 180.0, "s_min": 180, "s_max": 180}, {"dia": "2026-08-29", "ciclos": 60, "min_bomba": 180.0, "s_min": 180, "s_max": 180}, {"dia": "2026-08-30", "ciclos": 69, "min_bomba": 208.1, "s_min": 124, "s_max": 300}], "dist_rssi": {"metrica": "rssi", "n": 22291, "min": -87.0, "max": -52.0, "bins": [{"desde": -87.0, "hasta": -85.75, "n": 2, "pct": 0.01, "cdf": 0.01}, {"desde": -85.75, "hasta": -84.5, "n": 1, "pct": 0.0, "cdf": 0.01}, {"desde": -83.25, "hasta": -82.0, "n": 1, "pct": 0.0, "cdf": 0.02}, {"desde": -82.0, "hasta": -80.75, "n": 20, "pct": 0.09, "cdf": 0.11}, {"desde": -80.75, "hasta": -79.5, "n": 16, "pct": 0.07, "cdf": 0.18}, {"desde": -79.5, "hasta": -78.25, "n": 25, "pct": 0.11, "cdf": 0.29}, {"desde": -78.25, "hasta": -77.0, "n": 61, "pct": 0.27, "cdf": 0.57}, {"desde": -77.0, "hasta": -75.75, "n": 211, "pct": 0.95, "cdf": 1.51}, {"desde": -75.75, "hasta": -74.5, "n": 170, "pct": 0.76, "cdf": 2.27}, {"desde": -74.5, "hasta": -73.25, "n": 251, "pct": 1.13, "cdf": 3.4}, {"desde": -73.25, "hasta": -72.0, "n": 310, "pct": 1.39, "cdf": 4.79}, {"desde": -72.0, "hasta": -70.75, "n": 1156, "pct": 5.19, "cdf": 9.98}, {"desde": -70.75, "hasta": -69.5, "n": 975, "pct": 4.37, "cdf": 14.35}, {"desde": -69.5, "hasta": -68.25, "n": 1180, "pct": 5.29, "cdf": 19.64}, {"desde": -68.25, "hasta": -67.0, "n": 1392, "pct": 6.24, "cdf": 25.89}, {"desde": -67.0, "hasta": -65.75, "n": 3345, "pct": 15.01, "cdf": 40.9}, {"desde": -65.75, "hasta": -64.5, "n": 2252, "pct": 10.1, "cdf": 51.0}, {"desde": -64.5, "hasta": -63.25, "n": 2596, "pct": 11.65, "cdf": 62.64}, {"desde": -63.25, "hasta": -62.0, "n": 2507, "pct": 11.25, "cdf": 73.89}, {"desde": -62.0, "hasta": -60.75, "n": 3779, "pct": 16.95, "cdf": 90.84}, {"desde": -60.75, "hasta": -59.5, "n": 934, "pct": 4.19, "cdf": 95.03}, {"desde": -59.5, "hasta": -58.25, "n": 493, "pct": 2.21, "cdf": 97.25}, {"desde": -58.25, "hasta": -57.0, "n": 241, "pct": 1.08, "cdf": 98.33}, {"desde": -57.0, "hasta": -55.75, "n": 253, "pct": 1.13, "cdf": 99.46}, {"desde": -55.75, "hasta": -54.5, "n": 72, "pct": 0.32, "cdf": 99.78}, {"desde": -54.5, "hasta": -53.25, "n": 36, "pct": 0.16, "cdf": 99.95}, {"desde": -53.25, "hasta": -52.0, "n": 12, "pct": 0.05, "cdf": 100.0}]}, "dist_temp": {"metrica": "temperatura", "n": 22265, "min": 0.0, "max": 30.0, "bins": [{"desde": 0.0, "hasta": 1.25, "n": 13, "pct": 0.06, "cdf": 0.06}, {"desde": 13.75, "hasta": 15.0, "n": 185, "pct": 0.83, "cdf": 0.89}, {"desde": 15.0, "hasta": 16.25, "n": 1891, "pct": 8.49, "cdf": 9.38}, {"desde": 16.25, "hasta": 17.5, "n": 5989, "pct": 26.9, "cdf": 36.28}, {"desde": 17.5, "hasta": 18.75, "n": 3594, "pct": 16.14, "cdf": 52.42}, {"desde": 18.75, "hasta": 20.0, "n": 2033, "pct": 9.13, "cdf": 61.55}, {"desde": 20.0, "hasta": 21.25, "n": 1770, "pct": 7.95, "cdf": 69.5}, {"desde": 21.25, "hasta": 22.5, "n": 2042, "pct": 9.17, "cdf": 78.68}, {"desde": 22.5, "hasta": 23.75, "n": 1996, "pct": 8.96, "cdf": 87.64}, {"desde": 23.75, "hasta": 25.0, "n": 1324, "pct": 5.95, "cdf": 93.59}, {"desde": 25.0, "hasta": 26.25, "n": 787, "pct": 3.53, "cdf": 97.12}, {"desde": 26.25, "hasta": 27.5, "n": 390, "pct": 1.75, "cdf": 98.87}, {"desde": 27.5, "hasta": 28.75, "n": 140, "pct": 0.63, "cdf": 99.5}, {"desde": 28.75, "hasta": 30.0, "n": 111, "pct": 0.5, "cdf": 100.0}]}, "gateway": {"ultima_trama": "2026-08-31T02:41:57.473074+00:00", "silencio_s": 121, "estado": "en linea", "ingesta_en_vivo": 1344, "por_origen": [{"origen": "directo", "n": 1344, "desde": "2026-08-26T10:25:52.124190+00:00", "hasta": "2026-08-31T02:41:57.473074+00:00"}, {"origen": "backfill", "n": 31781, "desde": "2026-08-08T19:06:09.876672+00:00", "hasta": "2026-08-26T10:20:52.118198+00:00"}]}, "devices": [{"device_uid": "FOG_RPI_HIERBABUENA_01", "device_type": "GATEWAY", "status": "ONLINE", "last_seen": null, "alias": "Raspberry Pi — Gateway Fog Principal", "location": "Cultivo indoor · hierbabuena", "description": "Nodo fog: broker MQTT, motor de reglas y buffer local", "gateway_id": "FOG_RPI_HIERBABUENA_01", "silencio_s": 121.565971}, {"device_uid": "IoT-node-26.001", "sensor_id": "IoT-node-26.001", "device_type": "HIDROPONIA", "status": "ONLINE", "last_seen": "2026-08-31T02:41:57.473074+00:00", "alias": "Nodo HydroNode — hierbabuena indoor", "location": "Cultivo indoor · hierbabuena", "description": "Nodo ESP32: sensores, relés y ciclos de riego", "firmware_version": "2.3.0", "gateway_id": "FOG_RPI_HIERBABUENA_01", "silencio_s": 121.565971, "ultima_lectura": {"temperatura": 17.47, "humedad": 94.44, "ec": 929.4, "rssi": -59, "agua": false, "uptime_ms": 9607278}}, {"device_uid": "IoT-node-26.002", "sensor_id": "IoT-node-26.002", "device_type": "HIDROPONIA", "status": "ONLINE", "last_seen": "2026-08-31T02:40:42.101717+00:00", "alias": "Nodo HydroNode · lechuga hidropónica", "location": "Cultivo indoor · hierbabuena", "description": "Nodo ESP32: sensores, relés y ciclos de riego", "firmware_version": "2.3.0", "gateway_id": "FOG_RPI_HIERBABUENA_01", "silencio_s": 196.937328, "ultima_lectura": {"temperatura": 24.62, "humedad": 72.92, "ec": null, "rssi": -83, "agua": null, "uptime_ms": 2840228}}], "heat_rssi": {"metrica": "rssi", "min": -76.5, "max": -55.8, "celdas": [["08-09", 2, -65.9], ["08-09", 3, -67.4], ["08-09", 4, -64.7], ["08-10", 0, -61.6], ["08-10", 1, -61.8], ["08-10", 2, -62.0], ["08-10", 3, -62.4], ["08-10", 4, -61.8], ["08-10", 5, -64.6], ["08-10", 6, -64.4], ["08-10", 7, -65.0], ["08-10", 8, -64.2], ["08-10", 9, -64.4], ["08-10", 10, -64.6], ["08-10", 11, -65.4], ["08-10", 12, -65.5], ["08-10", 13, -65.7], ["08-10", 14, -66.0], ["08-10", 15, -64.7], ["08-10", 16, -64.9], ["08-10", 17, -63.4], ["08-10", 18, -61.9], ["08-10", 19, -61.5], ["08-10", 20, -61.6], ["08-10", 21, -62.2], ["08-10", 22, -61.4], ["08-10", 23, -61.8], ["08-11", 0, -63.1], ["08-11", 1, -62.5], ["08-11", 2, -64.3], ["08-11", 3, -65.4], ["08-11", 4, -64.7], ["08-11", 5, -61.2], ["08-11", 6, -62.0], ["08-11", 7, -61.9], ["08-11", 8, -61.9], ["08-11", 9, -61.8], ["08-11", 10, -61.9], ["08-11", 11, -63.0], ["08-11", 12, -64.2], ["08-11", 13, -63.7], ["08-11", 14, -63.9], ["08-11", 15, -62.6], ["08-11", 16, -62.8], ["08-11", 17, -61.2], ["08-11", 18, -61.7], ["08-11", 19, -62.8], ["08-11", 20, -64.8], ["08-11", 21, -64.7], ["08-11", 22, -64.1], ["08-11", 23, -62.7], ["08-12", 0, -63.8], ["08-12", 1, -62.8], ["08-12", 2, -63.5], ["08-12", 3, -64.2], ["08-12", 4, -62.5], ["08-12", 5, -64.5], ["08-12", 6, -65.2], ["08-12", 7, -67.1], ["08-12", 8, -67.7], ["08-12", 9, -68.3], ["08-12", 10, -68.3], ["08-12", 11, -70.1], ["08-12", 12, -69.7], ["08-12", 13, -69.2], ["08-12", 14, -66.2], ["08-12", 15, -65.9], ["08-12", 16, -66.2], ["08-12", 17, -61.7], ["08-12", 18, -61.5], ["08-12", 19, -62.7], ["08-12", 20, -62.0], ["08-12", 21, -61.7], ["08-12", 22, -61.0], ["08-12", 23, -62.4], ["08-13", 0, -64.2], ["08-13", 1, -63.2], ["08-13", 2, -64.2], ["08-13", 3, -64.4], ["08-13", 4, -63.7], ["08-13", 5, -61.8], ["08-13", 6, -61.6], ["08-13", 7, -62.6], ["08-13", 8, -63.1], ["08-13", 9, -62.7], ["08-13", 10, -62.9], ["08-13", 11, -62.3], ["08-13", 12, -63.2], ["08-13", 13, -64.2], ["08-13", 14, -64.2], ["08-13", 15, -64.9], ["08-13", 16, -64.7], ["08-13", 17, -64.2], ["08-13", 18, -63.6], ["08-13", 19, -64.0], ["08-13", 20, -63.6], ["08-13", 21, -64.0], ["08-13", 22, -64.0], ["08-13", 23, -63.8], ["08-14", 0, -68.5], ["08-14", 1, -67.9], ["08-14", 2, -68.3], ["08-14", 3, -68.8], ["08-14", 4, -67.4], ["08-14", 5, -63.3], ["08-14", 6, -63.8], ["08-14", 7, -63.7], ["08-14", 8, -63.0], ["08-14", 9, -64.0], ["08-14", 10, -63.8], ["08-14", 11, -62.8], ["08-14", 12, -61.7], ["08-14", 13, -63.3], ["08-14", 14, -62.1], ["08-14", 15, -62.8], ["08-14", 16, -64.3], ["08-14", 17, -65.8], ["08-14", 18, -66.0], ["08-14", 19, -66.8], ["08-14", 20, -68.0], ["08-14", 21, -69.5], ["08-14", 22, -69.7], ["08-14", 23, -69.1], ["08-15", 0, -63.8], ["08-15", 1, -64.6], ["08-15", 2, -63.4], ["08-15", 3, -64.0], ["08-15", 4, -64.0], ["08-15", 5, -67.2], ["08-15", 6, -66.9], ["08-15", 7, -67.5], ["08-15", 8, -67.4], ["08-15", 9, -68.1], ["08-15", 10, -67.4], ["08-15", 11, -67.6], ["08-15", 12, -68.6], ["08-15", 13, -70.0], ["08-15", 14, -69.2], ["08-15", 15, -68.8], ["08-15", 16, -69.7], ["08-15", 17, -65.7], ["08-15", 18, -62.7], ["08-15", 19, -64.2], ["08-15", 20, -63.4], ["08-15", 21, -64.7], ["08-15", 22, -64.2], ["08-15", 23, -64.2], ["08-16", 0, -69.9], ["08-16", 1, -69.8], ["08-16", 2, -72.7], ["08-16", 3, -73.4], ["08-16", 4, -68.3], ["08-16", 5, -63.0], ["08-16", 6, -63.2], ["08-16", 7, -62.7], ["08-16", 8, -63.2], ["08-16", 9, -62.8], ["08-16", 10, -63.0], ["08-16", 11, -62.9], ["08-16", 12, -64.3], ["08-16", 13, -69.7], ["08-16", 14, -73.8], ["08-16", 15, -71.0], ["08-16", 16, -69.1], ["08-16", 17, -75.3], ["08-16", 18, -75.8], ["08-16", 19, -76.5], ["08-16", 20, -70.3], ["08-16", 21, -69.1], ["08-16", 22, -69.3], ["08-16", 23, -69.5], ["08-17", 0, -64.9], ["08-17", 1, -67.8], ["08-17", 2, -64.8], ["08-17", 3, -65.8], ["08-17", 4, -65.3], ["08-17", 5, -68.2], ["08-17", 6, -68.1], ["08-17", 7, -69.4], ["08-17", 8, -69.9], ["08-17", 9, -71.2], ["08-17", 10, -67.4], ["08-17", 11, -66.7], ["08-17", 12, -66.0], ["08-17", 13, -67.3], ["08-17", 14, -65.2], ["08-17", 15, -64.1], ["08-17", 16, -65.6], ["08-17", 17, -69.0], ["08-17", 18, -67.4], ["08-17", 19, -67.9], ["08-17", 20, -66.8], ["08-17", 21, -65.8], ["08-17", 22, -65.1], ["08-17", 23, -64.7], ["08-18", 0, -65.3], ["08-18", 1, -63.0], ["08-18", 2, -61.2], ["08-18", 3, -60.7], ["08-18", 4, -58.1], ["08-18", 5, -65.0], ["08-18", 6, -65.5], ["08-18", 7, -66.4], ["08-18", 8, -65.2], ["08-18", 9, -65.8], ["08-18", 10, -66.1], ["08-18", 11, -65.4], ["08-18", 12, -64.4], ["08-18", 13, -63.9], ["08-18", 14, -64.5], ["08-18", 15, -63.8], ["08-18", 16, -63.6], ["08-18", 17, -66.3], ["08-18", 18, -66.5], ["08-18", 19, -65.5], ["08-18", 20, -65.4], ["08-18", 21, -64.8], ["08-18", 22, -64.3], ["08-18", 23, -63.0], ["08-19", 0, -65.4], ["08-19", 1, -65.5], ["08-19", 2, -65.6], ["08-19", 3, -64.6], ["08-19", 4, -65.4], ["08-19", 5, -57.8], ["08-19", 6, -58.3], ["08-19", 7, -57.3], ["08-19", 8, -56.4], ["08-19", 9, -56.0], ["08-19", 10, -56.3], ["08-19", 11, -58.9], ["08-19", 12, -60.6], ["08-19", 13, -60.2], ["08-19", 14, -62.5], ["08-19", 15, -63.9], ["08-19", 16, -64.0], ["08-19", 17, -63.6], ["08-19", 18, -65.5], ["08-19", 19, -71.3], ["08-19", 20, -69.7], ["08-19", 21, -69.0], ["08-19", 22, -66.0], ["08-19", 23, -65.5], ["08-20", 0, -68.7], ["08-20", 1, -65.9], ["08-20", 2, -70.2], ["08-20", 3, -72.7], ["08-20", 4, -72.2], ["08-20", 5, -67.5], ["08-20", 6, -67.0], ["08-20", 7, -65.8], ["08-20", 8, -66.2], ["08-20", 9, -66.6], ["08-20", 10, -66.3], ["08-20", 11, -68.4], ["08-20", 12, -68.5], ["08-20", 13, -67.7], ["08-20", 14, -68.2], ["08-20", 15, -69.3], ["08-20", 16, -70.1], ["08-20", 17, -71.2], ["08-20", 18, -73.7], ["08-20", 19, -74.4], ["08-20", 20, -74.1], ["08-20", 21, -74.4], ["08-20", 22, -73.9], ["08-20", 23, -70.5], ["08-21", 0, -69.8], ["08-21", 1, -68.1], ["08-21", 2, -68.2], ["08-21", 3, -68.4], ["08-21", 4, -65.8], ["08-21", 5, -72.2], ["08-21", 6, -73.8], ["08-21", 7, -70.5], ["08-21", 8, -68.6], ["08-21", 9, -69.4], ["08-21", 10, -68.7], ["08-21", 11, -68.8], ["08-21", 12, -68.6], ["08-21", 13, -68.7], ["08-21", 14, -69.3], ["08-21", 15, -70.0], ["08-21", 16, -70.5], ["08-21", 17, -70.3], ["08-21", 18, -70.8], ["08-21", 19, -70.5], ["08-21", 20, -71.4], ["08-21", 21, -71.0], ["08-21", 22, -69.7], ["08-21", 23, -70.6], ["08-22", 0, -61.2], ["08-22", 1, -61.0], ["08-22", 2, -60.9], ["08-22", 3, -60.0], ["08-22", 4, -62.2], ["08-22", 5, -64.9], ["08-22", 6, -65.2], ["08-22", 7, -65.0], ["08-22", 8, -63.4], ["08-22", 9, -62.7], ["08-22", 10, -64.0], ["08-22", 11, -64.7], ["08-22", 12, -67.3], ["08-22", 13, -64.5], ["08-22", 14, -60.7], ["08-22", 15, -61.3], ["08-22", 16, -61.9], ["08-22", 17, -62.6], ["08-22", 18, -62.2], ["08-22", 19, -62.5], ["08-22", 20, -62.2], ["08-22", 21, -62.6], ["08-22", 22, -62.9], ["08-22", 23, -62.6], ["08-23", 0, -60.0], ["08-23", 1, -60.6], ["08-23", 2, -66.0], ["08-23", 3, -68.0], ["08-23", 4, -68.6], ["08-23", 5, -62.8], ["08-23", 6, -62.7], ["08-23", 7, -62.5], ["08-23", 8, -62.4], ["08-23", 9, -62.1], ["08-23", 10, -62.7], ["08-23", 11, -62.7], ["08-23", 12, -61.7], ["08-23", 13, -61.2], ["08-23", 14, -62.0], ["08-23", 15, -63.8], ["08-23", 16, -63.5], ["08-23", 17, -61.8], ["08-23", 18, -62.0], ["08-23", 19, -64.8], ["08-23", 20, -63.2], ["08-23", 21, -62.7], ["08-23", 22, -60.9], ["08-23", 23, -59.8], ["08-24", 0, -62.7], ["08-24", 1, -62.0], ["08-24", 2, -62.9], ["08-24", 3, -61.0], ["08-24", 4, -61.8], ["08-24", 5, -67.5], ["08-24", 6, -66.7], ["08-24", 7, -66.8], ["08-24", 8, -65.8], ["08-24", 9, -66.6], ["08-24", 10, -66.3], ["08-24", 11, -65.9], ["08-24", 12, -65.8], ["08-24", 13, -66.0], ["08-24", 14, -65.3], ["08-24", 15, -65.3], ["08-24", 16, -65.5], ["08-24", 17, -64.9], ["08-24", 18, -65.4], ["08-24", 19, -64.8], ["08-24", 20, -66.6], ["08-24", 21, -65.5], ["08-24", 22, -68.1], ["08-24", 23, -63.0], ["08-25", 0, -68.9], ["08-25", 1, -68.0], ["08-25", 2, -68.0], ["08-25", 3, -68.9], ["08-25", 4, -69.0], ["08-25", 5, -61.2], ["08-25", 6, -60.6], ["08-25", 7, -61.3], ["08-25", 8, -60.6], ["08-25", 9, -61.3], ["08-25", 10, -60.7], ["08-25", 11, -61.7], ["08-25", 12, -61.6], ["08-25", 13, -62.7], ["08-25", 14, -63.3], ["08-25", 15, -63.4], ["08-25", 16, -63.0], ["08-25", 17, -61.5], ["08-25", 18, -63.2], ["08-25", 19, -62.8], ["08-25", 20, -62.8], ["08-25", 21, -62.5], ["08-25", 22, -62.2], ["08-25", 23, -63.1], ["08-26", 0, -65.2], ["08-26", 1, -64.5], ["08-26", 2, -63.3], ["08-26", 3, -63.3], ["08-26", 4, -60.5], ["08-26", 5, -68.4], ["08-26", 6, -68.5], ["08-26", 7, -68.8], ["08-26", 8, -68.0], ["08-26", 9, -68.8], ["08-26", 10, -71.1], ["08-26", 11, -63.2], ["08-26", 12, -65.0], ["08-26", 13, -66.3], ["08-26", 14, -67.0], ["08-26", 15, -75.5], ["08-26", 16, -71.8], ["08-26", 17, -69.5], ["08-26", 18, -68.2], ["08-26", 19, -67.7], ["08-26", 20, -67.2], ["08-26", 21, -66.3], ["08-26", 22, -64.2], ["08-26", 23, -63.8], ["08-27", 0, -64.0], ["08-27", 1, -63.9], ["08-27", 2, -64.8], ["08-27", 3, -63.4], ["08-27", 4, -62.2], ["08-27", 5, -59.8], ["08-27", 6, -59.8], ["08-27", 7, -61.0], ["08-27", 8, -59.4], ["08-27", 9, -60.4], ["08-27", 10, -60.3], ["08-27", 11, -60.1], ["08-27", 12, -60.9], ["08-27", 13, -60.7], ["08-27", 14, -59.9], ["08-27", 15, -59.6], ["08-27", 16, -60.8], ["08-27", 17, -60.3], ["08-27", 18, -61.9], ["08-27", 19, -61.3], ["08-27", 20, -61.8], ["08-27", 21, -61.9], ["08-27", 22, -61.1], ["08-27", 23, -64.3], ["08-28", 0, -62.2], ["08-28", 1, -62.3], ["08-28", 2, -63.0], ["08-28", 3, -64.4], ["08-28", 4, -63.0], ["08-28", 5, -62.0], ["08-28", 6, -62.0], ["08-28", 7, -62.0], ["08-28", 8, -60.8], ["08-28", 9, -61.3], ["08-28", 10, -61.5], ["08-28", 11, -61.9], ["08-28", 12, -61.2], ["08-28", 13, -60.8], ["08-28", 14, -61.3], ["08-28", 15, -62.2], ["08-28", 16, -59.0], ["08-28", 17, -58.8], ["08-28", 18, -59.3], ["08-28", 19, -60.3], ["08-28", 20, -60.1], ["08-28", 21, -59.4], ["08-28", 22, -59.4], ["08-28", 23, -62.4], ["08-29", 0, -61.0], ["08-29", 1, -62.1], ["08-29", 2, -61.8], ["08-29", 3, -62.2], ["08-29", 4, -61.4], ["08-29", 5, -61.8], ["08-29", 6, -62.7], ["08-29", 7, -61.8], ["08-29", 8, -61.8], ["08-29", 9, -62.3], ["08-29", 10, -60.8], ["08-29", 11, -60.3], ["08-29", 12, -61.4], ["08-29", 13, -61.8], ["08-29", 14, -63.0], ["08-29", 15, -63.1], ["08-29", 16, -62.3], ["08-29", 17, -63.0], ["08-29", 18, -61.2], ["08-29", 19, -62.0], ["08-29", 20, -62.0], ["08-29", 21, -61.5], ["08-29", 22, -61.6], ["08-29", 23, -60.8], ["08-30", 0, -59.6], ["08-30", 1, -55.8], ["08-30", 2, -57.4], ["08-30", 5, -60.3], ["08-30", 6, -61.3], ["08-30", 7, -60.8], ["08-30", 8, -60.3], ["08-30", 9, -61.2], ["08-30", 10, -60.6], ["08-30", 11, -60.5], ["08-30", 12, -62.7], ["08-30", 13, -62.4], ["08-30", 14, -61.8], ["08-30", 15, -61.4], ["08-30", 16, -61.8], ["08-30", 17, -62.9], ["08-30", 18, -62.2], ["08-30", 19, -64.5], ["08-30", 20, -64.9], ["08-30", 21, -72.3], ["08-30", 22, -70.2], ["08-30", 23, -60.5]]}, "heat_temp": {"metrica": "temperatura", "min": 14.6, "max": 27.4, "celdas": [["08-09", 2, 25.9], ["08-09", 3, 27.0], ["08-09", 4, 16.6], ["08-10", 0, 18.9], ["08-10", 1, 18.1], ["08-10", 2, 17.7], ["08-10", 3, 17.6], ["08-10", 4, 17.4], ["08-10", 5, 16.1], ["08-10", 6, 15.7], ["08-10", 7, 15.3], ["08-10", 8, 15.0], ["08-10", 9, 14.7], ["08-10", 10, 14.6], ["08-10", 11, 15.5], ["08-10", 12, 17.2], ["08-10", 13, 19.6], ["08-10", 14, 22.0], ["08-10", 15, 24.5], ["08-10", 16, 26.1], ["08-10", 17, 26.5], ["08-10", 18, 26.4], ["08-10", 19, 25.9], ["08-10", 20, 24.9], ["08-10", 21, 23.3], ["08-10", 22, 21.8], ["08-10", 23, 19.9], ["08-11", 0, 17.1], ["08-11", 1, 16.3], ["08-11", 2, 16.0], ["08-11", 3, 16.3], ["08-11", 4, 16.2], ["08-11", 5, 16.9], ["08-11", 6, 16.9], ["08-11", 7, 16.9], ["08-11", 8, 16.5], ["08-11", 9, 15.9], ["08-11", 10, 15.6], ["08-11", 11, 16.6], ["08-11", 12, 16.9], ["08-11", 13, 17.6], ["08-11", 14, 17.9], ["08-11", 15, 18.9], ["08-11", 16, 20.7], ["08-11", 17, 22.9], ["08-11", 18, 22.8], ["08-11", 19, 21.6], ["08-11", 20, 21.7], ["08-11", 21, 21.0], ["08-11", 22, 19.6], ["08-11", 23, 18.1], ["08-12", 0, 17.4], ["08-12", 1, 17.2], ["08-12", 2, 17.0], ["08-12", 3, 16.6], ["08-12", 4, 16.4], ["08-12", 5, 16.4], ["08-12", 6, 16.5], ["08-12", 7, 16.1], ["08-12", 8, 15.5], ["08-12", 9, 15.3], ["08-12", 10, 15.0], ["08-12", 11, 15.9], ["08-12", 12, 16.4], ["08-12", 13, 18.3], ["08-12", 14, 20.7], ["08-12", 15, 22.5], ["08-12", 16, 23.6], ["08-12", 17, 24.2], ["08-12", 18, 24.5], ["08-12", 19, 25.4], ["08-12", 20, 23.6], ["08-12", 21, 22.0], ["08-12", 22, 19.8], ["08-12", 23, 18.1], ["08-13", 0, 17.7], ["08-13", 1, 17.4], ["08-13", 2, 16.9], ["08-13", 3, 16.4], ["08-13", 4, 16.4], ["08-13", 5, 16.3], ["08-13", 6, 16.3], ["08-13", 7, 15.9], ["08-13", 8, 15.7], ["08-13", 9, 15.8], ["08-13", 10, 15.8], ["08-13", 11, 17.1], ["08-13", 12, 17.5], ["08-13", 13, 18.9], ["08-13", 14, 21.8], ["08-13", 15, 23.9], ["08-13", 16, 24.3], ["08-13", 17, 24.0], ["08-13", 18, 23.2], ["08-13", 19, 23.0], ["08-13", 20, 22.9], ["08-13", 21, 21.6], ["08-13", 22, 20.4], ["08-13", 23, 18.6], ["08-14", 0, 19.5], ["08-14", 1, 18.7], ["08-14", 2, 18.1], ["08-14", 3, 18.2], ["08-14", 4, 17.8], ["08-14", 5, 16.6], ["08-14", 6, 16.6], ["08-14", 7, 16.5], ["08-14", 8, 16.4], ["08-14", 9, 16.3], ["08-14", 10, 16.2], ["08-14", 11, 17.6], ["08-14", 12, 17.9], ["08-14", 13, 19.0], ["08-14", 14, 21.8], ["08-14", 15, 24.5], ["08-14", 16, 26.4], ["08-14", 17, 27.3], ["08-14", 18, 26.5], ["08-14", 19, 24.8], ["08-14", 20, 23.0], ["08-14", 21, 21.6], ["08-14", 22, 21.3], ["08-14", 23, 20.2], ["08-15", 0, 19.6], ["08-15", 1, 19.1], ["08-15", 2, 19.1], ["08-15", 3, 18.8], ["08-15", 4, 18.7], ["08-15", 5, 17.2], ["08-15", 6, 16.7], ["08-15", 7, 16.5], ["08-15", 8, 16.5], ["08-15", 9, 16.7], ["08-15", 10, 16.6], ["08-15", 11, 17.9], ["08-15", 12, 19.2], ["08-15", 13, 19.9], ["08-15", 14, 22.4], ["08-15", 15, 24.5], ["08-15", 16, 24.7], ["08-15", 17, 24.4], ["08-15", 18, 25.0], ["08-15", 19, 24.7], ["08-15", 20, 24.3], ["08-15", 21, 23.4], ["08-15", 22, 21.9], ["08-15", 23, 20.7], ["08-16", 0, 18.4], ["08-16", 1, 18.2], ["08-16", 2, 18.0], ["08-16", 3, 17.7], ["08-16", 4, 17.5], ["08-16", 5, 18.5], ["08-16", 6, 18.1], ["08-16", 7, 17.5], ["08-16", 8, 17.2], ["08-16", 9, 17.0], ["08-16", 10, 16.8], ["08-16", 11, 17.9], ["08-16", 12, 19.1], ["08-16", 13, 20.4], ["08-16", 14, 21.0], ["08-16", 15, 22.2], ["08-16", 16, 22.5], ["08-16", 17, 22.8], ["08-16", 18, 22.5], ["08-16", 19, 23.0], ["08-16", 20, 23.1], ["08-16", 21, 21.7], ["08-16", 22, 20.7], ["08-16", 23, 19.1], ["08-17", 0, 18.7], ["08-17", 1, 18.2], ["08-17", 2, 17.6], ["08-17", 3, 17.3], ["08-17", 4, 16.9], ["08-17", 5, 17.1], ["08-17", 6, 17.0], ["08-17", 7, 16.6], ["08-17", 8, 16.4], ["08-17", 9, 16.2], ["08-17", 10, 15.9], ["08-17", 11, 16.7], ["08-17", 12, 17.6], ["08-17", 13, 19.5], ["08-17", 14, 20.8], ["08-17", 15, 22.0], ["08-17", 16, 22.7], ["08-17", 17, 22.0], ["08-17", 18, 22.3], ["08-17", 19, 22.4], ["08-17", 20, 21.8], ["08-17", 21, 21.4], ["08-17", 22, 20.6], ["08-17", 23, 19.3], ["08-18", 0, 17.4], ["08-18", 1, 16.7], ["08-18", 2, 16.2], ["08-18", 3, 15.8], ["08-18", 4, 17.1], ["08-18", 5, 16.7], ["08-18", 6, 16.6], ["08-18", 7, 16.7], ["08-18", 8, 16.5], ["08-18", 9, 16.5], ["08-18", 10, 16.4], ["08-18", 11, 17.5], ["08-18", 12, 18.9], ["08-18", 13, 20.2], ["08-18", 14, 21.3], ["08-18", 15, 20.4], ["08-18", 16, 21.0], ["08-18", 17, 22.9], ["08-18", 18, 23.4], ["08-18", 19, 23.9], ["08-18", 20, 22.9], ["08-18", 21, 21.7], ["08-18", 22, 19.9], ["08-18", 23, 18.3], ["08-19", 0, 18.2], ["08-19", 1, 17.2], ["08-19", 2, 16.7], ["08-19", 3, 16.6], ["08-19", 4, 16.5], ["08-19", 5, 16.8], ["08-19", 6, 16.6], ["08-19", 7, 16.4], ["08-19", 8, 16.3], ["08-19", 9, 16.0], ["08-19", 10, 15.7], ["08-19", 11, 16.6], ["08-19", 12, 18.4], ["08-19", 13, 20.7], ["08-19", 14, 21.9], ["08-19", 15, 23.6], ["08-19", 16, 24.9], ["08-19", 17, 25.6], ["08-19", 18, 25.2], ["08-19", 19, 23.9], ["08-19", 20, 22.8], ["08-19", 21, 21.6], ["08-19", 22, 20.0], ["08-19", 23, 18.8], ["08-20", 0, 18.9], ["08-20", 1, 18.0], ["08-20", 2, 17.7], ["08-20", 3, 18.0], ["08-20", 4, 17.9], ["08-20", 5, 16.6], ["08-20", 6, 16.7], ["08-20", 7, 16.3], ["08-20", 8, 16.2], ["08-20", 9, 16.1], ["08-20", 10, 16.1], ["08-20", 11, 17.2], ["08-20", 12, 17.5], ["08-20", 13, 19.4], ["08-20", 14, 21.3], ["08-20", 15, 22.5], ["08-20", 16, 23.2], ["08-20", 17, 25.4], ["08-20", 18, 24.9], ["08-20", 19, 24.7], ["08-20", 20, 23.8], ["08-20", 21, 22.7], ["08-20", 22, 20.8], ["08-20", 23, 19.4], ["08-21", 0, 19.4], ["08-21", 1, 18.9], ["08-21", 2, 18.6], ["08-21", 3, 18.6], ["08-21", 4, 18.1], ["08-21", 5, 17.5], ["08-21", 6, 17.3], ["08-21", 7, 16.6], ["08-21", 8, 16.2], ["08-21", 9, 16.1], ["08-21", 10, 15.8], ["08-21", 11, 16.6], ["08-21", 12, 18.0], ["08-21", 13, 19.1], ["08-21", 14, 20.6], ["08-21", 15, 22.7], ["08-21", 16, 22.1], ["08-21", 17, 23.6], ["08-21", 18, 25.9], ["08-21", 19, 25.4], ["08-21", 20, 23.7], ["08-21", 21, 22.1], ["08-21", 22, 21.4], ["08-21", 23, 20.5], ["08-22", 0, 17.7], ["08-22", 1, 17.1], ["08-22", 2, 16.9], ["08-22", 3, 16.9], ["08-22", 4, 16.6], ["08-22", 5, 18.0], ["08-22", 6, 17.6], ["08-22", 7, 17.5], ["08-22", 8, 17.2], ["08-22", 9, 16.9], ["08-22", 10, 16.9], ["08-22", 11, 17.7], ["08-22", 12, 18.9], ["08-22", 13, 19.7], ["08-22", 14, 20.3], ["08-22", 15, 23.1], ["08-22", 16, 24.7], ["08-22", 17, 23.1], ["08-22", 18, 23.2], ["08-22", 19, 22.6], ["08-22", 20, 22.2], ["08-22", 21, 20.6], ["08-22", 22, 19.9], ["08-22", 23, 18.4], ["08-23", 0, 18.1], ["08-23", 1, 16.8], ["08-23", 2, 17.7], ["08-23", 3, 18.1], ["08-23", 4, 18.1], ["08-23", 5, 16.4], ["08-23", 6, 16.6], ["08-23", 7, 16.4], ["08-23", 8, 16.4], ["08-23", 9, 16.3], ["08-23", 10, 16.3], ["08-23", 11, 17.4], ["08-23", 12, 18.8], ["08-23", 13, 19.7], ["08-23", 14, 21.2], ["08-23", 15, 22.2], ["08-23", 16, 24.1], ["08-23", 17, 24.1], ["08-23", 18, 22.5], ["08-23", 19, 21.1], ["08-23", 20, 21.4], ["08-23", 21, 21.1], ["08-23", 22, 20.0], ["08-23", 23, 18.7], ["08-24", 0, 17.5], ["08-24", 1, 16.9], ["08-24", 2, 16.5], ["08-24", 3, 16.0], ["08-24", 4, 15.9], ["08-24", 5, 17.9], ["08-24", 6, 17.7], ["08-24", 7, 17.2], ["08-24", 8, 17.1], ["08-24", 9, 17.2], ["08-24", 10, 17.2], ["08-24", 11, 17.4], ["08-24", 12, 18.1], ["08-24", 13, 20.0], ["08-24", 14, 22.0], ["08-24", 15, 22.3], ["08-24", 16, 23.3], ["08-24", 17, 24.2], ["08-24", 18, 23.6], ["08-24", 19, 22.8], ["08-24", 20, 22.0], ["08-24", 21, 21.3], ["08-24", 22, 19.9], ["08-24", 23, 18.5], ["08-25", 0, 17.6], ["08-25", 1, 17.4], ["08-25", 2, 17.4], ["08-25", 3, 17.4], ["08-25", 4, 17.2], ["08-25", 5, 15.7], ["08-25", 6, 15.5], ["08-25", 7, 15.8], ["08-25", 8, 15.7], ["08-25", 9, 15.4], ["08-25", 10, 15.1], ["08-25", 11, 16.2], ["08-25", 12, 18.4], ["08-25", 13, 21.3], ["08-25", 14, 22.9], ["08-25", 15, 21.3], ["08-25", 16, 22.3], ["08-25", 17, 21.5], ["08-25", 18, 21.4], ["08-25", 19, 22.9], ["08-25", 20, 22.8], ["08-25", 21, 21.1], ["08-25", 22, 19.7], ["08-25", 23, 18.4], ["08-26", 0, 19.1], ["08-26", 1, 18.6], ["08-26", 2, 18.5], ["08-26", 3, 18.5], ["08-26", 4, 17.5], ["08-26", 5, 17.3], ["08-26", 6, 17.2], ["08-26", 7, 17.1], ["08-26", 8, 16.9], ["08-26", 9, 16.9], ["08-26", 10, 16.9], ["08-26", 11, 18.1], ["08-26", 12, 18.6], ["08-26", 13, 20.1], ["08-26", 14, 22.2], ["08-26", 15, 24.3], ["08-26", 16, 25.5], ["08-26", 17, 27.4], ["08-26", 18, 26.9], ["08-26", 19, 26.2], ["08-26", 20, 24.4], ["08-26", 21, 22.6], ["08-26", 22, 21.3], ["08-26", 23, 19.9], ["08-27", 0, 18.0], ["08-27", 1, 17.7], ["08-27", 2, 17.6], ["08-27", 3, 17.6], ["08-27", 4, 17.8], ["08-27", 5, 17.1], ["08-27", 6, 16.9], ["08-27", 7, 16.9], ["08-27", 8, 17.2], ["08-27", 9, 17.1], ["08-27", 10, 16.7], ["08-27", 11, 17.2], ["08-27", 12, 17.6], ["08-27", 13, 20.7], ["08-27", 14, 22.4], ["08-27", 15, 22.2], ["08-27", 16, 21.9], ["08-27", 17, 22.2], ["08-27", 18, 23.4], ["08-27", 19, 23.7], ["08-27", 20, 23.5], ["08-27", 21, 22.3], ["08-27", 22, 20.5], ["08-27", 23, 18.9], ["08-28", 0, 20.1], ["08-28", 1, 19.6], ["08-28", 2, 19.1], ["08-28", 3, 18.0], ["08-28", 4, 17.2], ["08-28", 5, 17.8], ["08-28", 6, 17.5], ["08-28", 7, 17.1], ["08-28", 8, 17.0], ["08-28", 9, 16.9], ["08-28", 10, 16.8], ["08-28", 11, 17.0], ["08-28", 12, 18.1], ["08-28", 13, 19.8], ["08-28", 14, 21.6], ["08-28", 15, 22.2], ["08-28", 16, 23.9], ["08-28", 17, 24.9], ["08-28", 18, 26.4], ["08-28", 19, 25.9], ["08-28", 20, 25.6], ["08-28", 21, 24.5], ["08-28", 22, 22.9], ["08-28", 23, 21.1], ["08-29", 0, 19.0], ["08-29", 1, 18.8], ["08-29", 2, 18.8], ["08-29", 3, 18.4], ["08-29", 4, 18.1], ["08-29", 5, 17.5], ["08-29", 6, 17.7], ["08-29", 7, 17.4], ["08-29", 8, 16.8], ["08-29", 9, 16.8], ["08-29", 10, 16.9], ["08-29", 11, 17.7], ["08-29", 12, 18.7], ["08-29", 13, 20.2], ["08-29", 14, 20.2], ["08-29", 15, 21.3], ["08-29", 16, 21.4], ["08-29", 17, 23.3], ["08-29", 18, 24.8], ["08-29", 19, 26.2], ["08-29", 20, 24.3], ["08-29", 21, 23.2], ["08-29", 22, 21.2], ["08-29", 23, 19.8], ["08-30", 0, 16.2], ["08-30", 1, 17.8], ["08-30", 2, 17.6], ["08-30", 5, 18.1], ["08-30", 6, 17.8], ["08-30", 7, 17.6], ["08-30", 8, 17.3], ["08-30", 9, 17.0], ["08-30", 10, 16.9], ["08-30", 11, 17.8], ["08-30", 12, 18.3], ["08-30", 13, 19.6], ["08-30", 14, 20.7], ["08-30", 15, 21.8], ["08-30", 16, 21.1], ["08-30", 17, 23.4], ["08-30", 18, 23.1], ["08-30", 19, 24.0], ["08-30", 20, 22.8], ["08-30", 21, 21.1], ["08-30", 22, 19.7], ["08-30", 23, 16.1]]}, "multi": {"metricas": ["temperatura", "humedad_ambiente", "ec", "rssi"], "puntos": [["08-17T02:00", 17.87, 91.17, 0.0, -73.06], ["08-17T04:00", 17.27, 91.96, 0.0, -68.23], ["08-17T06:00", 16.82, 91.96, 0.0, -68.75], ["08-17T08:00", 16.29, 92.05, 0.0, -70.53], ["08-17T10:00", 16.29, 89.63, 0.0, -67.06], ["08-17T12:00", 18.56, 81.55, 0.0, -66.68], ["08-17T14:00", 21.4, 72.78, 0.0, -64.65], ["08-17T16:00", 22.33, 69.22, 0.0, -67.33], ["08-17T18:00", 22.35, 67.98, 0.0, -67.65], ["08-17T20:00", 21.59, 69.93, 0.0, -66.33], ["08-17T22:00", 19.93, 80.83, 0.0, -64.9], ["08-18T00:00", 18.48, 87.03, 0.0, -66.37], ["08-18T02:00", 17.48, 87.7, 0.0, -65.31], ["08-18T04:00", 16.79, 89.6, 0.0, -65.16], ["08-18T06:00", 16.65, 90.15, 0.0, -65.96], ["08-18T08:00", 16.5, 90.04, 0.0, -65.5], ["08-18T10:00", 16.96, 89.83, 0.0, -65.75], ["08-18T12:00", 19.52, 79.57, 0.0, -64.14], ["08-18T14:00", 20.86, 74.28, 0.0, -64.11], ["08-18T16:00", 21.91, 72.06, 0.0, -64.98], ["08-18T18:00", 23.61, 61.11, 0.0, -66.01], ["08-18T20:00", 22.28, 62.29, 0.0, -65.1], ["08-18T22:00", 19.14, 72.43, 0.0, -63.67], ["08-19T00:00", 17.04, 80.44, 0.0, -64.16], ["08-19T02:00", 16.05, 78.76, 2.95, -60.88], ["08-19T04:00", 16.94, 89.88, 0.0, -57.97], ["08-19T06:00", 16.48, 91.93, 0.0, -57.79], ["08-19T08:00", 16.16, 95.62, 0.0, -56.17], ["08-19T10:00", 16.18, 91.73, 0.0, -57.58], ["08-19T12:00", 19.58, 72.33, 0.0, -60.4], ["08-19T14:00", 22.78, 59.42, 0.0, -63.18], ["08-19T16:00", 25.23, 53.48, 0.0, -63.83], ["08-19T18:00", 24.58, 52.6, 0.0, -68.43], ["08-19T20:00", 22.21, 57.88, 0.0, -69.37], ["08-19T22:00", 19.38, 65.47, 0.0, -65.72], ["08-20T00:00", 17.7, 76.47, 0.0, -65.42], ["08-20T02:00", 16.67, 86.28, 0.0, -65.09], ["08-20T04:00", 16.56, 88.63, 0.0, -66.45], ["08-20T06:00", 16.48, 91.45, 0.0, -66.44], ["08-20T08:00", 16.14, 92.85, 0.0, -66.41], ["08-20T10:00", 16.64, 91.06, 0.0, -67.37], ["08-20T12:00", 18.41, 75.54, 0.0, -68.12], ["08-20T14:00", 21.93, 63.35, 0.0, -68.76], ["08-20T16:00", 24.26, 57.84, 0.0, -70.65], ["08-20T18:00", 24.78, 55.72, 0.0, -74.08], ["08-20T20:00", 23.26, 58.29, 0.0, -74.24], ["08-20T22:00", 20.11, 66.86, 0.0, -72.23], ["08-21T00:00", 18.43, 78.1, 0.0, -67.27], ["08-21T02:00", 17.87, 88.97, 0.0, -71.46], ["08-21T04:00", 17.66, 90.51, 0.0, -72.23], ["08-21T06:00", 16.95, 93.31, 0.0, -72.18], ["08-21T08:00", 16.17, 91.58, 0.0, -69.02], ["08-21T10:00", 16.2, 88.09, 0.0, -68.73], ["08-21T12:00", 18.56, 79.18, 0.0, -68.64], ["08-21T14:00", 21.66, 71.72, 0.0, -69.64], ["08-21T16:00", 22.9, 65.3, 0.0, -70.38], ["08-21T18:00", 25.67, 58.19, 0.0, -70.63], ["08-21T20:00", 22.93, 65.14, 0.0, -71.2], ["08-21T22:00", 20.95, 73.87, 0.0, -70.13], ["08-22T00:00", 19.11, 85.8, 0.0, -68.93], ["08-22T02:00", 18.59, 92.68, 0.0, -68.33], ["08-22T04:00", 18.08, 95.41, 0.0, -65.34], ["08-22T06:00", 17.58, 96.37, 0.0, -65.12], ["08-22T08:00", 17.05, 97.03, 0.0, -63.04], ["08-22T10:00", 17.34, 93.5, 0.0, -64.38], ["08-22T12:00", 19.3, 84.55, 0.0, -65.88], ["08-22T14:00", 21.66, 74.62, 0.0, -60.98], ["08-22T16:00", 23.93, 66.0, 0.0, -62.28], ["08-22T18:00", 22.92, 67.44, 0.0, -62.36], ["08-22T20:00", 21.4, 69.03, 0.0, -62.38], ["08-22T22:00", 19.15, 80.15, 0.0, -62.75], ["08-23T00:00", 17.37, 88.46, 0.0, -61.09], ["08-23T02:00", 16.87, 92.31, 0.0, -60.45], ["08-23T04:00", 16.5, 92.27, 0.0, -62.5], ["08-23T06:00", 16.5, 96.0, 0.0, -62.6], ["08-23T08:00", 16.38, 97.95, 0.0, -62.24], ["08-23T10:00", 16.82, 93.8, 0.0, -62.71], ["08-23T12:00", 19.26, 82.05, 0.0, -61.49], ["08-23T14:00", 21.69, 70.97, 0.0, -62.88], ["08-23T16:00", 24.1, 62.07, 0.0, -62.65], ["08-23T18:00", 21.74, 64.68, 0.0, -63.58], ["08-23T20:00", 21.23, 68.7, 139.77, -62.95], ["08-23T22:00", 19.28, 81.96, 0.0, -60.25], ["08-24T00:00", 17.54, 90.78, 41.59, -60.26], ["08-24T02:00", 17.91, 94.23, 696.78, -67.0], ["08-24T04:00", 18.0, 96.34, 656.23, -68.04], ["08-24T06:00", 17.45, 94.96, 708.81, -66.75], ["08-24T08:00", 17.17, 96.2, 714.61, -66.17], ["08-24T10:00", 17.32, 90.14, 750.13, -66.13], ["08-24T12:00", 19.06, 75.51, 748.58, -65.92], ["08-24T14:00", 22.17, 64.94, 703.5, -65.33], ["08-24T16:00", 23.73, 60.02, 688.4, -65.21], ["08-24T18:00", 23.21, 61.03, 717.82, -65.08], ["08-24T20:00", 21.66, 65.07, 762.58, -66.04], ["08-24T22:00", 19.18, 75.02, 808.62, -65.54], ["08-25T00:00", 17.19, 86.62, 834.91, -62.33], ["08-25T02:00", 16.28, 85.96, 851.1, -61.96], ["08-25T04:00", 15.81, 88.96, 858.6, -61.46], ["08-25T06:00", 15.69, 90.57, 856.42, -60.96], ["08-25T08:00", 15.56, 88.57, 856.69, -60.96], ["08-25T10:00", 15.61, 83.76, 863.98, -61.17], ["08-25T12:00", 19.84, 67.19, 782.82, -62.13], ["08-25T14:00", 22.1, 60.85, 758.33, -63.38], ["08-25T16:00", 21.92, 65.22, 775.96, -62.25], ["08-25T18:00", 22.14, 65.21, 780.17, -62.96], ["08-25T20:00", 21.99, 65.31, 796.75, -62.67], ["08-25T22:00", 19.02, 78.89, 849.93, -62.63], ["08-26T00:00", 17.51, 90.12, 862.35, -68.46], ["08-26T02:00", 17.43, 91.68, 858.71, -68.46], ["08-26T04:00", 17.21, 92.57, 855.24, -68.71], ["08-26T06:00", 17.15, 94.45, 857.51, -68.63], ["08-26T08:00", 16.91, 95.8, 857.51, -68.42], ["08-26T10:00", 17.52, 94.88, 849.28, -67.17], ["08-26T12:00", 19.35, 85.59, 822.59, -65.67], ["08-26T14:00", 23.24, 69.15, 768.97, -71.25], ["08-26T16:00", 26.41, 59.18, 740.18, -70.67], ["08-26T18:00", 26.52, 55.64, 763.6, -67.96], ["08-26T20:00", 23.5, 60.34, 831.34, -66.75], ["08-26T22:00", 20.63, 75.63, 876.57, -63.96], ["08-27T00:00", 18.86, 86.84, 886.78, -64.88], ["08-27T02:00", 18.5, 90.28, 885.04, -63.33], ["08-27T04:00", 17.31, 89.0, 897.18, -60.13], ["08-27T06:00", 16.89, 92.06, 894.44, -60.42], ["08-27T08:00", 17.15, 94.96, 883.51, -59.92], ["08-27T10:00", 16.98, 90.94, 897.73, -60.21], ["08-27T12:00", 19.13, 76.5, 855.31, -60.79], ["08-27T14:00", 22.31, 66.1, 797.94, -59.75], ["08-27T16:00", 22.05, 67.61, 817.28, -60.54], ["08-27T18:00", 23.55, 65.11, 799.31, -61.63], ["08-27T20:00", 22.94, 63.81, 825.48, -61.83], ["08-27T22:00", 19.66, 77.92, 885.31, -62.71], ["08-28T00:00", 17.81, 88.83, 894.74, -63.96], ["08-28T02:00", 17.56, 90.73, 892.05, -64.08], ["08-28T04:00", 17.8, 92.27, 881.94, -62.08], ["08-28T06:00", 17.31, 94.59, 887.36, -62.0], ["08-28T08:00", 16.93, 95.09, 889.69, -61.04], ["08-28T10:00", 16.94, 89.41, 897.62, -61.71], ["08-28T12:00", 18.97, 76.99, 857.53, -61.0], ["08-28T14:00", 21.93, 68.29, 812.18, -61.75], ["08-28T16:00", 24.41, 59.69, 783.54, -58.88], ["08-28T18:00", 26.15, 54.25, 780.14, -59.83], ["08-28T20:00", 25.02, 54.78, 819.02, -59.75], ["08-28T22:00", 21.98, 69.87, 877.16, -60.92], ["08-29T00:00", 19.85, 86.44, 897.72, -62.29], ["08-29T02:00", 18.53, 91.67, 909.09, -63.71], ["08-29T04:00", 17.35, 92.33, 910.6, -62.38], ["08-29T06:00", 17.54, 95.18, 900.71, -62.21], ["08-29T08:00", 16.82, 96.83, 905.2, -62.04], ["08-29T10:00", 17.31, 93.11, 899.89, -60.54], ["08-29T12:00", 19.46, 83.39, 858.64, -61.58], ["08-29T14:00", 20.79, 78.3, 836.47, -63.04], ["08-29T16:00", 22.4, 72.34, 816.93, -62.67], ["08-29T18:00", 25.52, 58.59, 781.34, -61.63], ["08-29T20:00", 23.72, 63.48, 832.46, -61.75], ["08-29T22:00", 20.47, 87.0, 896.3, -61.21], ["08-30T00:00", 18.93, 94.51, 904.37, -61.54], ["08-30T02:00", 18.58, 96.06, 902.4, -61.96], ["08-30T04:00", 18.08, 96.9, 902.12, -60.88], ["08-30T06:00", 17.73, 98.01, 902.97, -61.04], ["08-30T08:00", 17.15, 99.1, 908.06, -60.75], ["08-30T10:00", 17.35, 95.96, 903.08, -60.54], ["08-30T12:00", 18.94, 90.63, 871.91, -62.54], ["08-30T14:00", 21.22, 81.12, 839.77, -61.63], ["08-30T16:00", 22.23, 71.97, 834.3, -62.33], ["08-30T18:00", 23.57, 66.31, 822.75, -63.38], ["08-30T20:00", 21.91, 68.81, 872.1, -68.63], ["08-30T22:00", 18.27, 74.95, 884.36, -66.35], ["08-31T00:00", 17.02, 85.95, 893.02, -57.71], ["08-31T02:00", 17.59, 93.59, 922.82, -57.44]]}, "corr_tec": {"x": "temperatura", "y": "ec", "r": 0.144, "n": 22265, "puntos": [[17.18, 0.0, 23], [22.67, 0.0, 10], [16.98, 884.8, 3], [25.05, 0.0, 14], [18.18, 0.0, 21], [18.9, 0.0, 8], [16.99, 947.0, 23], [17.26, 0.0, 6], [18.33, 0.0, 7], [19.86, 0.0, 8], [23.23, 0.0, 11], [18.21, 0.0, 20], [18.0, 0.0, 20], [16.75, 0.0, 0], [18.17, 0.0, 21], [16.26, 0.0, 1], [20.86, 0.0, 9], [20.34, 0.0, 17], [18.36, 0.0, 19], [15.82, 0.0, 2], [20.61, 0.0, 17], [16.49, 0.0, 20], [16.55, 0.0, 2], [17.73, 0.0, 23], [24.0, 0.0, 14], [24.95, 0.0, 10], [20.74, 0.0, 9], [17.91, 894.1, 7], [16.07, 0.0, 5], [17.47, 0.0, 20], [19.79, 0.0, 8], [19.43, 0.0, 7], [15.67, 0.0, 5], [27.09, 0.0, 13], [16.85, 0.0, 0], [21.78, 0.0, 9], [17.51, 0.0, 20], [16.23, 0.0, 0], [15.94, 0.0, 7], [15.72, 0.0, 6], [19.4, 0.0, 19], [22.04, 0.0, 13], [19.21, 0.0, 18], [18.06, 853.4, 18], [21.57, 1070.6, 21], [20.18, 909.8, 17], [23.09, 0.0, 11], [28.4, 800.0, 22], [22.02, 0.0, 13], [17.48, 0.0, 8], [18.42, 874.2, 7], [18.29, 0.0, 19], [17.17, 0.0, 6], [18.09, 0.0, 20], [20.93, 0.0, 16], [16.0, 0.0, 21], [16.16, 0.0, 2], [16.4, 0.0, 3], [18.27, 0.0, 8], [16.44, 0.0, 23], [17.69, 0.0, 7], [18.43, 864.0, 22], [17.35, 0.0, 6], [15.66, 0.0, 2], [18.67, 0.0, 18], [20.56, 0.0, 18], [24.94, 0.0, 12], [23.34, 0.0, 15], [16.71, 0.0, 0], [20.77, 0.0, 17], [16.04, 0.0, 21], [22.77, 0.0, 12], [25.07, 0.0, 14], [26.24, 0.0, 11], [22.5, 807.3, 9], [16.4, 0.0, 7], [16.99, 0.0, 1], [16.42, 0.0, 2], [21.46, 0.0, 16], [17.23, 0.0, 0], [27.69, 0.0, 12], [16.49, 0.0, 1], [18.72, 0.0, 20], [17.32, 0.0, 7], [16.31, 0.0, 4], [15.66, 0.0, 6], [17.14, 910.4, 4], [24.75, 0.0, 13], [17.38, 885.6, 23], [20.25, 830.6, 16], [15.97, 0.0, 4], [15.7, 0.0, 5], [16.4, 0.0, 2], [16.71, 0.0, 7], [21.21, 0.0, 9], [17.47, 0.0, 8], [17.04, 0.0, 20], [16.68, 0.0, 21], [16.59, 0.0, 2], [18.07, 0.0, 22], [16.75, 0.0, 7], [19.57, 0.0, 8], [18.59, 0.0, 19], [19.29, 0.0, 7], [17.1, 0.0, 20], [15.7, 0.0, 5], [20.41, 0.0, 17], [16.71, 0.0, 4], [21.76, 0.0, 15], [16.74, 0.0, 0], [23.61, 0.0, 13], [22.8, 0.0, 10], [23.38, 0.0, 15], [17.47, 0.0, 1], [17.89, 0.0, 19], [15.67, 0.0, 2], [17.62, 0.0, 6], [16.37, 0.0, 3], [19.23, 0.0, 7], [17.04, 0.0, 7], [22.62, 0.0, 16], [25.02, 0.0, 13], [24.91, 0.0, 13], [20.33, 0.0, 9], [18.44, 0.0, 20], [24.73, 0.0, 15], [16.26, 0.0, 4], [16.49, 0.0, 23], [17.17, 0.0, 7], [17.74, 0.0, 8], [17.89, 0.0, 6], [17.23, 0.0, 6], [15.09, 0.0, 5], [21.21, 0.0, 17], [14.65, 0.0, 4], [19.02, 0.0, 19], [16.85, 0.0, 23], [23.01, 0.0, 16], [22.97, 0.0, 13], [19.7, 0.0, 8], [22.29, 0.0, 9], [17.44, 0.0, 23], [21.61, 0.0, 16], [15.74, 0.0, 6], [22.46, 0.0, 9], [16.88, 0.0, 2], [20.77, 0.0, 9], [23.58, 761.8, 14], [15.81, 861.6, 0], [17.89, 0.0, 23], [25.3, 802.2, 14], [19.11, 0.0, 8], [17.71, 0.0, 23], [23.43, 0.0, 10], [20.5, 846.8, 9], [23.38, 0.0, 10], [22.68, 0.0, 10], [20.05, 0.0, 8], [30.0, 1069.6, 22], [21.95, 0.0, 16], [18.61, 0.0, 18], [19.23, 0.0, 20], [15.31, 0.0, 4], [17.48, 0.0, 23], [21.11, 0.0, 8], [16.89, 841.6, 4], [21.64, 0.0, 16], [24.07, 0.0, 15], [23.92, 824.5, 15], [16.41, 0.0, 6], [25.94, 0.0, 13], [17.22, 882.6, 23], [20.84, 0.0, 9], [21.48, 0.0, 17], [22.56, 0.0, 9], [23.24, 839.3, 16], [20.81, 0.0, 16], [15.64, 0.0, 5], [20.1, 910.9, 18], [18.25, 0.0, 20], [23.64, 0.0, 13], [19.15, 0.0, 17], [22.78, 0.0, 12], [18.94, 0.0, 19], [16.11, 0.0, 23], [23.12, 0.0, 12], [15.85, 0.0, 4], [21.34, 798.0, 13], [19.48, 0.0, 8], [22.67, 0.0, 13], [23.07, 0.0, 13], [15.43, 0.0, 3], [23.45, 0.0, 14], [19.76, 0.0, 8], [23.98, 0.0, 14], [16.62, 0.0, 1], [17.47, 0.0, 7], [20.76, 0.0, 11], [25.79, 0.0, 12], [17.23, 0.0, 6], [22.28, 0.0, 13], [17.53, 884.5, 1], [16.31, 0.0, 3], [17.91, 0.0, 6], [21.42, 0.0, 16], [18.47, 0.0, 18], [19.4, 0.0, 11], [17.48, 0.0, 8], [16.7, 0.0, 7], [16.92, 0.0, 22], [16.03, 0.0, 5], [16.55, 0.0, 1], [17.88, 0.0, 20], [21.71, 757.4, 16], [16.55, 0.0, 3], [23.77, 0.0, 10], [21.6, 0.0, 16], [17.22, 0.0, 0], [16.5, 0.0, 1], [16.75, 0.0, 6], [22.19, 0.0, 15], [16.89, 0.0, 21], [15.82, 0.0, 6], [18.27, 0.0, 23], [22.6, 0.0, 13], [20.18, 0.0, 16], [17.11, 893.3, 6], [20.24, 0.0, 16], [20.53, 0.0, 18], [16.07, 0.0, 2], [16.31, 0.0, 23], [24.04, 0.0, 15], [20.95, 0.0, 9], [17.43, 0.0, 23], [17.43, 0.0, 23], [17.73, 0.0, 8], [16.99, 0.0, 0], [25.42, 0.0, 14], [20.3, 0.0, 8], [19.57, 0.0, 17], [15.74, 0.0, 2], [22.44, 0.0, 13], [21.78, 0.0, 17], [16.35, 0.0, 20], [20.47, 0.0, 8], [19.42, 0.0, 8], [22.16, 873.0, 15], [16.62, 0.0, 20], [20.1, 0.0, 8], [15.7, 866.3, 0], [19.5, 0.0, 8], [17.74, 0.0, 22], [20.66, 0.0, 17], [16.06, 0.0, 21], [16.41, 0.0, 23], [17.97, 0.0, 18], [17.0, 0.0, 21], [17.82, 0.0, 7], [16.98, 0.0, 4], [18.64, 0.0, 18], [16.35, 0.0, 23], [16.2, 0.0, 4], [19.47, 0.0, 7], [16.92, 0.0, 4], [15.09, 0.0, 5], [25.3, 0.0, 14], [25.31, 0.0, 12], [22.13, 0.0, 14], [23.02, 0.0, 13], [17.71, 0.0, 19], [23.8, 0.0, 14], [16.09, 0.0, 5], [18.06, 0.0, 18], [16.53, 0.0, 6], [19.7, 0.0, 19], [15.88, 0.0, 3], [25.46, 0.0, 13], [23.19, 800.9, 11], [25.62, 0.0, 10], [16.74, 0.0, 6], [16.56, 0.0, 1], [16.73, 0.0, 6], [21.82, 0.0, 15], [24.67, 0.0, 10], [16.68, 0.0, 2], [25.71, 0.0, 13], [17.33, 0.0, 20], [29.37, 1045.2, 22], [18.95, 0.0, 8], [24.53, 0.0, 10], [21.75, 850.9, 12], [21.88, 0.0, 16], [18.13, 0.0, 20], [16.81, 0.0, 23], [24.19, 0.0, 11], [15.23, 0.0, 4], [23.61, 0.0, 13], [23.23, 0.0, 12], [22.89, 0.0, 15], [17.07, 0.0, 7], [15.09, 0.0, 5], [17.59, 0.0, 2], [16.99, 0.0, 1], [18.77, 0.0, 19], [18.65, 0.0, 18], [23.68, 0.0, 14], [15.08, 0.0, 3], [16.3, 0.0, 1], [19.23, 0.0, 8], [17.67, 925.3, 19], [24.13, 0.0, 14], [26.32, 0.0, 13], [16.33, 0.0, 2], [16.3, 0.0, 1], [19.69, 0.0, 17], [16.77, 0.0, 20], [19.76, 0.0, 17], [16.59, 0.0, 5], [26.07, 1300.6, 21], [19.76, 0.0, 7], [18.22, 0.0, 19], [23.6, 752.3, 14], [18.98, 0.0, 19], [15.89, 0.0, 5], [22.89, 0.0, 12], [20.68, 0.0, 17], [18.72, 0.0, 22], [16.15, 0.0, 5], [16.55, 0.0, 3], [16.71, 0.0, 21], [18.61, 0.0, 0], [16.55, 0.0, 1], [19.24, 0.0, 8], [19.78, 868.6, 18], [18.43, 913.1, 22], [22.71, 0.0, 15], [25.61, 0.0, 14], [16.42, 0.0, 0], [18.74, 0.0, 23], [21.99, 0.0, 10], [19.88, 0.0, 17], [22.07, 0.0, 9], [21.01, 0.0, 9], [16.41, 0.0, 23], [22.67, 0.0, 15], [22.65, 0.0, 10], [24.52, 0.0, 13], [21.64, 0.0, 16], [16.34, 0.0, 3], [21.6, 0.0, 16], [21.46, 0.0, 9], [21.32, 0.0, 9], [24.34, 0.0, 12], [18.0, 0.0, 22], [22.6, 0.0, 11], [16.71, 0.0, 2], [23.23, 0.0, 9], [24.23, 0.0, 15], [21.69, 829.4, 9], [24.14, 0.0, 13], [21.9, 0.0, 16], [15.17, 0.0, 4], [16.81, 0.0, 23], [20.3, 0.0, 10], [19.79, 0.0, 8], [16.34, 0.0, 0], [17.82, 0.0, 20], [16.34, 0.0, 2], [20.54, 0.0, 18], [22.47, 819.8, 10], [26.4, 0.0, 12], [16.16, 0.0, 3], [16.5, 0.0, 1], [17.36, 0.0, 6], [23.68, 0.0, 11], [19.63, 0.0, 7], [18.02, 0.0, 9], [18.87, 0.0, 19], [16.63, 0.0, 2], [22.83, 0.0, 12], [21.82, 0.0, 9], [16.41, 0.0, 23], [17.1, 881.4, 0], [22.47, 0.0, 14], [27.05, 0.0, 12], [22.49, 0.0, 11], [19.94, 0.0, 8], [23.04, 0.0, 10], [16.7, 0.0, 23], [16.44, 0.0, 5], [20.96, 878.1, 17], [15.74, 0.0, 3], [24.42, 0.0, 10], [21.02, 0.0, 9], [26.22, 0.0, 11], [22.37, 0.0, 12], [16.4, 0.0, 2], [16.59, 0.0, 0], [15.66, 0.0, 5], [21.24, 0.0, 9], [17.08, 0.0, 7], [21.09, 0.0, 9], [17.29, 865.0, 0], [16.95, 872.7, 2], [20.64, 0.0, 17], [20.35, 0.0, 17], [20.81, 0.0, 11], [17.97, 0.0, 7], [18.36, 0.0, 18], [17.94, 0.0, 9], [17.99, 0.0, 0], [16.04, 0.0, 5], [20.41, 0.0, 17], [22.02, 0.0, 10], [22.72, 0.0, 14], [23.67, 0.0, 15], [16.88, 0.0, 5], [16.38, 0.0, 4], [16.98, 0.0, 20], [21.94, 794.5, 15], [21.48, 0.0, 16], [22.01, 0.0, 16], [23.39, 0.0, 12], [20.23, 0.0, 10], [21.45, 0.0, 16], [28.53, 893.7, 22], [27.39, 896.0, 22], [17.62, 0.0, 20], [16.07, 0.0, 4], [15.7, 0.0, 5], [27.39, 0.0, 12], [17.62, 0.0, 20], [22.57, 0.0, 16], [17.76, 0.0, 19], [17.29, 0.0, 6], [17.57, 0.0, 22], [20.62, 867.3, 11], [23.2, 0.0, 15], [16.74, 0.0, 1], [23.95, 0.0, 10], [16.27, 0.0, 0], [23.23, 0.0, 9], [22.86, 0.0, 9], [18.87, 0.0, 18], [23.35, 0.0, 12], [16.14, 0.0, 0], [17.18, 672.9, 4], [17.33, 0.0, 22], [16.15, 0.0, 3], [19.08, 0.0, 18]]}, "corr_trssi": {"x": "temperatura", "y": "rssi", "r": -0.153, "n": 22265, "puntos": [[20.77, -68.0, 17], [16.42, -56.0, 2], [18.43, -66.0, 22], [22.07, -72.0, 16], [16.95, -68.0, 0], [16.34, -72.0, 4], [20.93, -68.0, 16], [17.59, -69.0, 23], [21.82, -67.0, 10], [16.44, -63.0, 23], [18.36, -64.0, 7], [14.64, -67.0, 5], [18.0, -69.0, 0], [18.07, -65.0, 18], [21.11, -62.0, 9], [21.61, -63.0, 16], [19.13, -64.0, 8], [24.13, -69.0, 14], [17.64, -66.0, 6], [16.63, -68.0, 5], [22.41, -64.0, 13], [19.69, -66.0, 17], [16.8, -61.0, 1], [24.95, -72.0, 10], [21.57, -70.0, 16], [18.97, -65.0, 8], [17.99, -63.0, 6], [22.8, -65.0, 13], [22.41, -61.0, 16], [18.22, -72.0, 20], [23.82, -75.0, 15], [23.43, -64.0, 15], [19.01, -62.0, 20], [22.84, -67.0, 15], [20.38, -77.0, 17], [16.5, -64.0, 4], [18.52, -70.0, 21], [19.33, -66.0, 19], [22.71, -76.0, 13], [17.28, -68.0, 1], [29.15, -65.0, 22], [16.44, -62.0, 2], [16.26, -60.0, 1], [18.15, -66.0, 22], [16.44, -67.0, 3], [23.11, -64.0, 15], [21.3, -67.0, 16], [16.52, -65.0, 1], [20.61, -61.0, 10], [16.6, -63.0, 2], [14.6, -66.0, 5], [22.02, -65.0, 12], [16.48, -66.0, 23], [18.73, -66.0, 22], [17.23, -62.0, 6], [21.24, -65.0, 9], [17.64, -75.0, 22], [22.8, -66.0, 15], [22.35, -66.0, 10], [16.7, -64.0, 22], [22.46, -64.0, 12], [17.44, -61.0, 23], [17.51, -67.0, 6], [17.3, -61.0, 23], [22.56, -61.0, 12], [24.17, -74.0, 10], [20.72, -63.0, 16], [24.39, -64.0, 11], [18.17, -68.0, 7], [18.29, -69.0, 6], [17.33, -68.0, 7], [17.13, -62.0, 23], [16.44, -66.0, 3], [20.21, -65.0, 16], [16.88, -57.0, 0], [20.34, -63.0, 11], [20.84, -65.0, 8], [25.02, -64.0, 12], [25.22, -70.0, 14], [24.98, -62.0, 14], [22.07, -64.0, 16], [16.6, -67.0, 2], [16.31, -62.0, 4], [17.67, -66.0, 20], [16.11, -66.0, 5], [17.43, -73.0, 0], [15.45, -62.0, 4], [25.2, -73.0, 11], [20.0, -60.0, 18], [17.18, -67.0, 4], [25.9, -62.0, 14], [23.75, -74.0, 15], [23.12, -62.0, 12], [21.72, -59.0, 11], [24.12, -64.0, 14], [16.37, -62.0, 2], [18.13, -66.0, 22], [18.55, -68.0, 20], [17.32, -63.0, 2], [18.1, -61.0, 18], [23.94, -65.0, 11], [24.75, -64.0, 14], [16.42, -65.0, 4], [16.92, -64.0, 4], [17.4, -65.0, 2], [18.72, -62.0, 19], [16.3, -60.0, 1], [24.63, -64.0, 12], [17.1, -67.0, 6], [18.34, -65.0, 7], [23.45, -57.0, 11], [21.83, -67.0, 16], [17.95, -72.0, 21], [17.4, -67.0, 23], [19.39, -67.0, 19], [15.74, -71.0, 6], [19.76, -58.0, 7], [15.66, -65.0, 3], [23.77, -62.0, 10], [27.8, -68.0, 22], [17.99, -68.0, 23], [17.63, -67.0, 2], [18.68, -68.0, 18], [16.99, -61.0, 0], [22.82, -61.0, 9], [17.38, -68.0, 6], [16.07, -72.0, 4], [19.69, -64.0, 17], [24.79, -73.0, 14], [16.96, -62.0, 5], [16.89, -62.0, 0], [19.6, -68.0, 7], [18.72, -68.0, 22], [16.52, -65.0, 5], [16.6, -70.0, 5], [18.07, -63.0, 1], [21.5, -64.0, 16], [19.72, -65.0, 17], [17.62, -65.0, 19], [17.1, -65.0, 20], [21.13, -68.0, 17], [17.84, -64.0, 8], [22.37, -64.0, 14], [16.95, -63.0, 6], [22.82, -61.0, 13], [15.82, -57.0, 4], [28.26, -65.0, 22], [18.12, -65.0, 20], [19.98, -67.0, 8], [17.92, -54.0, 22], [14.65, -64.0, 5], [22.41, -67.0, 9], [21.56, -62.0, 16], [17.85, -72.0, 21], [17.97, -64.0, 6], [23.86, -63.0, 13], [22.56, -61.0, 9], [20.95, -64.0, 9], [19.79, -61.0, 8], [18.42, -67.0, 22], [23.29, -61.0, 10], [23.5, -63.0, 9], [22.17, -68.0, 15], [16.98, -62.0, 6], [16.68, -68.0, 2], [16.18, -70.0, 4], [16.89, -65.0, 1], [16.86, -63.0, 5], [15.35, -68.0, 6], [16.99, -68.0, 0], [16.56, -63.0, 22], [16.65, -66.0, 21], [22.83, -66.0, 13], [17.08, -70.0, 0], [18.68, -62.0, 19], [28.31, -65.0, 21], [16.18, -66.0, 22], [18.06, -65.0, 0], [19.63, -62.0, 18], [17.43, -72.0, 0], [24.54, -64.0, 14], [20.35, -64.0, 10], [15.51, -58.0, 1], [18.19, -68.0, 8], [17.76, -61.0, 6], [16.0, -68.0, 6], [26.27, -61.0, 14], [17.13, -62.0, 23], [24.23, -65.0, 12], [19.83, -62.0, 17], [17.07, -64.0, 23], [16.34, -59.0, 23], [20.47, -60.0, 8], [20.15, -62.0, 17], [16.6, -62.0, 3], [18.33, -64.0, 20], [26.28, -65.0, 12], [24.26, -60.0, 10], [17.51, -67.0, 19], [17.97, -66.0, 7], [16.23, -64.0, 23], [19.24, -67.0, 19], [16.34, -69.0, 3], [22.75, -78.0, 15], [19.97, -69.0, 8], [22.9, -72.0, 12], [16.48, -63.0, 23], [19.95, -58.0, 17], [16.55, -68.0, 0], [16.55, -64.0, 3], [23.05, -68.0, 15], [17.14, -66.0, 2], [16.67, -64.0, 22], [16.93, -60.0, 7], [15.93, -65.0, 2], [16.89, -66.0, 5], [19.57, -64.0, 18], [15.66, -61.0, 5], [18.0, -64.0, 8], [16.98, -66.0, 1], [17.97, -68.0, 7], [17.03, -68.0, 0], [19.15, -62.0, 7], [18.4, -64.0, 19], [16.42, -66.0, 1], [17.54, -68.0, 1], [16.68, -64.0, 0], [15.3, -62.0, 2], [17.66, -63.0, 22], [16.3, -64.0, 1], [23.24, -65.0, 10], [24.16, -64.0, 15], [18.27, -64.0, 19], [22.49, -62.0, 10], [21.67, -63.0, 8], [20.9, -61.0, 16], [20.61, -63.0, 16], [16.8, -68.0, 4], [18.0, -65.0, 9], [22.39, -61.0, 15], [16.09, -70.0, 3], [18.95, -65.0, 20], [16.11, -69.0, 4], [25.62, -74.0, 10], [18.29, -71.0, 19], [20.79, -65.0, 8], [18.5, -66.0, 8], [20.8, -71.0, 18], [17.89, -67.0, 1], [24.24, -62.0, 15], [17.88, -64.0, 18], [16.77, -65.0, 7], [23.14, -66.0, 15], [17.71, -75.0, 23], [24.42, -60.0, 11], [23.94, -64.0, 10], [17.13, -64.0, 6], [24.22, -68.0, 11], [17.13, -63.0, 6], [16.16, -66.0, 3], [17.78, -62.0, 18], [16.83, -60.0, 0], [18.4, -73.0, 19], [23.02, -62.0, 13], [16.85, -68.0, 2], [17.4, -63.0, 19], [24.38, -60.0, 12], [15.92, -65.0, 23], [22.14, -68.0, 15], [18.09, -71.0, 21], [28.48, -66.0, 22], [19.63, -66.0, 8], [17.0, -61.0, 1], [23.31, -63.0, 15], [17.87, -65.0, 7], [17.87, -63.0, 0], [23.42, -63.0, 16], [21.66, -62.0, 11], [15.3, -62.0, 2], [16.33, -63.0, 22], [18.97, -64.0, 8], [24.76, -64.0, 12], [16.42, -69.0, 3], [19.24, -69.0, 8], [22.52, -65.0, 14], [22.72, -82.0, 9], [20.72, -65.0, 17], [16.45, -64.0, 23], [16.58, -67.0, 3], [21.06, -62.0, 9], [20.31, -65.0, 17], [17.23, -68.0, 22], [19.39, -68.0, 8], [27.57, -65.0, 13], [23.42, -66.0, 12], [16.26, -64.0, 1], [17.91, -60.0, 1], [17.88, -63.0, 9], [18.12, -69.0, 23], [21.26, -64.0, 9], [17.07, -70.0, 2], [16.95, -63.0, 1], [20.39, -73.0, 18], [17.3, -65.0, 20], [16.67, -66.0, 21], [18.12, -63.0, 20], [20.96, -67.0, 17], [25.44, -61.0, 15], [16.89, -63.0, 5], [17.64, -73.0, 22], [22.49, -75.0, 13], [16.8, -63.0, 22], [17.08, -62.0, 0], [21.06, -64.0, 10], [23.39, -66.0, 14], [22.09, -61.0, 13], [22.94, -74.0, 16], [16.67, -64.0, 21], [21.76, -62.0, 14], [15.82, -62.0, 4], [24.94, -62.0, 13], [16.07, -56.0, 4], [18.74, -61.0, 22], [17.87, -61.0, 7], [17.53, -68.0, 1], [23.05, -60.0, 9], [16.4, -65.0, 23], [24.0, -65.0, 10], [16.78, -66.0, 0], [16.27, -70.0, 3], [16.65, -68.0, 2], [16.95, -64.0, 4], [18.18, -63.0, 18], [21.98, -64.0, 9], [18.33, -68.0, 6], [20.23, -67.0, 16], [14.64, -62.0, 5], [21.2, -59.0, 16], [18.02, -61.0, 7], [21.44, -65.0, 15], [19.73, -64.0, 11], [16.12, -72.0, 4], [29.76, -64.0, 22], [26.18, -63.0, 13], [21.36, -63.0, 10], [18.13, -65.0, 20], [16.63, -69.0, 1], [18.8, -64.0, 22], [17.36, -64.0, 20], [18.36, -67.0, 8], [22.74, -65.0, 15], [26.22, -67.0, 11], [16.65, -63.0, 23], [15.66, -60.0, 3], [22.07, -66.0, 16], [17.59, -59.0, 20], [16.5, -66.0, 4], [20.86, -62.0, 16], [16.42, -65.0, 2], [18.37, -59.0, 19], [17.76, -62.0, 7], [17.06, -69.0, 2], [23.42, -70.0, 12], [19.98, -66.0, 17], [16.11, -69.0, 7], [25.07, -64.0, 12], [20.56, -78.0, 8], [16.42, -72.0, 3], [17.84, -62.0, 21], [24.38, -64.0, 12], [17.0, -62.0, 21], [18.47, -69.0, 19], [17.97, -76.0, 21], [17.99, -66.0, 0], [19.02, -69.0, 19], [17.28, -71.0, 1], [16.49, -62.0, 1], [18.72, -68.0, 18], [18.07, -63.0, 1], [16.6, -60.0, 20], [16.7, -63.0, 21], [19.36, -62.0, 8], [16.62, -73.0, 2], [17.67, -64.0, 6], [18.5, -65.0, 7], [18.18, -63.0, 18], [23.02, -69.0, 11], [22.94, -70.0, 15], [16.42, -70.0, 3], [16.22, -63.0, 4], [16.42, -74.0, 3], [16.03, -62.0, 22], [25.56, -69.0, 12], [18.79, -63.0, 19], [17.81, -64.0, 8], [19.08, -68.0, 20], [19.57, -64.0, 19], [22.23, -70.0, 16], [17.11, -64.0, 20], [18.68, -62.0, 19], [17.69, -66.0, 23], [22.52, -65.0, 14], [20.74, -62.0, 11], [18.44, -60.0, 8], [17.95, -61.0, 6], [18.34, -61.0, 20], [23.42, -64.0, 13], [22.43, -75.0, 16], [16.2, -55.0, 4], [21.51, -72.0, 11], [17.07, -63.0, 6], [19.13, -63.0, 9], [25.91, -64.0, 10], [29.94, -69.0, 22], [22.5, -63.0, 10], [20.5, -64.0, 11], [19.38, -68.0, 19], [19.39, -68.0, 18], [15.02, -68.0, 5], [16.16, -63.0, 5], [16.55, -62.0, 3], [18.31, -66.0, 19], [20.62, -79.0, 9], [16.71, -63.0, 4], [16.75, -67.0, 1], [16.5, -68.0, 2], [19.14, -63.0, 9], [20.91, -66.0, 10], [22.59, -67.0, 9], [17.41, -71.0, 0], [17.82, -63.0, 8], [16.16, -61.0, 3], [17.13, -61.0, 6], [16.99, -64.0, 5], [26.87, -61.0, 14], [17.46, -66.0, 23], [14.78, -65.0, 4], [16.23, -64.0, 5], [18.67, -66.0, 21], [24.82, -63.0, 13], [16.42, -62.0, 23], [16.44, -58.0, 2], [15.31, -70.0, 6], [16.68, -70.0, 21], [20.39, -72.0, 9], [15.79, -61.0, 4], [20.09, -64.0, 10], [20.91, -67.0, 9], [18.91, -67.0, 19], [22.34, -68.0, 15]]}, "ev_resumen": [{"evento": "riego_hidroponia_fin", "n": 434, "ultimo": "2026-08-31T02:26:03+00:00"}, {"evento": "riego_hidroponia_inicio", "n": 425, "ultimo": "2026-08-31T02:23:03+00:00"}, {"evento": "conectado", "n": 6, "ultimo": "2026-08-31T00:02:42+00:00"}, {"evento": "desconectado", "n": 5, "ultimo": "2026-08-30T23:12:06+00:00"}, {"evento": "corregido", "n": 1, "ultimo": "2026-08-23T23:09:54+00:00"}, {"evento": "discrepancia", "n": 1, "ultimo": "2026-08-23T23:09:54+00:00"}], "ev_ultimos": [{"ts": "08-31T02:26", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T02:23", "evento": "riego_hidroponia_inicio"}, {"ts": "08-31T02:11", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T02:08", "evento": "riego_hidroponia_inicio"}, {"ts": "08-31T01:56", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T01:50", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T01:38", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T01:34", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T01:26", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T01:23", "evento": "riego_hidroponia_inicio"}, {"ts": "08-31T01:18", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T01:16", "evento": "riego_hidroponia_inicio"}, {"ts": "08-31T01:05", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T01:02", "evento": "riego_hidroponia_inicio"}, {"ts": "08-31T00:50", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T00:39", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T00:19", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T00:16", "evento": "riego_hidroponia_inicio"}, {"ts": "08-31T00:04", "evento": "riego_hidroponia_fin"}, {"ts": "08-31T00:02", "evento": "conectado"}, {"ts": "08-30T23:32", "evento": "riego_hidroponia_fin"}, {"ts": "08-30T23:29", "evento": "riego_hidroponia_inicio"}, {"ts": "08-30T23:17", "evento": "riego_hidroponia_fin"}, {"ts": "08-30T23:15", "evento": "conectado"}, {"ts": "08-30T23:12", "evento": "desconectado"}, {"ts": "08-30T23:04", "evento": "riego_hidroponia_fin"}, {"ts": "08-30T23:01", "evento": "riego_hidroponia_inicio"}, {"ts": "08-30T22:46", "evento": "riego_hidroponia_inicio"}, {"ts": "08-30T22:34", "evento": "riego_hidroponia_fin"}, {"ts": "08-30T22:31", "evento": "riego_hidroponia_inicio"}], "dur_riego": [[124, 1], [180, 200], [300, 1]]}</script>
+<script>(function () {
+  "use strict";
+  const D = JSON.parse(document.getElementById("datos").textContent);
+  const S = getComputedStyle(document.documentElement);
+  const C = n => S.getPropertyValue(n).trim();
+  const NS = "http://www.w3.org/2000/svg";
+  const pista = document.getElementById("pista");
+
+  const el = (t, a) => {
+    const e = document.createElementNS(NS, t);
+    for (const k in a) if (a[k] !== undefined && a[k] !== null) e.setAttribute(k, a[k]);
+    return e;
+  };
+  const txt = (x, y, s, o = {}) => {
+    const e = el("text", { x, y, fill: o.fill || C("--tinta-3"), "font-size": o.size || 10.5,
+      "text-anchor": o.anchor || "start", "font-weight": o.weight || 400 });
+    e.textContent = s;
+    return e;
+  };
+  const nf = (v, d = 1) => (v === null || v === undefined || isNaN(v)) ? "—"
+    : Number(v).toLocaleString("es", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const ent = v => (v === null || v === undefined) ? "—" : Number(v).toLocaleString("es");
+
+  function sensible(nodo, html) {
+    nodo.style.cursor = "crosshair";
+    const ver = ev => {
+      pista.innerHTML = html;
+      pista.classList.add("on");
+      const r = pista.getBoundingClientRect();
+      let x = ev.clientX + 14, y = ev.clientY - r.height - 10;
+      if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+      if (y < 8) y = ev.clientY + 18;
+      pista.style.left = x + "px"; pista.style.top = y + "px";
+    };
+    nodo.addEventListener("pointerenter", ver);
+    nodo.addEventListener("pointermove", ver);
+    nodo.addEventListener("pointerleave", () => pista.classList.remove("on"));
+  }
+
+  /* Rejilla horizontal reutilizable: la escribian seis graficas por
+     separado y ya habian divergido en el gris. */
+  function rejillaY(svg, L, R, Y, vals, fmt) {
+    vals.forEach(v => {
+      svg.appendChild(el("line", { x1: L, x2: R, y1: Y(v), y2: Y(v),
+        stroke: C("--rejilla"), "stroke-width": 1 }));
+      svg.appendChild(txt(L - 7, Y(v) + 3.5, fmt ? fmt(v) : v, { anchor: "end" }));
+    });
+  }
+
+  const kpi = (k, v, u, f) =>
+    `<div class="kpi"><span class="k">${k}</span>
+       <span class="v">${v}${u ? `<span class="u">${u}</span>` : ""}</span>
+       <span class="f">${f}</span></div>`;
+
+  // ══════════════════════════════════════════════════════════
+  //  Cuadro de mando y cobertura
+  // ══════════════════════════════════════════════════════════
+  const r7 = D.r7, r30 = D.r30, fog = D.fog;
+  const totalTramas = fog.ventana.sin_nube + fog.ventana.con_nube;
+
+  document.getElementById("m-tramas").textContent = ent(totalTramas) + " tramas registradas";
+  document.getElementById("c-total").textContent =
+    ent(totalTramas) + " tramas · " + nf(fog.ventana.dias, 1) + " días de serie";
+
+  document.getElementById("mando").innerHTML =
+    kpi("Pérdida de mensajes", nf(r7.perdida.pct, 3), "%", "objetivo: menos de 1 %") +
+    kpi("Potencia media", nf(r7.rssi.media, 1), "dBm", "objetivo: por encima de −70") +
+    kpi("Latencia de subida", ent(Math.round(r7.latencia_subida.media_ms)), "ms", "objetivo: menos de 1500") +
+    kpi("Autonomía sin nube", nf(fog.autonomia.dias_sin_nube, 1), "días",
+        nf(fog.autonomia.pct_del_historico_sin_nube, 1) + " % del histórico") +
+    kpi("Riego autónomo", ent(fog.riego_autonomo.ciclos), "ciclos",
+        nf(fog.riego_autonomo.minutos_bomba, 0) + " min de bomba");
+
+  document.getElementById("cobertura").innerHTML =
+    kpi("Tramas totales", ent(totalTramas), "", "en toda la serie") +
+    kpi("Días de serie", nf(fog.ventana.dias, 1), "", "8 → 30 de agosto") +
+    kpi("Nodos", ent(r30.cobertura.nodos), "", "un cultivo real instrumentado") +
+    kpi("Versiones de firmware", ent(r30.cobertura.versiones_fw), "", "durante el periodo") +
+    kpi("Huecos en la serie", ent(fog.huecos_de_datos.length), "",
+        "periodos sin una sola trama");
+
+  document.getElementById("fog-kpi").innerHTML =
+    kpi("Retenido en el borde", ent(fog.autonomia.tramas_generadas_sin_nube), "tramas",
+        "guardadas y subidas sin perder ninguna") +
+    kpi("Recuperación media", ent(fog.recuperaciones.mttr_s), "s",
+        "objetivo §9: menos de 90 s") +
+    kpi("Peor recuperación", ent(fog.recuperaciones.peor_s), "s",
+        "de " + fog.recuperaciones.n + " incidentes") +
+    kpi("Días con riego autónomo", ent(fog.riego_autonomo.dias_con_riego), "",
+        "sin conexión a la nube");
+
+  // ══════════════════════════════════════════════════════════
+  //  III · Cobertura diaria
+  // ══════════════════════════════════════════════════════════
+  (function () {
+    const svg = document.getElementById("g-cob"), d = D.diario;
+    const W = 900, H = 300, L = 54, R = 14, T = 16, B = 40;
+    const max = Math.max(...d.map(x => Math.max(x.tramas, x.esperadas)));
+    const Y = v => T + (1 - v / max) * (H - T - B);
+    const bw = (W - L - R) / d.length;
+    rejillaY(svg, L, W - R, Y, [0, 500, 1000, 1500, 2000, 2500, 3000].filter(v => v <= max), ent);
+
+    d.forEach((x, i) => {
+      const perd = Math.max(0, x.esperadas - x.tramas);
+      const xx = L + i * bw + bw * .16, w = bw * .68;
+      // Apiladas: la altura total es la expectativa, el trozo rojo su fraccion.
+      const hR = (H - B) - Y(x.tramas);
+      const g = el("g", {});
+      g.appendChild(el("rect", { x: xx, y: Y(x.tramas), width: w, height: Math.max(1, hR),
+        fill: C("--s1"), rx: 2 }));
+      if (perd > 0) {
+        const hP = (H - B) - Y(perd);
+        // 2 px de aire entre segmentos, para que el apilado se lea.
+        g.appendChild(el("rect", { x: xx, y: Y(x.tramas) - hP - 2, width: w,
+          height: Math.max(1.5, hP), fill: C("--malo"), rx: 2 }));
+      }
+      const pct = x.esperadas ? (100 * perd / x.esperadas) : 0;
+      sensible(g, `<b>${x.dia.slice(8, 10)}/${x.dia.slice(5, 7)}</b><br>` +
+        `recibidas ${ent(x.tramas)}<br>esperadas ${ent(x.esperadas)}<br>` +
+        `perdidas ${ent(perd)} (${nf(pct, 2)} %)<br>` +
+        `cadencia ${Math.round((x.periodo_ms || 0) / 1000)} s`);
+      svg.appendChild(g);
+      if (i % 3 === 0)
+        svg.appendChild(txt(xx + w / 2, H - B + 15, x.dia.slice(8, 10) + "/" + x.dia.slice(5, 7),
+          { anchor: "middle", size: 9.5 }));
+    });
+    svg.appendChild(el("line", { x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1 }));
+    svg.appendChild(txt(L - 7, T - 3, "tramas", { anchor: "end", size: 9.5 }));
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  //  IV · RSSI: histograma + acumulada
+  // ══════════════════════════════════════════════════════════
+  (function () {
+    const svg = document.getElementById("g-rssi-dist"), b = D.dist_rssi.bins;
+    const W = 900, H = 280, L = 54, R = 54, T = 18, B = 44;
+    const maxPct = Math.max(...b.map(x => x.pct));
+    const X = i => L + (i / b.length) * (W - L - R);
+    const bw = (W - L - R) / b.length;
+    const Y = v => T + (1 - v / maxPct) * (H - T - B);
+    const Yc = v => T + (1 - v / 100) * (H - T - B);
+    rejillaY(svg, L, W - R, Y, [0, 5, 10, 15, 20].filter(v => v <= maxPct), v => v + " %");
+
+    const umbral = b.findIndex(x => x.desde >= -70);
+    if (umbral > 0) {
+      svg.appendChild(el("line", { x1: X(umbral), x2: X(umbral), y1: T, y2: H - B,
+        stroke: C("--malo"), "stroke-width": 1.5, "stroke-dasharray": "5 4" }));
+      svg.appendChild(txt(X(umbral) - 6, T + 11, "−70 dBm",
+        { anchor: "end", size: 10, fill: C("--malo"), weight: 600 }));
+    }
+
+    b.forEach((x, i) => {
+      const h = Math.max(1, (H - B) - Y(x.pct));
+      const r = el("rect", { x: X(i) + 1, y: Y(x.pct), width: Math.max(1, bw - 2),
+        height: h, fill: C("--s1"), rx: 2 });
+      sensible(r, `<b>${nf(x.desde, 1)} a ${nf(x.hasta, 1)} dBm</b><br>` +
+        `${ent(x.n)} muestras · ${nf(x.pct, 2)} %<br>acumulada ${nf(x.cdf, 1)} %`);
+      svg.appendChild(r);
+    });
+
+    svg.appendChild(el("path", {
+      d: b.map((x, i) => (i ? "L" : "M") + (X(i) + bw / 2).toFixed(1) + " " + Yc(x.cdf).toFixed(1)).join(" "),
+      fill: "none", stroke: C("--s2"), "stroke-width": 2.2, "stroke-linejoin": "round" }));
+    [0, 25, 50, 75, 100].forEach(v =>
+      svg.appendChild(txt(W - R + 7, Yc(v) + 3.5, v + " %", { size: 9.5, fill: C("--s2") })));
+
+    svg.appendChild(el("line", { x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1 }));
+    for (let i = 0; i < b.length; i += 4)
+      svg.appendChild(txt(X(i) + bw / 2, H - B + 15, Math.round(b[i].desde), { anchor: "middle", size: 9.5 }));
+    svg.appendChild(txt((L + W - R) / 2, H - 8, "potencia recibida (dBm)",
+      { anchor: "middle", size: 10 }));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-rssi");
+    [["7 días", r7], ["30 días", r30]].forEach(([nom, r]) => {
+      const ok = r.rssi.media > -70 && r.rssi.pct_bajo_umbral < 15;
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td class="d">${nom}</td><td class="n">${ent(r.cobertura.tramas)}</td>
+         <td class="n d">${nf(r.rssi.media, 1)} dBm</td><td class="n">${nf(r.rssi.sigma, 2)}</td>
+         <td class="n">${nf(r.rssi.p05, 0)}</td><td class="n">${nf(r.rssi.p50, 0)}</td>
+         <td class="n">${nf(r.rssi.p95, 0)}</td>
+         <td class="n"><span class="chip ${ok ? "c-ok" : "c-av"}">${nf(r.rssi.pct_bajo_umbral, 1)} %</span></td></tr>`);
+    });
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-perdida");
+    [["7 días", r7], ["30 días", r30]].forEach(([nom, r]) => {
+      const p = r.perdida, ok = p.pct < p.objetivo_pct;
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td class="d">${nom}</td><td class="n">${ent(p.esperadas)}</td>
+         <td class="n">${ent(p.recibidas)}</td><td class="n">${ent(p.perdidas)}</td>
+         <td class="n d">${nf(p.pct, 3)} %</td>
+         <td><span class="chip ${ok ? "c-ok" : "c-no"}">${ok ? "cumple" : "incumple"} · menos de ${nf(p.objetivo_pct, 0)} %</span></td></tr>`);
+    });
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-lat2"), l = r7.latencia_subida, rec = r7.recuperacion_de_buffer;
+    tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="d">Camino en vivo</td><td class="n">${ent(l.n)}</td>
+       <td class="n d">${nf(l.media_ms, 1)} ms</td><td class="n">${nf(l.minimo_ms, 1)}</td>
+       <td class="n">${nf(l.p50_ms, 1)}</td><td class="n">${nf(l.p95_ms, 1)}</td></tr>`);
+    if (rec && rec.n)
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td class="d">Recuperadas del archivo</td><td class="n">${ent(rec.n)}</td>
+         <td class="n" colspan="4">espera máxima de <b>${nf(rec.peor_horas, 1)} h</b> — es la duración del corte, no una latencia de red</td></tr>`);
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  //  V · Jitter, dos paneles
+  // ══════════════════════════════════════════════════════════
+  (function () {
+    const svg = document.getElementById("g-jitter");
+    const j = r30.jitter_por_cadencia.filter(x => x.n > 50);
+    const W = 900, H = 230, T = 34, B = 40, pw = W / 2;
+    const paneles = [
+      ["Desviación absoluta", x => x.sigma_s, "s", v => nf(v, 3)],
+      ["Como porcentaje del periodo", x => 100 * x.sigma_s / x.cadencia_s, "%", v => nf(v, 3)],
+    ];
+    paneles.forEach(([titulo, val, u, fmt], p) => {
+      const x0 = p * pw, L = x0 + 56, R = x0 + pw - 24;
+      svg.appendChild(txt(x0 + 56, 18, titulo, { size: 11, fill: C("--tinta-2"), weight: 600 }));
+      const max = Math.max(...j.map(val)) * 1.25;
+      const bw = (R - L) / j.length;
+      j.forEach((x, i) => {
+        const v = val(x), h = (v / max) * (H - T - B);
+        const xx = L + i * bw + bw * .22, w = bw * .56;
+        const r = el("rect", { x: xx, y: H - B - h, width: w, height: Math.max(2, h),
+          fill: C("--s1"), rx: 3 });
+        sensible(r, `<b>cadencia de ${x.cadencia_s} s</b><br>σ ${nf(x.sigma_s, 3)} s<br>` +
+          `${nf(100 * x.sigma_s / x.cadencia_s, 3)} % del periodo<br>${ent(x.n)} intervalos`);
+        svg.appendChild(r);
+        svg.appendChild(txt(xx + w / 2, H - B - h - 7, fmt(v),
+          { anchor: "middle", size: 10, fill: C("--tinta"), weight: 600 }));
+        svg.appendChild(txt(xx + w / 2, H - B + 15, x.cadencia_s + " s",
+          { anchor: "middle", size: 9.5 }));
+      });
+      svg.appendChild(el("line", { x1: L, x2: R, y1: H - B, y2: H - B,
+        stroke: C("--base"), "stroke-width": 1 }));
+      svg.appendChild(txt(L - 8, T - 8, u, { anchor: "end", size: 9.5 }));
+    });
+    svg.appendChild(txt(W / 2, H - 8,
+      "crece en segundos, cae en proporción: el error es por ciclo, no acumulativo",
+      { anchor: "middle", size: 10, fill: C("--tinta-3") }));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-jitter");
+    r30.jitter_por_cadencia.forEach(x => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="d">${x.cadencia_s} s</td><td class="n">${ent(x.n)}</td>
+       <td class="n">${nf(x.media_s, 2)} s</td><td class="n d">${nf(x.sigma_s, 3)} s</td>
+       <td class="n">${nf(x.min_s, 2)}</td><td class="n">${nf(x.max_s, 2)}</td>
+       <td class="n">${nf(100 * x.sigma_s / x.cadencia_s, 3)} %</td></tr>`));
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  //  VI · Mapas de calor
+  // ══════════════════════════════════════════════════════════
+  function heat(id, datos, unidad, invertir) {
+    const svg = document.getElementById(id);
+    const W = 900, H = 300, L = 52, R = 92, T = 18, B = 34;
+    const dias = [...new Set(datos.celdas.map(c => c[0]))].sort();
+    const cw = (W - L - R) / dias.length, ch = (H - T - B) / 24;
+    const ramp = ["--q1", "--q2", "--q3", "--q4", "--q5", "--q6", "--q7"].map(C);
+    const col = v => {
+      let t = (v - datos.min) / (datos.max - datos.min || 1);
+      if (invertir) t = 1 - t;
+      return ramp[Math.min(6, Math.max(0, Math.round(t * 6)))];
+    };
+    datos.celdas.forEach(([dia, hora, val]) => {
+      const i = dias.indexOf(dia);
+      if (i < 0) return;
+      const r = el("rect", { x: L + i * cw, y: T + hora * ch,
+        width: Math.max(1, cw - 1), height: Math.max(1, ch - 1), fill: col(val), rx: 1 });
+      sensible(r, `<b>${dia} · ${String(hora).padStart(2, "0")}:00</b><br>${nf(val, 1)} ${unidad}`);
+      svg.appendChild(r);
+    });
+    for (let hr = 0; hr < 24; hr += 3)
+      svg.appendChild(txt(L - 7, T + hr * ch + ch / 2 + 3.5, String(hr).padStart(2, "0"),
+        { anchor: "end", size: 9.5 }));
+    dias.forEach((d, i) => { if (i % 3 === 0)
+      svg.appendChild(txt(L + i * cw + cw / 2, H - B + 14, d, { anchor: "middle", size: 9 })); });
+    svg.appendChild(txt(L - 7, T - 4, "hora", { anchor: "end", size: 9.5 }));
+    // Escala de color
+    const lx = W - R + 16;
+    ramp.forEach((c, i) => {
+      svg.appendChild(el("rect", { x: lx, y: T + 10 + i * 22, width: 16, height: 20, fill: c }));
+    });
+    const lo = invertir ? datos.max : datos.min, hi = invertir ? datos.min : datos.max;
+    svg.appendChild(txt(lx + 22, T + 24, nf(lo, 0) + " " + unidad, { size: 9.5 }));
+    svg.appendChild(txt(lx + 22, T + 24 + 6 * 22, nf(hi, 0) + " " + unidad, { size: 9.5 }));
+  }
+  heat("g-heat-temp", D.heat_temp, "°C", false);
+  heat("g-heat-rssi", D.heat_rssi, "dBm", true);
+
+  // ── Perfil horario: cuatro paneles ────────────────────────
+  (function () {
+    const svg = document.getElementById("g-perfil");
+    const hs = D.perfil.horas, riego = new Map(D.perfil.riego_por_hora.map(r => [r.hora, r.ciclos]));
+    const W = 900, H = 330, L = 56, R = 16, T = 16, B = 34;
+    const ph = (H - T - B) / 4;
+    const paneles = [
+      ["Temperatura (°C)", h => h.temperatura, C("--s2"), 1],
+      ["Humedad del aire (%)", h => h.humedad, C("--s3"), 0],
+      ["Potencia recibida (dBm)", h => h.rssi, C("--s1"), 0],
+      ["Ciclos de riego", h => riego.get(h.hora) ?? 0, C("--tinta-3"), 0],
+    ];
+    const bw = (W - L - R) / 24;
+    paneles.forEach(([nom, val, color, dec], p) => {
+      const y0 = T + p * ph, y1 = y0 + ph - 12;
+      const vals = hs.map(val).filter(v => v !== null && v !== undefined);
+      if (!vals.length) return;
+      const lo = Math.min(...vals), hi = Math.max(...vals);
+      const Y = v => y1 - ((v - lo) / (hi - lo || 1)) * (y1 - y0 - 14);
+      svg.appendChild(txt(L, y0 + 9, nom, { size: 10, fill: C("--tinta-2"), weight: 600 }));
+      svg.appendChild(txt(L - 7, y0 + 20, nf(hi, dec), { anchor: "end", size: 9 }));
+      svg.appendChild(txt(L - 7, y1 + 3, nf(lo, dec), { anchor: "end", size: 9 }));
+      svg.appendChild(el("line", { x1: L, x2: W - R, y1: y1 + 4, y2: y1 + 4,
+        stroke: C("--rejilla"), "stroke-width": 1 }));
+      hs.forEach(h => {
+        const v = val(h);
+        if (v === null || v === undefined) return;
+        const dia = h.hora >= 6 && h.hora < 18;
+        const hh = Math.max(1.5, y1 - Y(v));
+        const r = el("rect", { x: L + h.hora * bw + bw * .18, y: Y(v),
+          width: bw * .64, height: hh, fill: color, opacity: dia ? 1 : .48, rx: 2 });
+        sensible(r, `<b>${String(h.hora).padStart(2, "0")}:00</b> · ${dia ? "con luz" : "oscuridad"}<br>` +
+          `${nom}: ${nf(v, dec)}<br>${ent(h.n)} muestras`);
+        svg.appendChild(r);
+      });
+    });
+    for (let hr = 0; hr < 24; hr += 2)
+      svg.appendChild(txt(L + hr * bw + bw / 2, H - B + 22, String(hr).padStart(2, "0"),
+        { anchor: "middle", size: 9.5 }));
+    svg.appendChild(txt((L + W - R) / 2, H - 8,
+      "hora del día · el tono claro marca las horas sin luz",
+      { anchor: "middle", size: 10 }));
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  //  VII · Tiempo de aire
+  // ══════════════════════════════════════════════════════════
+  (function () {
+    const svg = document.getElementById("g-aire2");
+    const filas = [
+      { n: "Balizas del punto de acceso", v: 0.82, fijo: true },
+      { n: "Nodo del cultivo · cadencia 300 s", v: 0.063 },
+      { n: "Nodo del banco · cadencia 60 s", v: 0.021 },
+    ];
+    const W = 900, H = 190, L = 254, R = 84, T = 20, B = 34, max = 0.9;
+    const bh = (H - T - B) / filas.length;
+    const X = v => L + (v / max) * (W - L - R);
+    [0, .2, .4, .6, .8].forEach(t => {
+      svg.appendChild(el("line", { x1: X(t), x2: X(t), y1: T, y2: H - B,
+        stroke: C("--rejilla"), "stroke-width": 1 }));
+      svg.appendChild(txt(X(t), H - B + 15, nf(t, 1) + " %", { anchor: "middle" }));
+    });
+    filas.forEach((f, i) => {
+      const y = T + i * bh + 6, h = bh - 14;
+      const r = el("rect", { x: L, y, width: Math.max(2, X(f.v) - L), height: h,
+        fill: f.fijo ? C("--s3") : C("--s1"), rx: 3 });
+      sensible(r, `<b>${f.n}</b><br>${nf(f.v, 3)} % del tiempo de aire`);
+      svg.appendChild(r);
+      svg.appendChild(txt(L - 12, y + h / 2 + 4, f.n, { anchor: "end", size: 10.5, fill: C("--tinta-2") }));
+      svg.appendChild(txt(X(f.v) + 8, y + h / 2 + 4, nf(f.v, 3) + " %",
+        { size: 10.5, fill: C("--tinta"), weight: 600 }));
+    });
+    svg.appendChild(txt((L + W - R) / 2, H - 6, "porcentaje del tiempo de aire del canal",
+      { anchor: "middle", size: 10 }));
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  //  VIII · Autonomía y recuperación
+  // ══════════════════════════════════════════════════════════
+  (function () {
+    const svg = document.getElementById("g-autonomia"), d = D.diario;
+    const W = 900, H = 280, L = 62, R = 58, T = 18, B = 40;
+    let suma = 0; const acum = d.map(x => (suma += x.tramas));
+    const maxA = Math.max(...acum), maxD = Math.max(...d.map(x => x.tramas));
+    const bw = (W - L - R) / d.length;
+    const Ya = v => T + (1 - v / maxA) * (H - T - B);
+    const Yd = v => T + (1 - v / maxD) * (H - T - B);
+    rejillaY(svg, L, W - R, Ya, [0, 10000, 20000, 30000].filter(v => v <= maxA), ent);
+
+    d.forEach((x, i) => {
+      const h = (H - B) - Yd(x.tramas);
+      const r = el("rect", { x: L + i * bw + bw * .2, y: Yd(x.tramas), width: bw * .6,
+        height: Math.max(1, h), fill: C("--s3"), opacity: .55, rx: 2 });
+      sensible(r, `<b>${x.dia.slice(8, 10)}/${x.dia.slice(5, 7)}</b><br>` +
+        `generadas ${ent(x.tramas)}<br>acumulado ${ent(acum[i])}<br>` +
+        `ciclos de riego ${ent(x.ciclos_riego)}`);
+      svg.appendChild(r);
+    });
+    svg.appendChild(el("path", {
+      d: d.map((x, i) => (i ? "L" : "M") + (L + i * bw + bw / 2).toFixed(1) + " " + Ya(acum[i]).toFixed(1)).join(" "),
+      fill: "none", stroke: C("--s1"), "stroke-width": 2.4, "stroke-linejoin": "round" }));
+    svg.appendChild(el("line", { x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1 }));
+    for (let i = 0; i < d.length; i += 3)
+      svg.appendChild(txt(L + i * bw + bw / 2, H - B + 15,
+        d[i].dia.slice(8, 10) + "/" + d[i].dia.slice(5, 7), { anchor: "middle", size: 9.5 }));
+    svg.appendChild(txt(L - 7, T - 3, "acumulado", { anchor: "end", size: 9.5 }));
+    svg.appendChild(txt(W - R + 7, T + 10, "por día", { size: 9.5, fill: C("--s3") }));
+  })();
+
+  (function () {
+    const svg = document.getElementById("g-escalera2");
+    const esc = [["18:19", 20.34], ["18:24", 15.34], ["18:29", 10.35], ["18:34", 5.35], ["18:39", 0.36]];
+    const W = 900, H = 220, L = 56, R = 20, T = 18, B = 42, ym = 22;
+    const bw = (W - L - R) / esc.length;
+    const Y = v => T + (1 - v / ym) * (H - T - B);
+    rejillaY(svg, L, W - R, Y, [0, 5, 10, 15, 20], v => v + " min");
+    esc.forEach(([hora, m], i) => {
+      const h = (H - B) - Y(m);
+      const r = el("rect", { x: L + i * bw + bw * .2, y: Y(m), width: bw * .6,
+        height: Math.max(2, h), fill: C("--s1"), rx: 3 });
+      sensible(r, `<b>Trama de las ${hora}</b><br>esperó ${nf(m, 2)} min en el archivo local`);
+      svg.appendChild(r);
+      svg.appendChild(txt(L + i * bw + bw / 2, Y(m) - 7, nf(m, 1),
+        { anchor: "middle", size: 10.5, fill: C("--tinta"), weight: 600 }));
+      svg.appendChild(txt(L + i * bw + bw / 2, H - B + 15, hora, { anchor: "middle", size: 10 }));
+    });
+    svg.appendChild(el("line", { x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1 }));
+    svg.appendChild(txt((L + W - R) / 2, H - 8,
+      "instante en que el nodo publicó · todas se subieron a las 18:39:43",
+      { anchor: "middle", size: 10 }));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-rec2");
+    const eventos = [
+      ["Cambio de canal 6 → 11", 9.76], ["Cambio de canal 11 → 6", 4.35],
+      ["Cambio de canal 6 → 11", 3.56], ["Reinicio del servicio del gateway", 11.54],
+      ["Nodo apagado y reencendido", 193.0],
+    ];
+    eventos.forEach(([n, s]) => {
+      const ok = s <= 90;
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td class="d">${n}</td><td class="n">${nf(s, 2)}</td>
+         <td><span class="chip ${ok ? "c-ok" : "c-av"}">${ok ? "dentro" : "es el corte, no la recuperación"}</span></td></tr>`);
+    });
+    tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="d">Media de los cuatro provocados</td>
+       <td class="n d">7,30</td><td><span class="chip c-ok">doce veces por debajo del objetivo</span></td></tr>`);
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  //  IX · El cultivo
+  // ══════════════════════════════════════════════════════════
+  (function () {
+    const svg = document.getElementById("g-riego2");
+    const riego = new Map(D.perfil.riego_por_hora.map(r => [r.hora, r.ciclos]));
+    // El divisor lo informa la API. Antes se deducia dividiendo el
+    // recuento de muestras entre 288, lo que asume cadencia constante de
+    // 300 s — y la cadencia paso de 10 s a 60 s y a 300 s. Salian 0,04
+    // ciclos por hora donde son 4.
+    const dias = Math.max(1, D.perfil.dias_con_riego || 1);
+    const W = 900, H = 210, L = 46, R = 16, T = 18, B = 40;
+    const vals = Array.from({ length: 24 }, (_, h) => (riego.get(h) ?? 0) / dias);
+    const ym = Math.max(5, Math.ceil(Math.max(...vals)));
+    const bw = (W - L - R) / 24;
+    const Y = v => T + (1 - v / ym) * (H - T - B);
+    rejillaY(svg, L, W - R, Y, Array.from({ length: ym + 1 }, (_, i) => i));
+    vals.forEach((v, hr) => {
+      const dia = hr >= 6 && hr < 18;
+      const r = el("rect", { x: L + hr * bw + bw * .16, y: Y(v),
+        width: bw * .68, height: Math.max(2, (H - B) - Y(v)),
+        fill: dia ? C("--s2") : C("--s1"), rx: 3 });
+      sensible(r, `<b>${String(hr).padStart(2, "0")}:00</b><br>${nf(v, 2)} ciclos/hora<br>` +
+        (dia ? "fotoperiodo con luz" : "oscuridad"));
+      svg.appendChild(r);
+      if (hr % 3 === 0)
+        svg.appendChild(txt(L + hr * bw + bw / 2, H - B + 15, String(hr).padStart(2, "0"),
+          { anchor: "middle", size: 9.5 }));
+    });
+    svg.appendChild(el("line", { x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1 }));
+    svg.appendChild(txt(L - 7, T - 3, "ciclos/h", { anchor: "end", size: 9.5 }));
+    svg.appendChild(txt((L + W - R) / 2, H - 8, "hora del día", { anchor: "middle", size: 10 }));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-dur");
+    const total = D.dur_riego.reduce((a, [, n]) => a + n, 0);
+    D.dur_riego.forEach(([s, n]) => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="n d">${s} s</td><td class="n">${ent(n)}</td>
+       <td>${nf(100 * n / total, 1)} % de los ciclos${s === 180 ? " · duración programada" : ""}</td></tr>`));
+  })();
+
+  (function () {
+    const tb = document.getElementById("t-decisiones");
+    const nombres = {
+      riego_hidroponia_fin: "Riego de hidroponía terminado",
+      riego_hidroponia_inicio: "Riego de hidroponía iniciado",
+      conectado: "Nodo reasociado a la red",
+      desconectado: "Nodo perdido de la red",
+      corregido: "Programa divergente corregido",
+      discrepancia: "Discrepancia de programa detectada",
+    };
+    D.fog.decisiones_del_borde.forEach(x => tb.insertAdjacentHTML("beforeend",
+      `<tr><td>${nombres[x.evento] || x.evento.replace(/_/g, " ")}</td>
+       <td class="n d">${ent(x.n)}</td></tr>`));
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  //  X · Correlaciones
+  // ══════════════════════════════════════════════════════════
+  function scatter(id, pieId, datos, ejeX, ejeY) {
+    const svg = document.getElementById(id);
+    const W = 440, H = 320, L = 52, R = 16, T = 16, B = 56;
+    const xs = datos.puntos.map(p => p[0]), ys = datos.puntos.map(p => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const X = v => L + ((v - x0) / (x1 - x0 || 1)) * (W - L - R);
+    const Y = v => T + (1 - (v - y0) / (y1 - y0 || 1)) * (H - T - B);
+    // El ciclo horario es circular, y la escala tambien: 0 h y 23 h
+    // tienen que quedar cerca, no en extremos opuestos.
+    const colH = h => {
+      const t = h / 24;
+      const paleta = [C("--s1"), C("--s3"), C("--s2"), "#e87ba4", C("--s1")];
+      const i = Math.min(3, Math.floor(t * 4));
+      return paleta[i];
+    };
+    [0, .25, .5, .75, 1].forEach(f => {
+      const yv = y0 + f * (y1 - y0);
+      svg.appendChild(el("line", { x1: L, x2: W - R, y1: Y(yv), y2: Y(yv),
+        stroke: C("--rejilla"), "stroke-width": 1 }));
+      svg.appendChild(txt(L - 6, Y(yv) + 3.5, nf(yv, 0), { anchor: "end", size: 9.5 }));
+    });
+    datos.puntos.forEach(([px, py, ph]) => {
+      const c = el("circle", { cx: X(px), cy: Y(py), r: 2.6, fill: colH(ph), opacity: .5 });
+      sensible(c, `${ejeX}: <b>${nf(px, 2)}</b><br>${ejeY}: <b>${nf(py, 1)}</b><br>` +
+        `a las ${String(ph).padStart(2, "0")}:00`);
+      svg.appendChild(c);
+    });
+    svg.appendChild(el("line", { x1: L, x2: W - R, y1: H - B, y2: H - B,
+      stroke: C("--base"), "stroke-width": 1 }));
+    [x0, (x0 + x1) / 2, x1].forEach(v =>
+      svg.appendChild(txt(X(v), H - B + 15, nf(v, 1), { anchor: "middle", size: 9.5 })));
+    svg.appendChild(txt((L + W - R) / 2, H - B + 32, ejeX, { anchor: "middle", size: 10 }));
+    svg.appendChild(txt(L - 6, T - 3, ejeY, { anchor: "end", size: 9.5 }));
+
+    const leyenda = ["00–06 h", "06–12 h", "12–18 h", "18–24 h"];
+    leyenda.forEach((t, i) => {
+      svg.appendChild(el("rect", { x: L + i * 92, y: H - 18, width: 9, height: 9,
+        fill: [C("--s1"), C("--s3"), C("--s2"), "#e87ba4"][i], rx: 2 }));
+      svg.appendChild(txt(L + i * 92 + 13, H - 10, t, { size: 9 }));
+    });
+
+    const r = datos.r;
+    const fuerza = r === null ? "sin coeficiente"
+      : Math.abs(r) < .2 ? "sin relación apreciable"
+      : Math.abs(r) < .5 ? "relación débil"
+      : Math.abs(r) < .8 ? "relación moderada" : "relación fuerte";
+    document.getElementById(pieId).textContent =
+      `Coeficiente de Pearson r = ${nf(r, 3)} sobre ${ent(datos.n)} pares — ${fuerza}. ` +
+      `Se muestran ${ent(datos.puntos.length)} puntos submuestreados.`;
+  }
+  scatter("g-corr1", "p-corr1", D.corr_tec, "Temperatura (°C)", "EC (µS/cm)");
+  scatter("g-corr2", "p-corr2", D.corr_trssi, "Temperatura (°C)", "RSSI (dBm)");
+
+  // ── Multiserie: cuatro paneles apilados ───────────────────
+  (function () {
+    const svg = document.getElementById("g-multi"), p = D.multi.puntos;
+    const W = 900, H = 460, L = 58, R = 16, T = 16, B = 40;
+    const ph = (H - T - B) / 4;
+    const defs = [
+      ["Temperatura (°C)", 1, C("--s2"), 1],
+      ["Humedad del aire (%)", 2, C("--s3"), 0],
+      ["Conductividad (µS/cm)", 3, C("--s1"), 0],
+      ["Potencia recibida (dBm)", 4, "#4a3aa7", 0],
+    ];
+    const X = i => L + (i / (p.length - 1)) * (W - L - R);
+    defs.forEach(([nom, idx, color, dec], k) => {
+      const y0 = T + k * ph, y1 = y0 + ph - 14;
+      const vals = p.map(q => q[idx]).filter(v => v !== null && v !== undefined);
+      if (!vals.length) return;
+      const lo = Math.min(...vals), hi = Math.max(...vals);
+      const Y = v => y1 - ((v - lo) / (hi - lo || 1)) * (y1 - y0 - 16);
+      svg.appendChild(txt(L, y0 + 10, nom, { size: 10, fill: C("--tinta-2"), weight: 600 }));
+      svg.appendChild(txt(L - 7, y0 + 20, nf(hi, dec), { anchor: "end", size: 9 }));
+      svg.appendChild(txt(L - 7, y1 + 3, nf(lo, dec), { anchor: "end", size: 9 }));
+      svg.appendChild(el("line", { x1: L, x2: W - R, y1: y1 + 5, y2: y1 + 5,
+        stroke: C("--rejilla"), "stroke-width": 1 }));
+      // connectNulls falso: un hueco es un corte real y unir los extremos
+      // dibujaria una recta atravesando horas sin medir.
+      let d = "", abierto = false;
+      p.forEach((q, i) => {
+        const v = q[idx];
+        if (v === null || v === undefined) { abierto = false; return; }
+        d += (abierto ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1) + " ";
+        abierto = true;
+      });
+      svg.appendChild(el("path", { d, fill: "none", stroke: color, "stroke-width": 1.6,
+        "stroke-linejoin": "round" }));
+    });
+    p.forEach((q, i) => {
+      const w = (W - L - R) / p.length;
+      const r = el("rect", { x: X(i) - w / 2, y: T, width: w, height: H - T - B, fill: "transparent" });
+      sensible(r, `<b>${q[0]}</b><br>temp ${nf(q[1], 2)} °C<br>hum ${nf(q[2], 1)} %<br>` +
+        `EC ${nf(q[3], 0)} µS/cm<br>RSSI ${nf(q[4], 1)} dBm`);
+      svg.appendChild(r);
+    });
+    [0, Math.floor(p.length / 3), Math.floor(2 * p.length / 3), p.length - 1].forEach(i =>
+      svg.appendChild(txt(X(i), H - B + 22, p[i][0].slice(0, 5),
+        { anchor: i === 0 ? "start" : i === p.length - 1 ? "end" : "middle", size: 9.5 })));
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  //  XI · Objetivos
+  // ══════════════════════════════════════════════════════════
+  (function () {
+    const tb = document.getElementById("t-obj2");
+    const filas = [
+      ["Pérdida de mensajes", "menos de 1 %", nf(r7.perdida.pct, 3) + " %", "IV.2", true],
+      ["Potencia media recibida", "por encima de −70 dBm", nf(r7.rssi.media, 1) + " dBm", "IV.1", r7.rssi.media > -70],
+      ["Latencia de subida", "menos de 1500 ms", ent(Math.round(r7.latencia_subida.media_ms)) + " ms", "IV.3", true],
+      ["Jitter", "caracterizar", "σ " + nf(r30.jitter_por_cadencia[0].sigma_s, 3) + " s", "V", true],
+      ["Recuperación tras corte", "menos de 90 s", "7,3 s de media", "VIII", true],
+      ["Tiempo bajo el umbral", "mínimo", nf(r7.rssi.pct_bajo_umbral, 1) + " %", "IV.1", r7.rssi.pct_bajo_umbral < 15],
+      ["Autonomía sin nube", "demostrar", nf(fog.autonomia.dias_sin_nube, 1) + " días", "VIII", true],
+    ];
+    filas.forEach(([m, o, v, s, ok]) => tb.insertAdjacentHTML("beforeend",
+      `<tr><td class="d">${m}</td><td class="mono" style="font-size:.8rem">${o}</td>
+       <td class="n d">${v}</td><td class="mono" style="font-size:.8rem">§ ${s}</td>
+       <td><span class="chip ${ok ? "c-ok" : "c-av"}">${ok ? "cumple" : "al límite"}</span></td></tr>`));
+  })();
+})();
+</script>
