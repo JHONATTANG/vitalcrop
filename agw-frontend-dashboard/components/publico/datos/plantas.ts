@@ -35,11 +35,13 @@ export interface Planta {
   consejo: string;
   /** La de VitalCrop. */
   vitalcrop?: boolean;
+  imagen: string;
 }
 
 export const PLANTAS: Planta[] = [
   {
     id: 'hierbabuena', nombre: 'Hierbabuena', cientifico: 'Mentha spicata', familia: 'Lamiáceas',
+    imagen: '/img/vc/mata-1.jpg',
     piso: ['frio', 'templado'], temperatura: [18, 25], ph: [5.5, 6.5], ec: [1.4, 2.0], luz: [12, 14],
     ciclo: '35–45 días a primer corte; rebrota cada 30', sistemas: ['Raíz flotante', 'NFT', 'Sustrato'],
     uso: 'Aromática culinaria y de infusión. Colombia la exporta fresca.',
@@ -48,6 +50,7 @@ export const PLANTAS: Planta[] = [
   },
   {
     id: 'lechuga', nombre: 'Lechuga', cientifico: 'Lactuca sativa', familia: 'Asteráceas',
+    imagen: '/img/plantas/lechuga.jpg',
     piso: ['frio', 'templado'], temperatura: [15, 22], ph: [5.8, 6.2], ec: [0.8, 1.4], luz: [12, 16],
     ciclo: '35–50 días desde el trasplante', sistemas: ['Raíz flotante', 'NFT'],
     uso: 'La hortaliza hidropónica por excelencia: rápida, ligera y de raíz pequeña.',
@@ -55,6 +58,7 @@ export const PLANTAS: Planta[] = [
   },
   {
     id: 'albahaca', nombre: 'Albahaca', cientifico: 'Ocimum basilicum', familia: 'Lamiáceas',
+    imagen: '/img/plantas/albahaca.jpg',
     piso: ['templado', 'calido'], temperatura: [20, 28], ph: [5.5, 6.5], ec: [1.0, 1.6], luz: [14, 16],
     ciclo: '40–60 días a primer corte', sistemas: ['NFT', 'Sustrato', 'Raíz flotante'],
     uso: 'Aromática de mayor valor por kilo entre las de exportación.',
@@ -62,6 +66,7 @@ export const PLANTAS: Planta[] = [
   },
   {
     id: 'espinaca', nombre: 'Espinaca', cientifico: 'Spinacia oleracea', familia: 'Amarantáceas',
+    imagen: '/img/plantas/espinaca.jpg',
     piso: ['frio', 'paramo'], temperatura: [12, 20], ph: [6.0, 7.0], ec: [1.8, 2.3], luz: [10, 14],
     ciclo: '40–50 días', sistemas: ['Raíz flotante', 'Sustrato'],
     uso: 'Hoja verde de clima frío; acumula nitratos si el nitrógeno va alto.',
@@ -69,6 +74,7 @@ export const PLANTAS: Planta[] = [
   },
   {
     id: 'fresa', nombre: 'Fresa', cientifico: 'Fragaria × ananassa', familia: 'Rosáceas',
+    imagen: '/img/plantas/fresa.jpg',
     piso: ['frio'], temperatura: [15, 22], ph: [5.5, 6.2], ec: [1.4, 1.8], luz: [12, 14],
     ciclo: 'Perenne; primera cosecha a los 60–90 días', sistemas: ['Sustrato', 'NFT vertical'],
     uso: 'Fruto de clima frío. Sibaté y Pamplona la producen en campo; en invernadero, en bolsa colgada.',
@@ -76,6 +82,7 @@ export const PLANTAS: Planta[] = [
   },
   {
     id: 'tomate', nombre: 'Tomate', cientifico: 'Solanum lycopersicum', familia: 'Solanáceas',
+    imagen: '/img/plantas/tomate.jpg',
     piso: ['templado', 'calido'], temperatura: [20, 27], ph: [5.8, 6.5], ec: [2.0, 3.5], luz: [14, 16],
     ciclo: '90–120 días a primera cosecha; produce 6 meses', sistemas: ['Sustrato con goteo', 'NFT'],
     uso: 'Fruto exigente: el que más nutrición y más luz pide de esta lista.',
@@ -83,6 +90,7 @@ export const PLANTAS: Planta[] = [
   },
   {
     id: 'cilantro', nombre: 'Cilantro', cientifico: 'Coriandrum sativum', familia: 'Apiáceas',
+    imagen: '/img/plantas/cilantro.jpg',
     piso: ['frio', 'templado'], temperatura: [16, 24], ph: [6.0, 6.5], ec: [1.2, 1.8], luz: [12, 14],
     ciclo: '45–60 días; un solo corte', sistemas: ['Raíz flotante', 'Sustrato'],
     uso: 'Indispensable en la cocina colombiana y de ciclo corto.',
@@ -90,6 +98,7 @@ export const PLANTAS: Planta[] = [
   },
   {
     id: 'pimenton', nombre: 'Pimentón', cientifico: 'Capsicum annuum', familia: 'Solanáceas',
+    imagen: '/img/plantas/pimenton.jpg',
     piso: ['templado', 'calido'], temperatura: [21, 28], ph: [5.8, 6.5], ec: [1.8, 2.8], luz: [14, 16],
     ciclo: '90–110 días a primera cosecha', sistemas: ['Sustrato con goteo'],
     uso: 'Fruto de invernadero de alto valor, sobre todo el de color.',

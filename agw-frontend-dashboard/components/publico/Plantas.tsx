@@ -1,18 +1,19 @@
 'use client';
 
 /**
- * Fichas de plantas con filtro por piso térmico.
+ * Fichas de plantas: foto, cuatro barras y una línea de consejo.
  *
- * Cada ficha enseña las cinco variables de manejo como barras sobre
- * un rango común, para que se comparen de un vistazo: la lechuga y el
- * tomate no se parecen en nada y eso se tiene que ver sin leer.
+ * Las barras van sobre una escala común para que se comparen de un
+ * vistazo. Todo lo demás se quitó: la foto y los rangos dicen más que
+ * un párrafo, y el consejo se queda porque es lo único que no está en
+ * ninguna otra parte.
  */
 import { useState } from 'react';
+import Image from 'next/image';
 import { Leaf, Sun, Droplets, FlaskConical, Thermometer, Clock } from 'lucide-react';
 import { PLANTAS, type Planta } from './datos/plantas';
 import { PISOS, type Piso } from './datos/zonas';
 
-/** Rango total de cada variable, para dibujar la barra en escala común. */
 const ESCALA = {
   temperatura: [10, 30] as const,
   ph:          [5.0, 7.5] as const,
@@ -20,68 +21,61 @@ const ESCALA = {
   luz:         [8, 18] as const,
 };
 
-function Barra({ icono: Icono, nombre, valor, escala, unidad, color }: {
-  icono: React.ElementType; nombre: string; valor: readonly [number, number];
+function Barra({ icono: Icono, valor, escala, unidad, color }: {
+  icono: React.ElementType; valor: readonly [number, number];
   escala: readonly [number, number]; unidad: string; color: string;
 }) {
   const a = ((valor[0] - escala[0]) / (escala[1] - escala[0])) * 100;
   const b = ((valor[1] - escala[0]) / (escala[1] - escala[0])) * 100;
   return (
-    <div>
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="text-campo-tinta-2 flex items-center gap-1.5"><Icono size={12} /> {nombre}</span>
-        <span className="text-campo-tinta font-medium tabular-nums">
-          {valor[0]}–{valor[1]} <span className="text-campo-tinta-3 font-normal">{unidad}</span>
-        </span>
-      </div>
-      <div className="relative h-1.5 rounded-full bg-campo-linea mt-1.5">
+    <div className="flex items-center gap-2">
+      <Icono size={12} className="text-campo-tinta-3 shrink-0" />
+      <div className="relative h-1.5 rounded-full bg-campo-linea flex-1">
         <div className="absolute inset-y-0 rounded-full" style={{ left: `${a}%`, width: `${b - a}%`, background: color }} />
       </div>
+      <span className="text-[11px] text-campo-tinta tabular-nums w-[88px] text-right">
+        {valor[0]}–{valor[1]} <span className="text-campo-tinta-3">{unidad}</span>
+      </span>
     </div>
   );
 }
 
 function Ficha({ p }: { p: Planta }) {
   return (
-    <article className={`rounded-2xl border bg-campo-papel p-5 flex flex-col ${
+    <article className={`rounded-2xl border bg-campo-papel overflow-hidden flex flex-col ${
       p.vitalcrop ? 'border-campo-verde shadow-[0_0_0_3px_rgba(30,122,70,.12)]' : 'border-campo-linea'}`}>
-      <header className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-display text-xl text-campo-tinta leading-tight">{p.nombre}</h3>
-          <p className="text-xs italic text-campo-tinta-3 mt-0.5">{p.cientifico} · {p.familia}</p>
+      <figure className="relative aspect-[4/3]">
+        <Image src={p.imagen} alt={p.nombre} fill sizes="(min-width: 1280px) 25vw, (min-width: 768px) 50vw, 100vw" className="object-cover" />
+        <div className="absolute inset-x-0 bottom-0 p-3 pt-10 bg-gradient-to-t from-campo-tinta/80 to-transparent">
+          <h3 className="font-display text-xl text-campo-hueso leading-tight">{p.nombre}</h3>
+          <p className="text-[11px] italic text-campo-hueso/80">{p.cientifico}</p>
         </div>
         {p.vitalcrop && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-campo-verde text-white text-[10px] font-semibold px-2 py-0.5 shrink-0">
+          <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-campo-verde text-white text-[10px] font-semibold px-2 py-0.5">
             <Leaf size={10} /> VITALCROP
           </span>
         )}
-      </header>
+        <div className="absolute top-2.5 left-2.5 flex gap-1">
+          {p.piso.map((x) => (
+            <span key={x} className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: PISOS[x].color }}>
+              {PISOS[x].nombre}
+            </span>
+          ))}
+        </div>
+      </figure>
 
-      <div className="flex flex-wrap gap-1 mt-3">
-        {p.piso.map((x) => (
-          <span key={x} className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: PISOS[x].color }}>
-            {PISOS[x].nombre}
-          </span>
-        ))}
-        {p.sistemas.map((s) => (
-          <span key={s} className="rounded-full px-2 py-0.5 text-[10px] font-medium border border-campo-linea text-campo-tinta-2">{s}</span>
-        ))}
+      <div className="p-4 space-y-2">
+        <Barra icono={Thermometer} valor={p.temperatura} escala={ESCALA.temperatura} unidad="°C" color="#D98E32" />
+        <Barra icono={Droplets} valor={p.ph} escala={ESCALA.ph} unidad="pH" color="#2A6FBF" />
+        <Barra icono={FlaskConical} valor={p.ec} escala={ESCALA.ec} unidad="mS/cm" color="#2E9E5B" />
+        <Barra icono={Sun} valor={p.luz} escala={ESCALA.luz} unidad="h luz" color="#C9A227" />
+        <p className="text-[11px] text-campo-tinta-2 flex items-center gap-1.5 pt-1">
+          <Clock size={11} className="shrink-0" /> {p.ciclo}
+        </p>
+        <p className="text-xs text-campo-tinta leading-snug pt-2 border-t border-campo-linea">
+          <span className="font-semibold text-campo-verde">Consejo · </span>{p.consejo}
+        </p>
       </div>
-
-      <div className="space-y-3 mt-4">
-        <Barra icono={Thermometer} nombre="Temperatura" valor={p.temperatura} escala={ESCALA.temperatura} unidad="°C" color="#D98E32" />
-        <Barra icono={Droplets} nombre="pH de la solución" valor={p.ph} escala={ESCALA.ph} unidad="" color="#2A6FBF" />
-        <Barra icono={FlaskConical} nombre="Conductividad" valor={p.ec} escala={ESCALA.ec} unidad="mS/cm" color="#2E9E5B" />
-        <Barra icono={Sun} nombre="Luz" valor={p.luz} escala={ESCALA.luz} unidad="h/día" color="#C9A227" />
-      </div>
-
-      <p className="text-xs text-campo-tinta-2 mt-4 flex items-start gap-1.5">
-        <Clock size={12} className="mt-0.5 shrink-0" /> {p.ciclo}
-      </p>
-      <p className="text-sm text-campo-tinta-2 leading-relaxed mt-3">{p.uso}</p>
-      <p className="text-xs text-campo-tinta leading-relaxed mt-3 pt-3 border-t border-campo-linea">
-        <span className="font-semibold text-campo-verde">Consejo · </span>{p.consejo}
-      </p>
     </article>
   );
 }
@@ -93,11 +87,10 @@ export default function Plantas() {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-1.5 mb-5">
-        <span className="text-xs text-campo-tinta-3 mr-1">Para clima</span>
         <button onClick={() => setPiso('todos')}
           className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
             piso === 'todos' ? 'bg-campo-tinta text-campo-hueso border-campo-tinta' : 'border-campo-linea text-campo-tinta-2'}`}>
-          Cualquiera
+          Cualquier clima
         </button>
         {(Object.keys(PISOS) as Piso[]).map((x) => (
           <button key={x} onClick={() => setPiso(piso === x ? 'todos' : x)}
@@ -107,7 +100,6 @@ export default function Plantas() {
             {PISOS[x].nombre}
           </button>
         ))}
-        <span className="text-xs text-campo-tinta-3 ml-auto tabular-nums">{lista.length} de {PLANTAS.length}</span>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {lista.map((p) => <Ficha key={p.id} p={p} />)}

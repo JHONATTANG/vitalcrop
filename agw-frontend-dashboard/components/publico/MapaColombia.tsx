@@ -18,6 +18,7 @@
  * meterlas en el encuadre encogía el continente a la mitad.
  */
 import { useMemo, useState } from 'react';
+import Image from 'next/image';
 import { Leaf, Mountain, Thermometer, X } from 'lucide-react';
 import mapa from './datos/colombia.json';
 import { ZONAS, PISOS, type Zona, type Piso } from './datos/zonas';
@@ -135,18 +136,15 @@ export default function MapaColombia() {
           })}
         </svg>
 
-        <p className="text-[11px] text-campo-tinta-3 mt-2">
-          Pasa por un departamento y haz clic para ver qué se cultiva; cada punto es una zona productora,
-          coloreada por su piso térmico. La hoja es VitalCrop.
-        </p>
+        <p className="text-[11px] text-campo-tinta-3 mt-2">Clic en un punto o un departamento · la hoja es VitalCrop.</p>
       </div>
 
       {/* ── Panel ─────────────────────────────────────────────── */}
-      <aside className="lg:sticky lg:top-24 rounded-2xl border border-campo-linea bg-campo-papel p-5 min-h-[320px]">
+      <aside className="lg:sticky lg:top-24 rounded-2xl border border-campo-linea bg-campo-papel overflow-hidden min-h-[320px]">
         {zona ? (
           <ZonaPanel z={zona} onCerrar={() => setZona(null)} />
         ) : depto ? (
-          <div>
+          <div className="p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-[.12em] text-campo-tinta-3">Departamento</p>
@@ -180,14 +178,18 @@ export default function MapaColombia() {
             )}
           </div>
         ) : (
-          <div className="text-sm text-campo-tinta-2 leading-relaxed">
-            <p className="font-display text-2xl text-campo-tinta">Un país de pisos, no de estaciones</p>
-            <p className="mt-3">
-              A 4° del ecuador no hay verano ni invierno: el clima lo pone la altura. Cada 1.000 m
-              que se sube, la temperatura media baja unos 6 °C, y con ella cambia todo lo que se puede
-              sembrar. Por eso el mapa se lee por colores y no por latitud.
-            </p>
-            <p className="mt-3">Toca un punto o un departamento.</p>
+          <div>
+            <div className="grid grid-cols-4 gap-0.5">
+              {ZONAS.slice(0, 8).map((z) => (
+                <button key={z.id} onClick={() => elegir(z)} className="relative aspect-square group" title={z.nombre}>
+                  <Image src={z.imagen} alt={z.pie} fill sizes="120px" className="object-cover group-hover:opacity-80 transition-opacity" />
+                </button>
+              ))}
+            </div>
+            <div className="p-5 text-sm text-campo-tinta-2 leading-relaxed">
+              <p className="font-display text-2xl text-campo-tinta">Un país de pisos, no de estaciones</p>
+              <p className="mt-2">Cada 1.000 m de altura, 6 °C menos y otro cultivo. Toca un punto o un departamento.</p>
+            </div>
           </div>
         )}
       </aside>
@@ -199,6 +201,16 @@ function ZonaPanel({ z, onCerrar }: { z: Zona; onCerrar: () => void }) {
   const piso = PISOS[z.piso];
   return (
     <div>
+      <figure className="relative aspect-[16/9]">
+        <Image src={z.imagen} alt={z.pie} fill sizes="(min-width: 1024px) 40vw, 100vw" className="object-cover" priority={!!z.vitalcrop} />
+        <figcaption className="absolute left-3 bottom-2 rounded-md bg-campo-tinta/70 text-campo-hueso text-[10px] px-2 py-0.5 backdrop-blur-sm">
+          {z.pie}
+        </figcaption>
+        <button onClick={onCerrar} className="absolute right-2 top-2 p-1.5 rounded-lg bg-campo-papel/90 text-campo-tinta-2 hover:text-campo-tinta" aria-label="Cerrar">
+          <X size={15} />
+        </button>
+      </figure>
+      <div className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[.12em] text-campo-tinta-3">{z.departamento}</p>
@@ -211,9 +223,6 @@ function ZonaPanel({ z, onCerrar }: { z: Zona; onCerrar: () => void }) {
             )}
           </h3>
         </div>
-        <button onClick={onCerrar} className="p-1.5 rounded-lg text-campo-tinta-3 hover:bg-campo-hueso shrink-0" aria-label="Cerrar">
-          <X size={16} />
-        </button>
       </div>
 
       <dl className="grid grid-cols-2 gap-2 mt-4">
@@ -244,6 +253,7 @@ function ZonaPanel({ z, onCerrar }: { z: Zona; onCerrar: () => void }) {
           Ver el cultivo de VitalCrop →
         </a>
       )}
+      </div>
     </div>
   );
 }

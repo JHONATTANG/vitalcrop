@@ -12,6 +12,7 @@
  * cultivo en ambiente controlado en Colombia.
  */
 import { useState } from 'react';
+import Image from 'next/image';
 import { MessageCircle, ThumbsUp, Send, Info, Hash } from 'lucide-react';
 
 interface Comentario {
@@ -28,6 +29,7 @@ interface Hilo {
   id: string;
   tema: string;
   titulo: string;
+  imagen: string;
   comentarios: Comentario[];
 }
 
@@ -35,7 +37,7 @@ const TEMAS = ['Hidroponía en casa', 'Aromáticas', 'Riego y sensores', 'Plagas
 
 const HILOS_INICIALES: Hilo[] = [
   {
-    id: 'raiz', tema: 'Hidroponía en casa',
+    id: 'raiz', tema: 'Hidroponía en casa', imagen: '/img/vc/raiz-1.jpg',
     titulo: '¿Cada cuánto debe correr la bomba en raíz flotante?',
     comentarios: [
       { id: 1, autor: 'Camila R.', lugar: 'Chía', hace: 'hace 3 días', gracias: 12,
@@ -47,7 +49,7 @@ const HILOS_INICIALES: Hilo[] = [
     ],
   },
   {
-    id: 'hierbabuena', tema: 'Aromáticas',
+    id: 'hierbabuena', tema: 'Aromáticas', imagen: '/img/vc/hoja-2.jpg',
     titulo: 'La hierbabuena crece pero huele a poco',
     comentarios: [
       { id: 4, autor: 'Luisa P.', lugar: 'Facatativá', hace: 'hace 5 días', gracias: 9,
@@ -57,7 +59,7 @@ const HILOS_INICIALES: Hilo[] = [
     ],
   },
   {
-    id: 'sensores', tema: 'Riego y sensores',
+    id: 'sensores', tema: 'Riego y sensores', imagen: '/img/vc/sensor.jpg',
     titulo: 'Sensor de humedad de suelo que marca siempre cero',
     comentarios: [
       { id: 6, autor: 'Mateo V.', lugar: 'Tunja', hace: 'hace 2 días', gracias: 7,
@@ -67,7 +69,7 @@ const HILOS_INICIALES: Hilo[] = [
     ],
   },
   {
-    id: 'hongos', tema: 'Plagas y hongos',
+    id: 'hongos', tema: 'Plagas y hongos', imagen: '/img/plantas/albahaca.jpg',
     titulo: 'Polvo blanco en la albahaca de invernadero',
     comentarios: [
       { id: 8, autor: 'Sara L.', lugar: 'Pereira', hace: 'hace 6 días', gracias: 4,
@@ -127,12 +129,17 @@ export default function Comunidad() {
           {lista.map((h) => (
             <li key={h.id}>
               <button onClick={() => setAbierto(h.id)}
-                className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${
+                className={`w-full text-left rounded-xl border px-3 py-3 transition-colors flex gap-3 ${
                   hilo?.id === h.id ? 'border-campo-azul bg-campo-azul-suave' : 'border-campo-linea bg-campo-papel hover:border-campo-tinta-3'}`}>
+                <span className="relative w-14 h-14 rounded-lg overflow-hidden shrink-0">
+                  <Image src={h.imagen} alt="" fill sizes="56px" className="object-cover" />
+                </span>
+                <span className="min-w-0">
                 <span className="text-[10px] uppercase tracking-wider text-campo-tinta-3 flex items-center gap-1"><Hash size={10} /> {h.tema}</span>
                 <span className="block text-sm font-semibold text-campo-tinta mt-0.5 leading-snug">{h.titulo}</span>
                 <span className="text-[11px] text-campo-tinta-3 flex items-center gap-1 mt-1.5">
                   <MessageCircle size={11} /> {h.comentarios.length} respuesta{h.comentarios.length === 1 ? '' : 's'}
+                </span>
                 </span>
               </button>
             </li>
@@ -143,9 +150,13 @@ export default function Comunidad() {
       {/* ── Hilo abierto ──────────────────────────────────────── */}
       {hilo && (
         <div className="rounded-2xl border border-campo-linea bg-campo-papel overflow-hidden">
-          <header className="px-5 py-4 border-b border-campo-linea">
-            <p className="text-[10px] uppercase tracking-wider text-campo-tinta-3">{hilo.tema}</p>
-            <h3 className="font-display text-xl text-campo-tinta mt-1">{hilo.titulo}</h3>
+          <header className="relative aspect-[16/5] min-h-[120px]">
+            <Image src={hilo.imagen} alt="" fill sizes="(min-width: 1024px) 60vw, 100vw" className="object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-campo-tinta/85 via-campo-tinta/30 to-transparent" />
+            <div className="absolute left-5 bottom-4 right-5">
+              <p className="text-[10px] uppercase tracking-wider text-campo-hueso/80">{hilo.tema}</p>
+              <h3 className="font-display text-xl md:text-2xl text-campo-hueso mt-0.5 text-balance">{hilo.titulo}</h3>
+            </div>
           </header>
 
           <ol className="divide-y divide-campo-linea">
