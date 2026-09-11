@@ -12,7 +12,8 @@
  * porque ECharts no tiene un tipo "banda" nativo.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import { format } from 'date-fns';
 import type { PuntoSerie } from '@/hooks/useTelecom';
 
@@ -97,5 +98,5 @@ export default function SerieBanda({
     return <p className="text-text-muted text-sm py-8 text-center">Sin datos</p>;
   }
 
-  return <ReactECharts option={option} style={{ height: alto }} notMerge />;
+  return <Grafica option={option} style={{ height: alto }} notMerge />;
 }

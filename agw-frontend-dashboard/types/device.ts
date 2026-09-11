@@ -36,4 +36,25 @@ export interface IoTDevice {
   gateway_id?: string;
   sensor_id?: string;
   created_at?: string;
+
+  /** Solo nodos. `true` = el firmware genera los valores de los sensores. */
+  simulado?: boolean;
+  /** Solo nodos. La especie del cultivo que lleva: hierbabuena, lechuga… */
+  especie?: string | null;
+  /** Solo gateway. Cuántos nodos cuelgan de él. */
+  nodos?: number;
+  /**
+   * Solo nodos. Lo que ese nodo tiene conectado de verdad. Decide qué
+   * lecturas se enseñan, qué órdenes se ofrecen y qué dibuja el mapa:
+   * un nodo sin válvula de tierra no puede ofrecer «llenar la tierra».
+   */
+  capacidades?: {
+    sensores: Sensor[];
+    actuadores: Actuador[];
+    modulos: Modulo[];
+  };
 }
+
+export type Sensor   = 'hdc1080' | 'tds' | 'nivel';
+export type Actuador = 'bomba' | 'valvula_hidro' | 'valvula_tierra' | 'luz';
+export type Modulo   = 'riego_hidro' | 'riego_tierra' | 'ambiente';

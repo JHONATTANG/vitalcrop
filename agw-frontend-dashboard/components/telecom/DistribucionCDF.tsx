@@ -12,7 +12,8 @@
  * objetivo solo tiene sentido sobre la acumulada.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import type { BinDistribucion } from '@/hooks/useTelecom';
 
 interface Props {
@@ -111,5 +112,5 @@ export default function DistribucionCDF({
     return <p className="text-text-muted text-sm py-8 text-center">Sin datos</p>;
   }
 
-  return <ReactECharts option={option} style={{ height: alto }} notMerge />;
+  return <Grafica option={option} style={{ height: alto }} notMerge />;
 }

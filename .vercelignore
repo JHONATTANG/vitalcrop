@@ -1,0 +1,22 @@
+# El proyecto `vitalcrop` de Vercel tiene su raíz en agw-frontend-dashboard.
+# El CLI sube desde aquí (la raíz del monorepo) y sin esto arrastra
+# 900 MB de firmware, capturas y el venv de la API: supera el límite de
+# 100 MB y el despliegue muere antes de empezar. Solo va el front.
+#
+# Se excluye cada carpeta por su nombre y no con `*`: un `*` seguido de
+# `!agw-frontend-dashboard/` no funciona, porque el comodín tumba el
+# directorio entero antes de que la negación pueda rescatarlo.
+.git/
+images/
+docs/
+informe/
+iot-nodes/
+agw-cloud-api/
+agw-edge-raspberry/
+*.png
+*.lnk
+*.md
+agw-frontend-dashboard/node_modules/
+agw-frontend-dashboard/.next/
+agw-frontend-dashboard/.env.local
+agw-frontend-dashboard/.env

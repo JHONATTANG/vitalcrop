@@ -17,7 +17,8 @@
  * todo lo que quede detrás del primero.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import {
   COLORES, COLOR_METRICA, ETIQUETA_METRICA, UNIDAD_METRICA,
   TOOLTIP, EJE_BASE, LEYENDA, areaDegradado, sombra, zoom, etiquetaFecha,
@@ -150,7 +151,7 @@ export default function SerieCompuesta({
   }
 
   return (
-    <ReactECharts
+    <Grafica
       option={option}
       style={{ height: alto, width: '100%' }}
       opts={{ renderer: 'canvas' }}

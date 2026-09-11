@@ -1,44 +1,48 @@
 'use client';
 
 /**
- * Mapa de la arquitectura como lienzo movible.
+ * Mapa de la instalación como lienzo movible.
  *
- * El diagrama del informe es un dibujo: siempre enseña lo mismo aunque
- * el nodo lleve dos horas caído. Este parte de la misma disposición en
- * estrella, pero los nodos son los aparatos que hay dados de alta ahora
- * y su color sale del estado real —el que la API deduce del silencio—,
- * así que un enlace roto se ve en el mapa sin abrir otra pantalla.
+ * Los tres aparatos reales —el gateway y los dos ESP32— con lo que
+ * cada uno tiene conectado, colocados en estrella alrededor del
+ * gateway. El color de cada anillo sale del estado que la API deduce
+ * del silencio, así que un enlace roto se ve sin abrir otra pantalla.
  *
- * DECISIONES
+ * La versión anterior pintaba UN nodo (`dispositivos.find`) con una
+ * lista fija de periféricos. Con dos nodos eso era mentir dos veces:
+ * el segundo no aparecía, y al primero se le dibujaban sensores que
+ * en realidad son del otro. Ahora cada nodo trae sus `capacidades`
+ * de la API y el mapa dibuja exactamente eso.
  *
- * · `layout: 'none'` con coordenadas propias, no el layout de fuerzas.
- *   Una simulación física coloca los nodos donde le conviene y la
- *   estrella se deshace; además la disposición cambia en cada carga y
- *   no se puede señalar "el de arriba a la derecha". Aquí cada aparato
- *   tiene su sitio, y quien quiera moverlo lo arrastra.
+ * DISPOSICIÓN
  *
- * · `draggable` y `roam` activos: era el encargo explícito —que se
- *   comporte como un lienzo— y además sirve para separar los sensores
- *   cuando se solapan en pantallas estrechas.
- *
- * · El grosor de cada arista no es decorativo: codifica la calidad del
- *   enlace. El tramo ESP32→gateway se dibuja según el RSSI, así que un
- *   enlace degradado adelgaza antes de llegar a caerse.
+ * · `layout: 'none'` con coordenadas propias. Un layout de fuerzas
+ *   coloca los nodos donde le conviene y la estrella se deshace.
+ * · Cada nodo ocupa un sector: con N nodos, se reparten en abanico
+ *   por debajo del gateway y sus periféricos cuelgan hacia fuera.
+ *   Así dos nodos no se solapan y un tercero cabría sin tocar nada.
+ * · `draggable` y `roam`: se arrastra y se acerca. «Recolocar»
+ *   devuelve la disposición original.
+ * · El grosor del tramo inalámbrico codifica el RSSI del nodo.
  */
 import React, { useMemo, useRef } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import { RotateCcw } from 'lucide-react';
 import { COLORES, TOOLTIP, sombra } from '@/components/charts/tema';
 import type { Dispositivo } from '@/hooks/useDevices';
+import type { Sensor, Actuador } from '@/types/device';
 
 interface Props {
   dispositivos: Dispositivo[];
-  /** Silencio del gateway en segundos, para el tramo hacia la nube. */
   silencioNube?: number | null;
   alto?: number;
+  /** Solo este nodo y sus periféricos, con el gateway. Para la ficha. */
+  soloNodo?: string;
 }
 
 type Categoria = 'nube' | 'gateway' | 'nodo' | 'sensor' | 'actuador';
+type Estado = 'ok' | 'aviso' | 'caido' | 'inerte';
 
 interface NodoMapa {
   id: string;
@@ -46,9 +50,18 @@ interface NodoMapa {
   categoria: Categoria;
   x: number;
   y: number;
-  estado: 'ok' | 'aviso' | 'caido' | 'inerte';
+  estado: Estado;
   detalle: string[];
   tam: number;
+}
+
+interface Arista {
+  source: string;
+  target: string;
+  valor: string;
+  ancho: number;
+  curva?: number;
+  guion?: 'dashed';
 }
 
 const COLOR_CATEGORIA: Record<Categoria, string> = {
@@ -59,196 +72,174 @@ const COLOR_CATEGORIA: Record<Categoria, string> = {
   actuador: COLORES.ambar,
 };
 
-const COLOR_ESTADO = {
+const COLOR_ESTADO: Record<Estado, string> = {
   ok:     COLORES.verde,
   aviso:  COLORES.ambar,
   caido:  COLORES.rojo,
   inerte: COLORES.textoTenue,
 };
 
+/** Lo que se sabe de cada periférico. El estado se decide con la lectura. */
+const SENSORES: Record<Sensor, { nombre: string; bus: string; que: string }> = {
+  hdc1080: { nombre: 'HDC1080',        bus: 'I²C', que: 'Temperatura y humedad del aire' },
+  tds:     { nombre: 'Sonda TDS',      bus: 'ADC', que: 'Conductividad de la solución' },
+  nivel:   { nombre: 'Sensor de nivel', bus: 'ADC', que: 'Agua en el sustrato; corta el llenado' },
+};
+
+const ACTUADORES: Record<Actuador, { nombre: string; que: string }> = {
+  bomba:          { nombre: 'Bomba',              que: 'Bomba principal · máx. 60 min seguidos' },
+  valvula_hidro:  { nombre: 'Válvula hidroponía', que: 'Raíz flotante · 3 min cada 15 de día' },
+  valvula_tierra: { nombre: 'Válvula tierra',     que: 'Llenado del sustrato cada 8 días' },
+  luz:            { nombre: 'Luz y ventilador',   que: 'Fotoperiodo 06:00 → 18:00' },
+};
+
+const estadoDe = (d?: Dispositivo): Estado => {
+  if (!d) return 'inerte';
+  if (d.status === 'ONLINE') return 'ok';
+  if (d.status === 'ERROR') return 'aviso';
+  if (d.status === 'OFFLINE') return 'caido';
+  return 'inerte';
+};
+
 export default function MapaTopologia({
-  dispositivos, silencioNube = null, alto = 460,
+  dispositivos, silencioNube = null, alto = 520, soloNodo,
 }: Props) {
   const ref = useRef<ReactECharts>(null);
 
   const { nodos, aristas } = useMemo(() => {
     const gw = dispositivos.find((d) => d.device_type === 'GATEWAY');
-    const nodo = dispositivos.find((d) => d.device_type !== 'GATEWAY');
-    const lectura = nodo?.ultima_lectura;
-    const rssi = lectura?.rssi ?? null;
+    let esp = dispositivos.filter((d) => d.device_type !== 'GATEWAY');
+    if (soloNodo) esp = esp.filter((d) => d.device_uid === soloNodo || d.id === soloNodo);
 
-    const estadoDe = (d?: Dispositivo): NodoMapa['estado'] => {
-      if (!d) return 'inerte';
-      if (d.status === 'ONLINE') return 'ok';
-      if (d.status === 'ERROR') return 'aviso';
-      if (d.status === 'OFFLINE') return 'caido';
-      return 'inerte';
-    };
+    const N: NodoMapa[] = [];
+    const A: Arista[] = [];
+    const nubeOk = silencioNube !== null && silencioNube < 900;
 
-    const nodoVivo = estadoDe(nodo) === 'ok';
-    const uptimeH = lectura?.uptime_ms ? (lectura.uptime_ms / 3_600_000).toFixed(1) : null;
+    // ── Nube y gateway, en el eje ────────────────────────────
+    N.push({
+      id: 'nube', nombre: 'Nube', categoria: 'nube', x: 0, y: -250, tam: 56,
+      estado: silencioNube === null ? 'inerte' : nubeOk ? 'ok' : silencioNube < 3600 ? 'aviso' : 'caido',
+      detalle: [
+        'API FastAPI + PostgreSQL (Neon)',
+        silencioNube !== null ? `última trama hace ${Math.round(silencioNube / 60)} min` : 'sin ingesta',
+      ],
+    });
+    N.push({
+      id: 'gw', nombre: gw?.alias?.split(' — ')[0] ?? 'Gateway', categoria: 'gateway',
+      x: 0, y: -60, tam: 84, estado: estadoDe(gw),
+      detalle: [
+        gw?.device_uid ?? 'sin identificador',
+        'Broker MQTT · reglas · buffer SQLite',
+        `Punto de acceso 2,4 GHz · ${esp.length} nodo${esp.length === 1 ? '' : 's'}`,
+      ],
+    });
+    A.push({ source: 'gw', target: 'nube', valor: 'HTTPS', ancho: nubeOk ? 3 : 1, guion: nubeOk ? undefined : 'dashed' });
 
-    // Coordenadas del lienzo. El gateway ocupa el centro porque es el
-    // punto por el que pasa todo: sin él no hay ni ruta a la nube ni
-    // red para el nodo.
-    const N: NodoMapa[] = [
-      {
-        id: 'nube', nombre: 'Nube · Vercel + Neon', categoria: 'nube',
-        x: 0, y: -230, tam: 62,
-        estado: silencioNube === null ? 'inerte'
-          : silencioNube < 900 ? 'ok' : silencioNube < 3600 ? 'aviso' : 'caido',
+    // ── Cada nodo en su sector ───────────────────────────────
+    // Con n nodos, se reparten en un abanico de 150° por debajo del
+    // gateway. Los periféricos de cada uno cuelgan más lejos, en un
+    // arco centrado en el ángulo del nodo, así no invaden al vecino.
+    const n = esp.length;
+    // Ángulos medidos desde el gateway, 90° = justo debajo. Con dos
+    // nodos quedan a 45° y 135°: bien separados y con sitio debajo
+    // de cada uno para su arco de periféricos.
+    const abanico = n === 1 ? 0 : Math.min(110, 90 * (n - 1));
+    const R_NODO = 230;
+
+    esp.forEach((d, i) => {
+      const angulo = n === 1 ? 90 : 90 - abanico / 2 + (abanico * i) / (n - 1);
+      const rad = (angulo * Math.PI) / 180;
+      const x = Math.cos(rad) * R_NODO * 1.35;
+      const y = -60 + Math.sin(rad) * R_NODO * (n === 1 ? 0.8 : 1);
+      const id = `n${i}`;
+      const l = d.ultima_lectura;
+      const rssi = l?.rssi ?? null;
+      const vivo = estadoDe(d) === 'ok';
+      const cap = d.capacidades ?? { sensores: [], actuadores: [], modulos: [] };
+
+      N.push({
+        id, categoria: 'nodo', x, y, tam: 68, estado: estadoDe(d),
+        nombre: d.especie ? d.especie[0].toUpperCase() + d.especie.slice(1) : d.device_uid,
         detalle: [
-          'API FastAPI sobre funciones sin servidor',
-          'PostgreSQL gestionado (Neon)',
-          silencioNube !== null
-            ? `última trama hace ${Math.round(silencioNube / 60)} min`
-            : 'sin ingesta registrada',
-        ],
-      },
-      {
-        id: 'wan', nombre: 'Enlace WAN', categoria: 'nube',
-        x: 0, y: -120, tam: 34,
-        estado: silencioNube === null ? 'inerte' : silencioNube < 900 ? 'ok' : 'caido',
-        detalle: [
-          'Salida a internet del gateway',
-          'Si cae, el borde sigue decidiendo solo',
-        ],
-      },
-      {
-        id: 'gw',
-        nombre: gw?.alias ?? 'Gateway fog',
-        categoria: 'gateway',
-        x: 0, y: 0, tam: 78,
-        estado: estadoDe(gw),
-        detalle: [
-          gw?.device_uid ?? 'sin identificador',
-          'Broker MQTT · motor de reglas · buffer SQLite',
-          'Punto de acceso privado del cultivo',
-        ],
-      },
-      {
-        id: 'ap', nombre: 'Punto de acceso 2,4 GHz', categoria: 'gateway',
-        x: -215, y: 95, tam: 40,
-        estado: nodoVivo ? 'ok' : 'aviso',
-        detalle: [
-          'hostapd sobre la interfaz interna',
-          'Red aislada: el nodo no tiene salida a internet',
-          rssi !== null ? `RSSI del nodo asociado: ${rssi} dBm` : 'sin estación asociada',
-        ],
-      },
-      {
-        id: 'nodo',
-        nombre: nodo?.alias ?? 'Nodo ESP32',
-        categoria: 'nodo',
-        x: 0, y: 175, tam: 70,
-        estado: estadoDe(nodo),
-        detalle: [
-          nodo?.device_uid ?? 'sin identificador',
-          nodo?.firmware_version ? `firmware ${nodo.firmware_version}` : 'firmware desconocido',
-          uptimeH ? `${uptimeH} h en marcha` : 'sin uptime reportado',
+          d.device_uid,
+          d.firmware_version ? `firmware ${d.firmware_version}` : 'firmware desconocido',
           rssi !== null ? `enlace a ${rssi} dBm` : 'sin señal medida',
+          l?.uptime_ms ? `${(l.uptime_ms / 3_600_000).toFixed(1)} h en marcha` : 'sin uptime',
+          ...(d.simulado ? ['sensores simulados por el firmware'] : []),
         ],
-      },
-      // ── Sensores ────────────────────────────────────────────
-      {
-        id: 'hdc', nombre: 'HDC1080', categoria: 'sensor',
-        x: -240, y: 258, tam: 40,
-        estado: lectura?.temperatura !== null && lectura?.temperatura !== undefined ? 'ok' : 'inerte',
-        detalle: [
-          'Temperatura y humedad del aire, bus I²C',
-          lectura?.temperatura !== null && lectura?.temperatura !== undefined
-            ? `${lectura.temperatura} °C · ${lectura.humedad ?? '—'} % HR`
-            : 'sin lectura',
-        ],
-      },
-      {
-        id: 'tds', nombre: 'Sonda TDS', categoria: 'sensor',
-        x: -120, y: 330, tam: 40,
-        estado: lectura?.ec ? 'ok' : 'inerte',
-        detalle: [
-          'Conductividad de la solución, ADC1 GPIO 33',
-          lectura?.ec ? `${lectura.ec} µS/cm` : 'sin lectura',
-        ],
-      },
-      {
-        id: 'nivel', nombre: 'Sensor de nivel', categoria: 'sensor',
-        x: 120, y: 330, tam: 40,
-        estado: lectura?.agua === null || lectura?.agua === undefined ? 'inerte' : 'ok',
-        detalle: [
-          'Detecta agua en el sustrato, ADC1 GPIO 32',
-          'Corta el llenado de tierra cuando varía',
-          lectura?.agua ? 'agua detectada' : 'sustrato sin agua libre',
-        ],
-      },
-      // ── Actuadores ──────────────────────────────────────────
-      {
-        id: 'bomba', nombre: 'Bomba', categoria: 'actuador',
-        x: 240, y: 258, tam: 40, estado: nodoVivo ? 'ok' : 'inerte',
-        detalle: ['Relé de la bomba principal', 'Nunca más de 60 min seguidos'],
-      },
-      {
-        id: 'v_hidro', nombre: 'Válvula hidroponía', categoria: 'actuador',
-        x: 300, y: 130, tam: 38, estado: nodoVivo ? 'ok' : 'inerte',
-        detalle: ['Circuito de raíz flotante', 'Día 4 ciclos/hora · noche 1'],
-      },
-      {
-        id: 'v_tierra', nombre: 'Válvula tierra', categoria: 'actuador',
-        x: 300, y: 20, tam: 38, estado: nodoVivo ? 'ok' : 'inerte',
-        detalle: ['Llenado del sustrato', 'Cada 10 días, con corte por sensor'],
-      },
-      {
-        id: 'luz', nombre: 'Luz y ventilador', categoria: 'actuador',
-        x: 215, y: -85, tam: 40, estado: nodoVivo ? 'ok' : 'inerte',
-        detalle: ['Fotoperiodo 06:00 → 18:00', 'Corte por sobretemperatura a 38 °C'],
-      },
-    ];
+      });
+      // Grosor por RSSI: −55 excelente, −85 el borde de lo utilizable.
+      const grosor = rssi === null ? 1 : Math.max(1, Math.min(6, 6 - ((-rssi - 55) / 30) * 5));
+      A.push({
+        source: 'gw', target: id, curva: 0,
+        valor: rssi !== null ? `MQTT · ${rssi} dBm` : 'MQTT',
+        ancho: vivo ? grosor : 1, guion: vivo ? undefined : 'dashed',
+      });
 
-    // Grosor del tramo inalámbrico según el RSSI. −55 dBm es excelente
-    // y −85 es el borde de lo utilizable; se mapea a ese intervalo.
-    const grosorEnlace = rssi === null ? 1
-      : Math.max(1, Math.min(6, 6 - ((-rssi - 55) / 30) * 5));
-
-    const A = [
-      { source: 'gw', target: 'wan', valor: 'HTTPS', ancho: silencioNube !== null && silencioNube < 900 ? 3 : 1, guion: silencioNube !== null && silencioNube < 900 ? undefined : 'dashed' },
-      { source: 'wan', target: 'nube', valor: 'REST · JSON', ancho: silencioNube !== null && silencioNube < 900 ? 3 : 1, guion: silencioNube !== null && silencioNube < 900 ? undefined : 'dashed' },
-      { source: 'gw', target: 'ap', valor: 'hostapd', ancho: 2.5 },
-      { source: 'ap', target: 'nodo', valor: rssi !== null ? `WiFi ${rssi} dBm` : 'WiFi', ancho: grosorEnlace, curva: 0.12 },
-      { source: 'nodo', target: 'gw', valor: 'MQTT', ancho: nodoVivo ? 3 : 1, curva: -0.22, guion: nodoVivo ? undefined : 'dashed' },
-      { source: 'nodo', target: 'hdc', valor: 'I²C', ancho: 1.6 },
-      { source: 'nodo', target: 'tds', valor: 'ADC', ancho: 1.6 },
-      { source: 'nodo', target: 'nivel', valor: 'ADC', ancho: 1.6 },
-      { source: 'nodo', target: 'bomba', valor: 'relé', ancho: 1.6 },
-      { source: 'nodo', target: 'v_hidro', valor: 'relé', ancho: 1.6 },
-      { source: 'nodo', target: 'v_tierra', valor: 'relé', ancho: 1.6 },
-      { source: 'nodo', target: 'luz', valor: 'relé', ancho: 1.6 },
-    ];
+      // Periféricos en arco alrededor del nodo, apuntando hacia fuera
+      const perifs: Array<{ id: string; nombre: string; categoria: Categoria; estado: Estado; detalle: string[]; bus: string }> = [
+        ...cap.sensores.map((s) => {
+          const m = SENSORES[s];
+          const lee = s === 'hdc1080' ? l?.temperatura != null
+            : s === 'tds' ? !!l?.ec
+            : l?.agua != null;
+          const lectura = s === 'hdc1080' && l?.temperatura != null ? `${l.temperatura} °C · ${l.humedad ?? '—'} % HR`
+            : s === 'tds' && l?.ec ? `${l.ec} µS/cm`
+            : s === 'nivel' && l?.agua != null ? (l.agua ? 'agua detectada' : 'sin agua libre')
+            : 'sin lectura';
+          return { id: `${id}_${s}`, nombre: m.nombre, categoria: 'sensor' as const,
+                   estado: lee ? 'ok' as const : 'inerte' as const, detalle: [m.que, lectura], bus: m.bus };
+        }),
+        ...cap.actuadores.map((a) => {
+          const m = ACTUADORES[a];
+          return { id: `${id}_${a}`, nombre: m.nombre, categoria: 'actuador' as const,
+                   estado: vivo ? 'ok' as const : 'inerte' as const, detalle: [m.que], bus: 'relé' };
+        }),
+      ];
+      // Arco de periféricos centrado hacia abajo (90°) y no hacia el
+      // ángulo del nodo: así ninguno sube a la altura del gateway ni
+      // invade el sector del vecino. Con muchos periféricos el arco se
+      // abre y se aleja, para que las etiquetas no se pisen.
+      const k = perifs.length;
+      // Con un solo nodo no hay vecino que invadir: el arco se abre
+      // hasta la horizontal y se aleja, que si no los tres periféricos
+      // se apilan bajo el nodo y pisan la leyenda.
+      const apertura = n === 1 ? Math.min(180, 50 * (k - 1) + 60) : Math.min(170, 34 * (k - 1) + 40);
+      const radio = (n === 1 ? 150 : 110) + Math.max(0, k - 3) * 14;
+      perifs.forEach((p, j) => {
+        const a2 = 90 - apertura / 2 + (k === 1 ? apertura / 2 : (apertura * j) / (k - 1));
+        const r2 = (a2 * Math.PI) / 180;
+        N.push({
+          id: p.id, nombre: p.nombre, categoria: p.categoria, estado: p.estado,
+          detalle: p.detalle, tam: 34,
+          x: x + Math.cos(r2) * radio * 1.3,
+          y: y + Math.sin(r2) * radio,
+        });
+        A.push({ source: id, target: p.id, valor: p.bus, ancho: 1.4 });
+      });
+    });
 
     return { nodos: N, aristas: A };
-  }, [dispositivos, silencioNube]);
+  }, [dispositivos, silencioNube, soloNodo]);
 
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
     tooltip: {
       ...TOOLTIP,
       formatter: (p: { dataType: string; data: Record<string, unknown> }) => {
-        if (p.dataType === 'edge') {
-          const d = p.data as { valor?: string; source?: string; target?: string };
-          return `<b>${d.valor ?? 'enlace'}</b>`;
-        }
+        if (p.dataType === 'edge') return `<b>${(p.data as { valor?: string }).valor ?? 'enlace'}</b>`;
         const d = p.data as unknown as NodoMapa;
-        const punto = { ok: COLORES.verde, aviso: COLORES.ambar, caido: COLORES.rojo, inerte: COLORES.textoTenue }[d.estado];
-        const rotulo = { ok: 'en línea', aviso: 'con retraso', caido: 'sin respuesta', inerte: 'sin telemetría' }[d.estado];
-        return `<div style="min-width:190px">
+        const rotulo = { ok: 'en línea', aviso: 'con retraso', caido: 'sin respuesta', inerte: 'sin datos' }[d.estado];
+        return `<div style="min-width:170px">
             <div style="font-weight:600;margin-bottom:2px">${d.nombre}</div>
-            <div style="color:${punto};font-size:10px;margin-bottom:6px">● ${rotulo}</div>
+            <div style="color:${COLOR_ESTADO[d.estado]};font-size:10px;margin-bottom:6px">● ${rotulo}</div>
             ${d.detalle.map((l) => `<div style="color:${COLORES.textoSec};font-size:11px">${l}</div>`).join('')}
           </div>`;
       },
     },
     legend: [{
       data: ['Nube', 'Gateway', 'Nodo', 'Sensores', 'Actuadores'],
-      bottom: 2,
-      textStyle: { color: COLORES.textoSec, fontSize: 10 },
+      bottom: 2, textStyle: { color: COLORES.textoSec, fontSize: 10 },
       itemWidth: 10, itemHeight: 10,
     }],
     series: [{
@@ -264,67 +255,47 @@ export default function MapaTopologia({
         { name: 'Actuadores', itemStyle: { color: COLOR_CATEGORIA.actuador } },
       ],
       label: {
-        show: true,
-        position: 'bottom' as const,
-        color: COLORES.texto,
-        fontSize: 10,
-        distance: 6,
+        show: true, position: 'bottom' as const, color: COLORES.texto,
+        fontSize: 10, distance: 5,
         formatter: (p: { data: unknown }) => (p.data as NodoMapa).nombre,
       },
       edgeLabel: {
-        show: true,
-        color: COLORES.textoTenue,
-        fontSize: 9,
+        show: true, color: COLORES.textoTenue, fontSize: 9,
         formatter: (p: { data: unknown }) => (p.data as { valor?: string }).valor ?? '',
       },
       emphasis: {
-        // 'adjacency' apaga todo menos el nodo señalado y sus enlaces.
-        // En una estrella con doce aristas es la diferencia entre ver
-        // de dónde cuelga algo y adivinarlo. `focusNodeAdjacency`, que
-        // hacía esto en ECharts 4, está retirado desde la 5.
-        focus: 'adjacency' as const,
-        scale: 1.08,
+        // Apaga todo menos el señalado y sus vecinos: con tres nodos y
+        // sus periféricos es la diferencia entre ver de dónde cuelga
+        // algo y adivinarlo.
+        focus: 'adjacency' as const, scale: 1.08,
         label: { color: COLORES.texto, fontWeight: 'bold' as const },
         lineStyle: { width: 4, opacity: 1 },
       },
       data: nodos.map((n) => ({
-        ...n,
-        name: n.id,
-        value: n.nombre,
-        symbolSize: n.tam,
+        ...n, name: n.id, value: n.nombre, symbolSize: n.tam,
         category: { nube: 0, gateway: 1, nodo: 2, sensor: 3, actuador: 4 }[n.categoria],
+        // El relleno lleva el rol y el anillo lleva el estado: dos
+        // canales para dos cosas, si no un sensor caído no se vería.
         itemStyle: {
           color: sombra(COLOR_CATEGORIA[n.categoria], n.estado === 'inerte' ? 0.25 : 0.85),
-          // El anillo lleva el estado y el relleno lleva el rol. Dos
-          // canales distintos para dos cosas distintas: si el color
-          // dijera las dos, no se podría ver un sensor caído.
           borderColor: COLOR_ESTADO[n.estado],
           borderWidth: n.estado === 'ok' ? 2 : 3,
-          shadowBlur: n.estado === 'caido' ? 18 : 10,
-          shadowColor: sombra(COLOR_ESTADO[n.estado], n.estado === 'caido' ? 0.7 : 0.35),
+          shadowBlur: n.estado === 'caido' ? 18 : 8,
+          shadowColor: sombra(COLOR_ESTADO[n.estado], n.estado === 'caido' ? 0.7 : 0.3),
         },
       })),
       links: aristas.map((a) => ({
-        source: a.source,
-        target: a.target,
-        valor: a.valor,
+        source: a.source, target: a.target, valor: a.valor,
         lineStyle: {
-          width: a.ancho,
-          color: COLORES.borde,
-          opacity: 0.85,
-          curveness: a.curva ?? 0,
-          type: a.guion ?? 'solid',
+          width: a.ancho, color: COLORES.borde, opacity: 0.9,
+          curveness: a.curva ?? 0, type: a.guion ?? 'solid',
         },
       })),
       lineStyle: { color: COLORES.borde, curveness: 0 },
     }],
   }), [nodos, aristas]);
 
-  const recolocar = () => {
-    // `notMerge` en el setOption reconstruye la serie con las posiciones
-    // originales, que es justo lo que hace falta después de arrastrar.
-    ref.current?.getEchartsInstance().setOption(option, true);
-  };
+  const recolocar = () => ref.current?.getEchartsInstance().setOption(option, true);
 
   return (
     <div className="relative">
@@ -333,20 +304,16 @@ export default function MapaTopologia({
         className="absolute right-2 top-2 z-10 flex items-center gap-1.5 rounded-md border
                    border-brand-border bg-bg-secondary/90 px-2 py-1 text-[11px]
                    text-text-secondary hover:text-text-primary transition-colors"
-        title="Devolver cada aparato a su posición original"
+        title="Devolver cada aparato a su sitio"
       >
         <RotateCcw size={11} /> Recolocar
       </button>
-      <ReactECharts
+      <Grafica
         ref={ref}
         option={option}
         style={{ height: alto, width: '100%', cursor: 'grab' }}
         opts={{ renderer: 'canvas' }}
       />
-      <p className="text-[11px] text-text-muted text-center -mt-2">
-        Arrastra cualquier aparato para recomponer el mapa · rueda para acercar ·
-        el grosor de cada enlace refleja su calidad real
-      </p>
     </div>
   );
 }

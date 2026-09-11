@@ -12,7 +12,8 @@
  * («riego de hidroponía terminado») y en vertical habría que girarlas.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import { COLORES, TOOLTIP, EJE_BASE, sombra } from '@/components/charts/tema';
 
 interface Props {
@@ -93,7 +94,7 @@ export default function DecisionesBorde({ decisiones, alto = 260 }: Props) {
   }
 
   return (
-    <ReactECharts option={option} style={{ height: alto, width: '100%' }}
+    <Grafica option={option} style={{ height: alto, width: '100%' }}
       opts={{ renderer: 'canvas' }} notMerge />
   );
 }

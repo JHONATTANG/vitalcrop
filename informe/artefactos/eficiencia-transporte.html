@@ -1,0 +1,848 @@
+<title>Eficiencia de Transporte MQTT</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.6.0/echarts.min.js"></script>
+
+<style>
+:root {
+  color-scheme: light;
+  --papel:      #f7f8fa;
+  --papel-2:    #ffffff;
+  --tinta:      #14181d;
+  --tinta-2:    #545c66;
+  --tinta-3:    #868e99;
+  --regla:      #dfe3e9;
+  --regla-2:    #eef1f5;
+  --s1:         #2a78d6;
+  --s2:         #eb6834;
+  --s3:         #1baf7a;
+  --critico:    #d03b3b;
+  --critico-bg: #fdf2f2;
+  --acento-bg:  #eef4fc;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --papel:      #14171b;
+    --papel-2:    #1a1e23;
+    --tinta:      #f2f4f7;
+    --tinta-2:    #a8b0ba;
+    --tinta-3:    #7b838d;
+    --regla:      #2b3038;
+    --regla-2:    #22262c;
+    --s1:         #3987e5;
+    --s2:         #d95926;
+    --s3:         #199e70;
+    --critico:    #e66767;
+    --critico-bg: #2a1c1c;
+    --acento-bg:  #1b2431;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --papel:      #14171b;
+  --papel-2:    #1a1e23;
+  --tinta:      #f2f4f7;
+  --tinta-2:    #a8b0ba;
+  --tinta-3:    #7b838d;
+  --regla:      #2b3038;
+  --regla-2:    #22262c;
+  --s1:         #3987e5;
+  --s2:         #d95926;
+  --s3:         #199e70;
+  --critico:    #e66767;
+  --critico-bg: #2a1c1c;
+  --acento-bg:  #1b2431;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0 20px 100px;
+}
+
+.hoja { max-width: 1000px; margin: 0 auto; }
+.col  { max-width: 660px; }
+
+/* ── Cabecera: impresión de instrumento ─────────────────── */
+.cab {
+  padding: 44px 0 22px;
+  border-bottom: 2px solid var(--tinta);
+}
+.eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--tinta-3);
+  margin: 0 0 14px;
+}
+h1 {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+  margin: 0 0 12px;
+}
+.sub { color: var(--tinta-2); margin: 0; max-width: 62ch; }
+
+.condiciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 1px;
+  background: var(--regla);
+  border: 1px solid var(--regla);
+  margin: 26px 0 0;
+}
+.cond { background: var(--papel-2); padding: 11px 13px; }
+.cond dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--tinta-3);
+  margin: 0 0 3px;
+}
+.cond dd {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Secciones ──────────────────────────────────────────── */
+section { padding-top: 54px; }
+h2 {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-weight: 600;
+  font-size: 1.4rem;
+  letter-spacing: -.01em;
+  text-wrap: balance;
+  margin: 0 0 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+h2 .num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--s1);
+  letter-spacing: .06em;
+  flex: none;
+}
+h3 {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: .95rem;
+  font-weight: 600;
+  margin: 34px 0 4px;
+}
+p { margin: 0 0 14px; }
+.col p { max-width: 65ch; }
+strong { font-weight: 600; }
+code, .mono {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .88em;
+  font-variant-numeric: tabular-nums;
+}
+code {
+  background: var(--regla-2);
+  padding: .1em .38em;
+  border-radius: 2px;
+}
+
+/* ── Figuras ────────────────────────────────────────────── */
+figure {
+  margin: 22px 0 8px;
+  background: var(--papel-2);
+  border: 1px solid var(--regla);
+}
+.lienzo { width: 100%; }
+figcaption {
+  font-size: 12.5px;
+  color: var(--tinta-2);
+  padding: 0 16px 14px;
+  max-width: 78ch;
+}
+figcaption b { color: var(--tinta); font-weight: 600; }
+
+/* ── Tablas ─────────────────────────────────────────────── */
+.tabla-envoltura { overflow-x: auto; margin: 20px 0 8px; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13.5px;
+  min-width: 480px;
+}
+caption {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--tinta-3);
+  padding-bottom: 7px;
+}
+th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--tinta-2);
+  border-bottom: 1.5px solid var(--tinta);
+  padding: 7px 11px 6px;
+  white-space: nowrap;
+}
+td {
+  border-bottom: 1px solid var(--regla);
+  padding: 7px 11px;
+  vertical-align: baseline;
+}
+tbody tr:last-child td { border-bottom: 1.5px solid var(--tinta); }
+.n {
+  text-align: right;
+  font-family: "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.t {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--tinta-2);
+  word-break: break-all;
+}
+tr.destacada td { background: var(--critico-bg); }
+tr.suma td { font-weight: 600; background: var(--regla-2); }
+.pastilla {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 2px;
+  border: 1px solid;
+}
+.p-mal  { color: var(--critico); border-color: var(--critico); }
+.p-ok   { color: var(--s3);      border-color: var(--s3); }
+
+/* ── Cifra suelta ───────────────────────────────────────── */
+.hallazgo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 30px;
+  align-items: flex-end;
+  border-left: 3px solid var(--critico);
+  background: var(--critico-bg);
+  padding: 16px 18px;
+  margin: 24px 0;
+}
+.hallazgo .cifra {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 2.3rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--critico);
+  font-variant-numeric: tabular-nums;
+}
+.hallazgo .texto { flex: 1 1 300px; font-size: 13.5px; color: var(--tinta-2); }
+.hallazgo .texto b { color: var(--tinta); }
+
+.formula {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 15px;
+  background: var(--acento-bg);
+  border-left: 3px solid var(--s1);
+  padding: 13px 16px;
+  margin: 18px 0;
+  overflow-x: auto;
+}
+
+pre.captura {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  background: var(--papel-2);
+  border: 1px solid var(--regla);
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 18px 0;
+  color: var(--tinta-2);
+}
+pre.captura b { color: var(--tinta); font-weight: 500; }
+
+.nota {
+  font-size: 12.5px;
+  color: var(--tinta-2);
+  border-top: 1px solid var(--regla);
+  padding-top: 12px;
+  margin-top: 30px;
+  max-width: 72ch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="hoja">
+
+<header class="cab">
+  <p class="eyebrow">VitalCrop AGW · Medición de enlace</p>
+  <h1>¿Cuánto del aire lleva dato?</h1>
+  <p class="sub">Eficiencia de transporte del enlace ESP32 → gateway, medida byte a byte
+  sobre el cultivo en marcha. La fórmula da 64 %. El aire da 56 %. Lo que de verdad
+  informa algo da 0,54 %, y la razón no está en los protocolos.</p>
+
+  <dl class="condiciones">
+    <div class="cond"><dt>Ventana</dt><dd>310 s</dd></div>
+    <div class="cond"><dt>Mensajes</dt><dd>136</dd></div>
+    <div class="cond"><dt>Instrumentos</dt><dd>tcpdump · mosquitto_sub</dd></div>
+    <div class="cond"><dt>Broker</dt><dd>mosquitto 2.0.21</dd></div>
+    <div class="cond"><dt>Tasa de subida</dt><dd>6,0 Mbit/s</dd></div>
+    <div class="cond"><dt>MTU / MSS</dt><dd>1500 / 1436</dd></div>
+    <div class="cond"><dt>QoS</dt><dd>0</dd></div>
+    <div class="cond"><dt>Nodos</dt><dd>2 asociados</dd></div>
+  </dl>
+</header>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section class="col">
+  <h2><span class="num">01</span>Lo que el nodo pone en el aire</h2>
+  <p>Suscribí el comodín <code>cultivo/indoor/#</code> durante 310 segundos y medí la
+  longitud de cada payload. El reparto no es el que esperaba: la telemetría, que es el
+  dato del cultivo, aparece <strong>dos veces</strong>; una alerta aparece 124.</p>
+</section>
+
+<figure>
+  <div class="lienzo" id="g-canales" style="height:330px"></div>
+  <figcaption>Mensajes por canal en la ventana, y a la derecha el tamaño medio de su
+  carga útil. Son dos escalas distintas —cuenta y bytes— así que van en dos paneles y no
+  en dos ejes. La <b>alerta</b> gana en número por dos órdenes de magnitud; el
+  <b>status</b> gana en tamaño, y por eso resultará ser el canal más eficiente de los
+  tres.</figcaption>
+</figure>
+
+<div class="hoja col">
+  <div class="tabla-envoltura">
+    <table>
+      <caption>Tabla 1 · Inventario de tópicos medido</caption>
+      <thead><tr>
+        <th>Canal</th><th>Tópico</th><th class="n">Mensajes</th>
+        <th class="n">Cadencia</th><th class="n">Carga</th>
+      </tr></thead>
+      <tbody>
+        <tr class="destacada">
+          <td>alerta</td><td class="t">cultivo/indoor/hierbabuena/alerta</td>
+          <td class="n">124</td><td class="n">5 s</td><td class="n">144 B</td>
+        </tr>
+        <tr>
+          <td>status</td><td class="t">cultivo/indoor/{especie}/status</td>
+          <td class="n">10</td><td class="n">60 s</td><td class="n">692 B</td>
+        </tr>
+        <tr>
+          <td>telemetría</td><td class="t">cultivo/indoor/{especie}/telemetria</td>
+          <td class="n">2</td><td class="n">300 s</td><td class="n">148 B</td>
+        </tr>
+        <tr class="suma">
+          <td colspan="2">Total</td><td class="n">136</td><td class="n">—</td>
+          <td class="n">185 B</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:12.5px;color:var(--tinta-2);margin-top:10px">
+  El tópico viaja entero en cada mensaje: MQTT 3.1.1 no comprime ni referencia tópicos.
+  Esos 33–37 caracteres son la mayor parte de la cabecera de aplicación.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section class="col">
+  <h2><span class="num">02</span>La fórmula, capa por capa</h2>
+  <p>La eficiencia de transporte es la fracción de la trama que lleva información útil:</p>
+  <div class="formula">e = L / (L + H)</div>
+  <p>con <code>L</code> la carga útil y <code>H</code> las cabeceras. Tomo la telemetría
+  de hierbabuena —170 B de JSON medidos— y sigo su descenso por la pila. Cada capa cobra
+  su peaje.</p>
+</section>
+
+<figure>
+  <div class="lienzo" id="g-capas" style="height:300px"></div>
+  <figcaption>Los 170 B de JSON son el segmento azul, constante; lo que crece a su derecha
+  son las cabeceras acumuladas. El porcentaje a la derecha de cada barra es la
+  <b>e</b> alcanzada en esa capa. El salto más caro es el primero: MQTT añade
+  <b>42 B</b>, y 37 de ellos son el nombre del tópico.</figcaption>
+</figure>
+
+<div class="hoja col">
+  <div class="tabla-envoltura">
+    <table>
+      <caption>Tabla 2 · Pila de protocolos, telemetría de 170 B</caption>
+      <thead><tr>
+        <th>Capa</th><th class="n">Añade</th><th class="n">Trama</th>
+        <th class="n">e</th><th>Qué es</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Carga útil</td><td class="n">—</td><td class="n">170 B</td>
+            <td class="n">100 %</td><td>El JSON de sensores</td></tr>
+        <tr><td>MQTT PUBLISH</td><td class="n">+42</td><td class="n">212 B</td>
+            <td class="n">80,2 %</td><td>Cabecera fija 3 + longitud 2 + tópico 37</td></tr>
+        <tr><td>TCP</td><td class="n">+20</td><td class="n">232 B</td>
+            <td class="n">73,3 %</td><td>Sin opciones</td></tr>
+        <tr><td>IPv4</td><td class="n">+20</td><td class="n">252 B</td>
+            <td class="n">67,5 %</td><td>Sin fragmentar</td></tr>
+        <tr><td>Ethernet</td><td class="n">+14</td><td class="n">266 B</td>
+            <td class="n">63,9 %</td><td>Lo que ve <code>tcpdump</code></td></tr>
+        <tr class="suma"><td>802.11 + WPA2</td><td class="n">+38</td><td class="n">304 B</td>
+            <td class="n">55,9 %</td><td>MAC 24 + CCMP 8 + MIC 8 + SNAP 8 + FCS 4</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:18px">Las cifras de Ethernet e IP no son teóricas. Esta es la
+  trama, tal como la escupió el analizador:</p>
+  <pre class="captura">38:18:2b:8a:12:7c &gt; dc:a6:32:90:de:f2, ethertype IPv4, <b>length 266</b>:
+    (tos 0x0, ttl 64, proto TCP (6), <b>length 252</b>)
+    10.42.0.26.62662 &gt; 10.42.0.1.1883: Flags [P.], <b>length 212</b></pre>
+  <p style="font-size:12.5px;color:var(--tinta-2)">266 = 14 + 252. 252 = 20 + 20 + 212.
+  212 = 42 + 170. La contabilidad cierra al byte, y cierra porque ningún mensaje llega
+  al MSS de 1436: un mensaje MQTT es siempre un segmento y una trama, sin fragmentación
+  que reparta cabeceras.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section class="col">
+  <h2><span class="num">03</span>Del papel a la realidad</h2>
+  <p>La fórmula ignora tres cosas, y cada una muerde más que la anterior. Aplicadas en
+  orden sobre los 136 mensajes de la ventana, la eficiencia no baja: se desploma.</p>
+</section>
+
+<figure>
+  <div class="lienzo" id="g-cascada" style="height:320px"></div>
+  <figcaption>La misma medición, con el denominador corregido cuatro veces. Los tres
+  primeros pasos son el precio de los protocolos y son razonables. El cuarto no es un
+  coste de transporte: es que <b>el 91 % de los mensajes repite algo ya sabido</b>. La
+  última barra está dibujada a escala; que casi no se vea es el resultado.</figcaption>
+</figure>
+
+<div class="hoja col">
+  <div class="tabla-envoltura">
+    <table>
+      <caption>Tabla 3 · Descenso de la eficiencia agregada</caption>
+      <thead><tr>
+        <th class="n">e</th><th>Denominador</th><th>Qué se añadió</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="n">66,7 %</td><td>Trama Ethernet</td>
+            <td>La fórmula, tal cual</td></tr>
+        <tr><td class="n">58,6 %</td><td>Trama en el aire</td>
+            <td>802.11 y WPA2 sustituyen a Ethernet</td></tr>
+        <tr><td class="n">45,4 %</td><td>+ ACK de TCP</td>
+            <td>Cada PUBLISH provoca 92 B de retorno sin dato</td></tr>
+        <tr class="destacada"><td class="n">0,54 %</td><td>+ solo dato nuevo</td>
+            <td>La alerta repetida deja de contar como <code>L</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hallazgo">
+    <div class="cifra">7,6</div>
+    <div class="texto"><b>bit/s de información nueva</b>, de 1.103 bit/s que el nodo
+    pone en el aire. 296 B útiles en 55.272 B transmitidos durante los 310 s de la
+    ventana.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section class="col">
+  <h2><span class="num">04</span>El aire no se mide en bytes</h2>
+  <p>Un canal 802.11 no se reparte por bytes sino por tiempo, y el nodo sube a
+  <strong>6,0 Mbit/s</strong> —la tasa más baja de OFDM— mientras el gateway le baja a
+  72 Mbit/s. Con los tiempos de 802.11g: preámbulo 20 µs, símbolo 4 µs, DIFS 28 µs,
+  SIFS 10 µs, ranura 9 µs y ventana de contienda mínima 15.</p>
+</section>
+
+<figure>
+  <div class="lienzo" id="g-airtime" style="height:290px"></div>
+  <figcaption>Desglose del tiempo que cada mensaje ocupa el canal. Solo el segmento
+  <b>datos</b> transporta algo, y dentro de él las cabeceras siguen pesando. Los 169,5 µs
+  de contienda, DIFS, SIFS y ACK son fijos: los paga igual un mensaje de 144 B que uno de
+  692, y es exactamente por eso que el <b>status</b> los amortiza mejor.</figcaption>
+</figure>
+
+<div class="hoja col">
+  <div class="tabla-envoltura">
+    <table>
+      <caption>Tabla 4 · Eficiencia por canal, en bytes y en tiempo</caption>
+      <thead><tr>
+        <th>Canal</th><th class="n">L</th><th class="n">Aire</th>
+        <th class="n">e bytes</th><th class="n">Airtime</th>
+        <th class="n">e airtime</th>
+      </tr></thead>
+      <tbody>
+        <tr class="destacada"><td>alerta</td><td class="n">144 B</td><td class="n">274 B</td>
+            <td class="n">52,6 %</td><td class="n">542 µs</td><td class="n">35,6 %</td></tr>
+        <tr><td>telemetría</td><td class="n">148 B</td><td class="n">282 B</td>
+            <td class="n">52,4 %</td><td class="n">550 µs</td><td class="n">35,8 %</td></tr>
+        <tr class="suma"><td>status</td><td class="n">692 B</td><td class="n">822 B</td>
+            <td class="n">84,2 %</td><td class="n">1.269 µs</td><td class="n">72,6 %</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:12.5px;color:var(--tinta-2);margin-top:10px">
+  La lección de diseño está en la última fila: <strong>agrupar paga</strong>. Un mensaje
+  cuatro veces más grande no cuesta cuatro veces más airtime, porque el sobrecoste fijo
+  se reparte. Enviar cuatro telemetrías juntas cada 20 min sería más eficiente que cuatro
+  sueltas cada 5.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section class="col">
+  <h2><span class="num">05</span>¿Cuántos nodos caben?</h2>
+  <p>Ésta era la pregunta original, y la respuesta desactiva el miedo: el airtime
+  <strong>no es la restricción</strong>. Un nodo con el tráfico de hoy ocupa 473 ms de
+  cada hora —el 0,013 % del canal—, y de esos 473 ms la alerta atascada se lleva
+  <strong>390</strong>.</p>
+</section>
+
+<figure>
+  <div class="lienzo" id="g-capacidad" style="height:310px"></div>
+  <figcaption>Ocupación del canal proyectada. Con el tráfico actual, 60 nodos usarían
+  el 0,79 % del canal; corregida la alerta, el 0,14 %. El eje llega al 1 % y no al 100 %
+  a propósito: a esta escala la pregunta no es si caben, sino cuánto margen sobra.
+  <b>El límite práctico lo pondrá la tabla de asociaciones del punto de acceso, no el
+  aire.</b></figcaption>
+</figure>
+
+<div class="hoja col">
+  <div class="tabla-envoltura">
+    <table>
+      <caption>Tabla 5 · Ocupación del canal por nodo y hora</caption>
+      <thead><tr>
+        <th>Canal</th><th class="n">Mensajes/h</th><th class="n">Airtime/h</th>
+        <th class="n">Del total</th>
+      </tr></thead>
+      <tbody>
+        <tr class="destacada"><td>alerta</td><td class="n">720</td><td class="n">390 ms</td>
+            <td class="n">82,5 %</td></tr>
+        <tr><td>status</td><td class="n">60</td><td class="n">76 ms</td>
+            <td class="n">16,1 %</td></tr>
+        <tr><td>telemetría</td><td class="n">12</td><td class="n">7 ms</td>
+            <td class="n">1,4 %</td></tr>
+        <tr class="suma"><td>Total</td><td class="n">792</td><td class="n">473 ms</td>
+            <td class="n">0,0131 % del canal</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="margin-top:16px">Corregida la alerta, el nodo baja a <strong>83 ms/hora</strong>:
+  <strong>5,7 veces</strong> menos airtime, sin perder un solo dato del cultivo.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section class="col">
+  <h2><span class="num">06</span>El estado del enlace</h2>
+  <p>Los contadores del socket y del punto de acceso, para dejar claro que la ineficiencia
+  medida <em>no</em> es culpa de un enlace malo. El enlace está sano.</p>
+
+  <div class="tabla-envoltura">
+    <table>
+      <caption>Tabla 6 · Socket TCP del nodo publicador y enlace radio</caption>
+      <thead><tr>
+        <th>Métrica</th><th class="n">Valor</th><th>Lectura</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>RSSI</td><td class="n">−58 dBm</td>
+            <td>Holgado frente al umbral de −70</td></tr>
+        <tr><td>Retransmisiones TCP</td><td class="n">0,57 %</td>
+            <td>154 B de 27.058 enviados <span class="pastilla p-ok">sano</span></td></tr>
+        <tr><td>Tramas fallidas (AP)</td><td class="n">1.397</td>
+            <td>De 572.261 transmitidas — 0,24 %</td></tr>
+        <tr><td>MSS / PMTU</td><td class="n">1436 / 1500</td>
+            <td>Sin fragmentación en ningún mensaje</td></tr>
+        <tr><td>Ventana del nodo</td><td class="n">4.704 B</td>
+            <td>Pequeña por diseño del ESP32; irrelevante a 200 B</td></tr>
+        <tr class="destacada"><td>RTT</td><td class="n">131,8 ms</td>
+            <td>Contra un <code>minrtt</code> de 11,5 ms</td></tr>
+        <tr class="suma"><td>Tasa de subida</td><td class="n">6,0 Mbit/s</td>
+            <td>La más baja de OFDM, con la señal para mucho más</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Los dos números que piden explicación</h3>
+  <p>El <strong>RTT de 131,8 ms contra un mínimo de 11,5</strong> es el ahorro de energía:
+  el nodo tiene <code>ahorro_wifi</code> activo y despierta en la baliza, así que los
+  paquetes esperan el DTIM. Es un precio elegido, no una avería — pero conviene saber que
+  la latencia del mando manual la fija ese ajuste, no la red.</p>
+  <p>La <strong>subida a 6,0 Mbit/s</strong> con −58 dBm de señal sí es dinero tirado:
+  a esa tasa la telemetría ocupa 550 µs de canal donde a 54 Mbit/s ocuparía unos 110.
+  No importa hoy, con el canal al 0,013 %; importaría con treinta nodos.</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section class="col">
+  <h2><span class="num">07</span>La conclusión incómoda</h2>
+  <p>Ninguna de las ineficiencias de protocolo justifica una intervención. 55,9 % sobre el
+  aire es lo normal para JSON sobre MQTT sobre TCP con payloads de 170 B, y el remedio
+  —binario en vez de JSON, tópicos cortos, agrupar mensajes— compraría puntos porcentuales
+  a cambio de un sistema mucho menos legible.</p>
+
+  <div class="hallazgo">
+    <div class="cifra">75 h</div>
+    <div class="texto"><b>emitiendo la misma alerta cada 5 segundos.</b>
+    <code>hsuelo</code> lee 0, el umbral mínimo es 20, y el nodo dispara
+    <code>nivel: GRAVE</code> sin antirrebote ni histéresis. El campo
+    <code>duracion_ms</code> del propio mensaje lo delata: 270.270.000.</div>
+  </div>
+
+  <p>Eso es el 91 % de los mensajes, el 82,5 % del airtime y la diferencia entre una
+  eficiencia del 45 % y una del 0,54 %. Y no es un problema de transporte: es un sensor
+  que no está dando señal y una regla de alertas que reemite una condición persistente
+  como si fuera nueva.</p>
+
+  <p><strong>Dos arreglos, en este orden.</strong> Primero, histéresis en el disparo: una
+  condición que ya se notificó no se reemite hasta que cambie de estado o pase un tiempo
+  largo. Segundo, averiguar si la sonda de humedad de suelo está desconectada o nunca se
+  instaló — porque mientras lea 0, cualquier umbral por encima de 0 disparará para
+  siempre.</p>
+
+  <p class="nota">Medido el 10/09/2026 entre las 00:44 y las 01:05 hora de Colombia, con
+  el cultivo operando y sin interrumpir ningún proceso. Instrumentos:
+  <code>tcpdump</code> sobre <code>wlan0</code>, <code>mosquitto_sub</code> contra el
+  broker local, <code>ss -tinm</code> para el socket y <code>iw station dump</code> para
+  el enlace radio. Los tiempos de airtime son calculados a partir de la tasa negociada
+  medida y los parámetros de 802.11g, no cronometrados en el aire.</p>
+</section>
+
+</div>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const T = {
+  s1: css('--s1'), s2: css('--s2'), s3: css('--s3'),
+  crit: css('--critico'), tinta: css('--tinta'),
+  t2: css('--tinta-2'), t3: css('--tinta-3'), regla: css('--regla')
+};
+
+const EJE = {
+  axisLine:  { lineStyle: { color: T.regla } },
+  axisTick:  { show: false },
+  axisLabel: { color: T.t2, fontSize: 11, fontFamily: '"IBM Plex Mono", monospace' },
+  splitLine: { lineStyle: { color: T.regla, type: 'dashed' } },
+  nameTextStyle: { color: T.t3, fontSize: 10.5, fontFamily: '"IBM Plex Mono", monospace' }
+};
+const TIP = {
+  trigger: 'axis',
+  backgroundColor: css('--papel-2'),
+  borderColor: T.regla,
+  borderWidth: 1,
+  textStyle: { color: T.tinta, fontSize: 12, fontFamily: '"IBM Plex Sans", sans-serif' },
+  extraCssText: 'box-shadow:0 2px 12px rgba(0,0,0,.09);border-radius:2px'
+};
+const LEY = {
+  textStyle: { color: T.t2, fontSize: 11.5, fontFamily: '"IBM Plex Sans", sans-serif' },
+  itemWidth: 11, itemHeight: 11, icon: 'roundRect'
+};
+const graficas = [];
+function pinta(id, opcion) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const ch = echarts.init(el);
+  ch.setOption(opcion);
+  graficas.push(ch);
+}
+
+/* ── 01 · Canales: dos paneles, escalas distintas ────────── */
+pinta('g-canales', {
+  tooltip: { ...TIP, axisPointer: { type: 'shadow' } },
+  title: [
+    { text: 'Mensajes en 310 s', left: 58, top: 6,
+      textStyle: { fontSize: 11.5, fontWeight: 600, color: T.t2,
+                   fontFamily: '"IBM Plex Sans", sans-serif' } },
+    { text: 'Carga útil media', left: '55%', top: 6,
+      textStyle: { fontSize: 11.5, fontWeight: 600, color: T.t2,
+                   fontFamily: '"IBM Plex Sans", sans-serif' } }
+  ],
+  grid: [
+    { left: 92, right: '52%', top: 40, bottom: 44 },
+    { left: '55%', right: 56, top: 40, bottom: 44 }
+  ],
+  xAxis: [
+    { ...EJE, type: 'value', gridIndex: 0, name: 'mensajes', nameLocation: 'middle', nameGap: 28 },
+    { ...EJE, type: 'value', gridIndex: 1, name: 'bytes', nameLocation: 'middle', nameGap: 28 }
+  ],
+  yAxis: [
+    { ...EJE, type: 'category', gridIndex: 0, data: ['telemetría', 'status', 'alerta'],
+      axisLabel: { ...EJE.axisLabel, fontFamily: '"IBM Plex Sans", sans-serif', fontSize: 12 } },
+    { ...EJE, type: 'category', gridIndex: 1, data: ['telemetría', 'status', 'alerta'],
+      axisLabel: { show: false } }
+  ],
+  series: [
+    { name: 'Mensajes', type: 'bar', barWidth: 16,
+      itemStyle: { borderRadius: [0, 4, 4, 0] },
+      label: { show: true, position: 'right', color: T.t2, fontSize: 11,
+               fontFamily: '"IBM Plex Mono", monospace' },
+      data: [
+        { value: 2,   itemStyle: { color: T.s1 } },
+        { value: 10,  itemStyle: { color: T.s3 } },
+        { value: 124, itemStyle: { color: T.crit } }
+      ] },
+    { name: 'Carga útil', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, barWidth: 16,
+      itemStyle: { borderRadius: [0, 4, 4, 0] },
+      label: { show: true, position: 'right', formatter: '{c} B', color: T.t2,
+               fontSize: 11, fontFamily: '"IBM Plex Mono", monospace' },
+      data: [
+        { value: 148, itemStyle: { color: T.s1 } },
+        { value: 692, itemStyle: { color: T.s3 } },
+        { value: 144, itemStyle: { color: T.crit } }
+      ] }
+  ]
+});
+
+/* ── 02 · Pila de capas ──────────────────────────────────── */
+const capas = [
+  { capa: 'Carga útil',    h: 0,  trama: 170, e: '100 %' },
+  { capa: 'MQTT PUBLISH',  h: 42, trama: 212, e: '80,2 %' },
+  { capa: 'TCP',           h: 20, trama: 232, e: '73,3 %' },
+  { capa: 'IPv4',          h: 20, trama: 252, e: '67,5 %' },
+  { capa: 'Ethernet',      h: 14, trama: 266, e: '63,9 %' },
+  { capa: '802.11 + WPA2', h: 38, trama: 304, e: '55,9 %' }
+];
+pinta('g-capas', {
+  tooltip: {
+    ...TIP, axisPointer: { type: 'shadow' },
+    formatter: p => {
+      const c = capas[p[0].dataIndex];
+      return `<b>${c.capa}</b><br>Trama: ${c.trama} B<br>` +
+             `Cabeceras: ${c.trama - 170} B<br>Eficiencia: ${c.e}`;
+    }
+  },
+  legend: { ...LEY, top: 4, data: ['Carga útil (170 B)', 'Cabeceras acumuladas'] },
+  grid: { left: 118, right: 82, top: 40, bottom: 40 },
+  xAxis: { ...EJE, type: 'value', name: 'bytes en la trama',
+           nameLocation: 'middle', nameGap: 28, max: 320 },
+  yAxis: { ...EJE, type: 'category', data: capas.map(c => c.capa).reverse(),
+           axisLabel: { ...EJE.axisLabel, fontFamily: '"IBM Plex Sans", sans-serif',
+                        fontSize: 12 } },
+  series: [
+    { name: 'Carga útil (170 B)', type: 'bar', stack: 'p', barWidth: 18,
+      itemStyle: { color: T.s1 },
+      data: capas.map(() => 170).reverse() },
+    { name: 'Cabeceras acumuladas', type: 'bar', stack: 'p', barWidth: 18,
+      itemStyle: { color: T.s2, borderRadius: [0, 4, 4, 0] },
+      label: {
+        show: true, position: 'right', color: T.tinta, fontSize: 11.5, fontWeight: 500,
+        fontFamily: '"IBM Plex Mono", monospace',
+        formatter: p => capas[capas.length - 1 - p.dataIndex].e
+      },
+      data: capas.map(c => c.trama - 170).reverse() }
+  ]
+});
+
+/* ── 03 · Cascada ────────────────────────────────────────── */
+const casc = [
+  { p: 'Sobre Ethernet',     e: 66.7, n: 'la fórmula, tal cual' },
+  { p: 'Sobre el aire',      e: 58.6, n: '802.11 + WPA2' },
+  { p: 'Con el ACK de TCP',  e: 45.4, n: 'el retorno no lleva dato' },
+  { p: 'Solo dato nuevo',    e: 0.54, n: 'la alerta no informa' }
+];
+pinta('g-cascada', {
+  tooltip: {
+    ...TIP, axisPointer: { type: 'shadow' },
+    formatter: p => `<b>${casc[p[0].dataIndex].p}</b><br>` +
+                    `e = ${casc[p[0].dataIndex].e} %<br>` +
+                    `<span style="color:${T.t2}">${casc[p[0].dataIndex].n}</span>`
+  },
+  grid: { left: 62, right: 30, top: 26, bottom: 62 },
+  xAxis: { ...EJE, type: 'category', data: casc.map(c => c.p),
+           axisLabel: { ...EJE.axisLabel, fontFamily: '"IBM Plex Sans", sans-serif',
+                        fontSize: 12, interval: 0, lineHeight: 15,
+                        formatter: v => v.replace(' ', '\n') } },
+  yAxis: { ...EJE, type: 'value', name: 'eficiencia (%)', max: 70,
+           axisLabel: { ...EJE.axisLabel, formatter: '{value} %' } },
+  series: [{
+    type: 'bar', barWidth: '46%',
+    itemStyle: { borderRadius: [4, 4, 0, 0] },
+    label: { show: true, position: 'top', color: T.tinta, fontSize: 13, fontWeight: 500,
+             fontFamily: '"IBM Plex Mono", monospace',
+             formatter: p => casc[p.dataIndex].e.toString().replace('.', ',') + ' %' },
+    data: [
+      { value: 66.7, itemStyle: { color: T.s1 } },
+      { value: 58.6, itemStyle: { color: T.s1 } },
+      { value: 45.4, itemStyle: { color: T.s2 } },
+      { value: 0.54, itemStyle: { color: T.crit } }
+    ]
+  }]
+});
+
+/* ── 04 · Airtime ────────────────────────────────────────── */
+// Orden de abajo arriba en el eje: status, telemetría, alerta — así la
+// alerta queda arriba, igual que en la tabla de al lado.
+const piezas = [
+  { n: 'Contienda + DIFS', c: T.t3, v: [95.5, 95.5, 95.5] },
+  { n: 'Preámbulo PLCP',   c: T.s2, v: [20, 20, 20] },
+  { n: 'Datos',            c: T.s1, v: [1100, 380, 372] },
+  { n: 'SIFS + ACK',       c: T.s3, v: [54, 54, 54] }
+];
+pinta('g-airtime', {
+  tooltip: { ...TIP, axisPointer: { type: 'shadow' },
+             valueFormatter: v => v + ' µs' },
+  legend: { ...LEY, top: 4 },
+  grid: { left: 104, right: 76, top: 42, bottom: 40 },
+  xAxis: { ...EJE, type: 'value', name: 'µs de canal ocupado',
+           nameLocation: 'middle', nameGap: 28 },
+  yAxis: { ...EJE, type: 'category', data: ['status', 'telemetría', 'alerta'],
+           axisLabel: { ...EJE.axisLabel, fontFamily: '"IBM Plex Sans", sans-serif',
+                        fontSize: 12 } },
+  series: piezas.map((p, i) => ({
+    name: p.n, type: 'bar', stack: 'a', barWidth: 22,
+    itemStyle: { color: p.c,
+                 borderColor: css('--papel-2'), borderWidth: 2,
+                 borderRadius: i === piezas.length - 1 ? [0, 4, 4, 0] : 0 },
+    data: p.v,
+    ...(i === piezas.length - 1 ? {
+      label: { show: true, position: 'right', color: T.tinta, fontSize: 11.5,
+               fontWeight: 500, fontFamily: '"IBM Plex Mono", monospace',
+               formatter: p2 => [1269, 550, 542][p2.dataIndex]
+                 .toLocaleString('es') + ' µs' }
+    } : {})
+  }))
+});
+
+/* ── 05 · Capacidad ──────────────────────────────────────── */
+const nodos = [1, 2, 5, 10, 20, 30, 45, 60];
+pinta('g-capacidad', {
+  tooltip: { ...TIP, valueFormatter: v => v.toFixed(3).replace('.', ',') + ' %' },
+  legend: { ...LEY, top: 4 },
+  grid: { left: 68, right: 30, top: 42, bottom: 46 },
+  xAxis: { ...EJE, type: 'category', data: nodos, name: 'nodos asociados',
+           nameLocation: 'middle', nameGap: 28, boundaryGap: false },
+  yAxis: { ...EJE, type: 'value', name: 'canal ocupado (%)', max: 1,
+           axisLabel: { ...EJE.axisLabel,
+                        formatter: v => v.toString().replace('.', ',') + ' %' } },
+  series: [
+    { name: 'Tráfico actual', type: 'line', smooth: false, symbolSize: 8,
+      lineStyle: { width: 2, color: T.crit }, itemStyle: { color: T.crit,
+        borderColor: css('--papel-2'), borderWidth: 2 },
+      areaStyle: { color: 'rgba(208,59,59,.10)' },
+      data: [0.0131, 0.0263, 0.0657, 0.1314, 0.2628, 0.3941, 0.5912, 0.7883] },
+    { name: 'Corregida la alerta', type: 'line', smooth: false, symbolSize: 8,
+      lineStyle: { width: 2, color: T.s3 }, itemStyle: { color: T.s3,
+        borderColor: css('--papel-2'), borderWidth: 2 },
+      areaStyle: { color: 'rgba(27,175,122,.10)' },
+      data: [0.0023, 0.0046, 0.0115, 0.023, 0.046, 0.0689, 0.1034, 0.1379] }
+  ]
+});
+
+addEventListener('resize', () => graficas.forEach(c => c.resize()));
+</script>

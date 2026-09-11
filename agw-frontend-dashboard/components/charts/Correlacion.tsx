@@ -18,7 +18,8 @@
  * población completa.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import {
   COLORES, ETIQUETA_METRICA, UNIDAD_METRICA, TOOLTIP, EJE_BASE, sombra,
 } from './tema';
@@ -32,8 +33,17 @@ interface Props {
   alto?: number;
 }
 
-export default function Correlacion({ puntos, x, y, r, alto = 320 }: Props) {
+export default function Correlacion({ puntos: crudos, x, y, r, alto = 320 }: Props) {
   const option = useMemo(() => {
+    // `numeric` de Postgres llega como cadena en el JSON. Sin esto los
+    // reduces de abajo concatenan en vez de sumar y la recta sale con
+    // pendiente absurda mientras los puntos ni se pintan.
+    // El (0, 0) exacto no es una lectura: es el sensor antes de su
+    // primera medida. Tres de esos anclan el eje en cero y aplastan
+    // la nube contra la esquina.
+    const puntos = crudos
+      .map((p) => ({ x: Number(p.x), y: Number(p.y), hora: Number(p.hora) }))
+      .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && !(p.x === 0 && p.y === 0));
     const datos = puntos.map((p) => [p.x, p.y, p.hora]);
 
     // Mínimos cuadrados sobre la muestra, solo para orientar la vista.
@@ -104,8 +114,10 @@ export default function Correlacion({ puntos, x, y, r, alto = 320 }: Props) {
           data: datos,
           symbolSize: 5,
           itemStyle: { opacity: 0.55 },
-          large: true,
-          largeThreshold: 800,
+          // Sin `large`: en ese modo ECharts pinta con un solo color
+          // —ignora el visualMap por dimensión— y el eje no se
+          // reescala a la nube, así que salía la recta sola sobre un
+          // eje vacío. Con 1.200 puntos el modo normal sobra.
         },
         ...(recta.length ? [{
           type: 'line' as const,
@@ -118,9 +130,9 @@ export default function Correlacion({ puntos, x, y, r, alto = 320 }: Props) {
         }] : []),
       ],
     };
-  }, [puntos, x, y]);
+  }, [crudos, x, y]);
 
-  if (!puntos.length) {
+  if (!crudos.length) {
     return <p className="text-text-muted text-sm py-12 text-center">Sin puntos que cruzar</p>;
   }
 
@@ -132,7 +144,7 @@ export default function Correlacion({ puntos, x, y, r, alto = 320 }: Props) {
 
   return (
     <div>
-      <ReactECharts
+      <Grafica
         option={option}
         style={{ height: alto, width: '100%' }}
         opts={{ renderer: 'canvas' }}
@@ -144,7 +156,7 @@ export default function Correlacion({ puntos, x, y, r, alto = 320 }: Props) {
           {' · '}{fuerza}
           {' · '}
           <span style={{ color: sombra(COLORES.textoTenue, 1) }}>
-            {puntos.length.toLocaleString()} puntos mostrados
+            {crudos.length.toLocaleString()} puntos mostrados
           </span>
         </p>
       )}

@@ -1,7 +1,8 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Leaf, Mail, KeyRound, Loader2, ArrowRight } from 'lucide-react';
+import { Suspense, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Leaf, Mail, KeyRound, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -17,12 +18,17 @@ type EmailForm = z.infer<typeof emailSchema>;
 
 // Schema for OTP Step
 const optSchema = z.object({
-  code: z.string().length(6, 'OTP must be exactly 6 characters'),
+  code: z.string().length(6, 'El código tiene seis dígitos'),
 });
 type OtpForm = z.infer<typeof optSchema>;
 
-export default function LoginPage() {
+function Login() {
   const router = useRouter();
+  // Adónde iba antes de que el middleware lo mandara aquí. Solo se
+  // acepta una ruta interna: un `next` con host ajeno abriría una
+  // redirección hacia fuera.
+  const next = useSearchParams().get('next');
+  const destino = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [storedEmail, setStoredEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,7 +63,7 @@ export default function LoginPage() {
       if (access_token) {
         setCookie('jwt', access_token, { maxAge: 60 * 60 * 24 * 7, path: '/' });
         toast.success('Sesión iniciada.');
-        router.push('/dashboard');
+        router.push(destino);
       } else {
         toast.error('La respuesta del servidor no traía una sesión válida.');
       }
@@ -160,6 +166,23 @@ export default function LoginPage() {
       <p className="text-center text-xs text-text-muted mt-6 font-medium">
         VitalCrop AGW · Cultivo en ambiente controlado
       </p>
+      <Link href="/"
+        className="flex items-center justify-center gap-1.5 text-xs text-text-muted
+                   hover:text-text-primary mt-3 transition-colors">
+        <ArrowLeft size={12} /> Volver a la portada
+      </Link>
     </div>
+  );
+}
+
+/**
+ * `useSearchParams` obliga a un límite de Suspense por encima, o el
+ * prerender de `next build` falla en esta ruta.
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <Login />
+    </Suspense>
   );
 }

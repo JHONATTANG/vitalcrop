@@ -15,7 +15,8 @@
  * diseño. La sombra bajo la línea es el volumen retenido.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import {
   COLORES, TOOLTIP, EJE_BASE, LEYENDA, areaDegradado, sombra, zoom,
 } from '@/components/charts/tema';
@@ -120,7 +121,7 @@ export default function AutonomiaAcumulada({ dias, desdeNube = null, alto = 330 
   }
 
   return (
-    <ReactECharts option={option} style={{ height: alto, width: '100%' }}
+    <Grafica option={option} style={{ height: alto, width: '100%' }}
       opts={{ renderer: 'canvas' }} notMerge />
   );
 }

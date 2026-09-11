@@ -124,12 +124,22 @@ export function useSerie(metrica = 'rssi', dias = 7, bucketMin = 30) {
   });
 }
 
-export function useEventos(dias = 7, tipo?: string) {
+/**
+ * `sensorId` acota al nodo. Sin él la API responde con el enlace real
+ * agregado; con él, con lo que ese nodo reporta, sea real o simulado.
+ * La ficha de cada nodo lo pasa siempre: sin eso la de lechuga
+ * enseñaba las curvas de hierbabuena y nadie lo notaba porque la
+ * forma era plausible.
+ */
+const nodo = (sensorId?: string) =>
+  sensorId ? `&sensor_id=${encodeURIComponent(sensorId)}` : '';
+
+export function useEventos(dias = 7, tipo?: string, sensorId?: string) {
   const q = tipo ? `&tipo=${encodeURIComponent(tipo)}` : '';
   return useQuery<{ resumen: Array<{ evento: string; n: number; ultimo: string }>; eventos: EventoNodo[] }>({
-    queryKey: ['telecom', 'eventos', dias, tipo],
+    queryKey: ['telecom', 'eventos', dias, tipo, sensorId],
     queryFn: async () =>
-      (await apiClient.get(`/api/metricas/eventos?dias=${dias}${q}`)).data,
+      (await apiClient.get(`/api/metricas/eventos?dias=${dias}${q}${nodo(sensorId)}`)).data,
     refetchInterval: REFRESCO,
   });
 }
@@ -203,32 +213,37 @@ export function useMultiserie(
   metricas = 'temperatura,humedad_ambiente,ec,rssi',
   dias = 7,
   bucketMin = 30,
+  sensorId?: string,
 ) {
   return useQuery<{ metricas: string[]; bucket_min: number; puntos: PuntoMultiserie[] }>({
-    queryKey: ['telecom', 'multiserie', metricas, dias, bucketMin],
+    queryKey: ['telecom', 'multiserie', metricas, dias, bucketMin, sensorId],
     queryFn: async () =>
       (await apiClient.get(
         `/api/metricas/multiserie?metricas=${encodeURIComponent(metricas)}` +
-        `&dias=${dias}&bucket_min=${bucketMin}`)).data,
+        `&dias=${dias}&bucket_min=${bucketMin}${nodo(sensorId)}`)).data,
     refetchInterval: 60_000,
   });
 }
 
-export function useDiario(dias = 21) {
+export function useDiario(dias = 21, sensorId?: string) {
   return useQuery<{ dias: DiaBalance[] }>({
-    queryKey: ['telecom', 'diario', dias],
-    queryFn: async () => (await apiClient.get(`/api/metricas/diario?dias=${dias}`)).data,
+    queryKey: ['telecom', 'diario', dias, sensorId],
+    queryFn: async () =>
+      (await apiClient.get(`/api/metricas/diario?dias=${dias}${nodo(sensorId)}`)).data,
     // Agrega por día: refrescarlo cada 15 s no cambiaría ninguna barra.
     refetchInterval: 5 * 60_000,
   });
 }
 
-export function useCorrelacion(x = 'temperatura', y = 'ec', dias = 14, muestras = 1200) {
+export function useCorrelacion(
+  x = 'temperatura', y = 'ec', dias = 14, muestras = 1200, sensorId?: string,
+) {
   return useQuery<{ x: string; y: string; r: number | null; n: number; puntos: PuntoCorrelacion[] }>({
-    queryKey: ['telecom', 'correlacion', x, y, dias, muestras],
+    queryKey: ['telecom', 'correlacion', x, y, dias, muestras, sensorId],
     queryFn: async () =>
       (await apiClient.get(
-        `/api/metricas/correlacion?x=${x}&y=${y}&dias=${dias}&muestras=${muestras}`)).data,
+        `/api/metricas/correlacion?x=${x}&y=${y}&dias=${dias}&muestras=${muestras}` +
+        nodo(sensorId))).data,
     refetchInterval: 5 * 60_000,
   });
 }

@@ -15,7 +15,8 @@
  * signifique algo.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import { COLORES, TOOLTIP, EJE_BASE, sombra } from '@/components/charts/tema';
 
 interface Props {
@@ -111,7 +112,7 @@ export default function HuecosDeDatos({ huecos, alto = 220 }: Props) {
 
   return (
     <div>
-      <ReactECharts option={option} style={{ height: alto, width: '100%' }}
+      <Grafica option={option} style={{ height: alto, width: '100%' }}
         opts={{ renderer: 'canvas' }} notMerge />
       <div className="flex items-center justify-center gap-4 text-[11px] text-text-muted -mt-2">
         <span className="flex items-center gap-1.5">

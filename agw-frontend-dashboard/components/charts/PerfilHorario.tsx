@@ -14,7 +14,8 @@
  * ventilador arrancan a las 6 y son ruido electromagnético.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import { COLORES, TOOLTIP, sombra } from './tema';
 import type { HoraPerfil } from '@/hooks/useTelecom';
 
@@ -139,7 +140,7 @@ export default function PerfilHorario({
   }
 
   return (
-    <ReactECharts
+    <Grafica
       option={option}
       style={{ height: alto, width: '100%' }}
       opts={{ renderer: 'canvas' }}

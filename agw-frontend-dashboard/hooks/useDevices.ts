@@ -42,6 +42,12 @@ export function useDevices() {
     // seguiría pintándose en verde indefinidamente.
     refetchInterval: 30_000,
     staleTime: 15_000,
+    // Un refetch fallido no borra lo que ya había: sin esto, un
+    // tropiezo de la API a los 30 s dejaba la ficha de un nodo en
+    // «no hay ningún aparato con ese identificador» hasta el
+    // siguiente refetch, con el nodo perfectamente vivo.
+    placeholderData: (previo) => previo,
+    retry: 2,
   });
 }
 

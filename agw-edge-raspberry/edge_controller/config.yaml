@@ -54,10 +54,16 @@ programa:
   hidro_riego_noche_s: 180
   hidro_descanso_noche_s: 3420
   # REGLA: la tierra se llena hasta que el sensor de nivel acusa el agua,
-  # y eso se repite cada N días. 10 es lo acordado para la hierbabuena;
-  # bajar a 8-9 en épocas de calor, subir a 12-13 en invierno.
+  # y eso se repite cada N días. 8 es lo acordado para la hierbabuena;
+  # subir a 12-13 en invierno.
   # Tras cambiarlo:  sudo systemctl restart agw-edge
-  tierra_cada_dias: 10
+  #
+  # CUIDADO al bajarlo: el firmware recalcula la fecha como
+  # ultimo_riego + N dias, y si eso cae en el pasado la tierra se llena
+  # en el siguiente paso por la hora programada. Antes de bajar N, mira
+  # `seg_desde_riego_tierra` en el status del nodo y comprueba que N sea
+  # mayor que esos dias.
+  tierra_cada_dias: 8
   tierra_hora: 7
   # 300 s en vez de 60: cinco veces menos escrituras, y el tope de
   # 50.000 filas del buffer pasa de cubrir 35 dias a cubrir 173.

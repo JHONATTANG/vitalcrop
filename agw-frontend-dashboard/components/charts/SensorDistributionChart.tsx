@@ -1,6 +1,7 @@
 'use client';
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import { TelemetryData } from '@/hooks/useTelemetry';
 
 interface Props {
@@ -87,5 +88,5 @@ export default function SensorDistributionChart({ data }: Props) {
     };
   }, [data]);
 
-  return <ReactECharts option={option} style={{ height: '350px', width: '100%' }} />;
+  return <Grafica option={option} style={{ height: '350px', width: '100%' }} />;
 }

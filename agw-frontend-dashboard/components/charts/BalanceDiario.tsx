@@ -16,7 +16,8 @@
  * lado obligaría a comparar dos alturas a ojo.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import {
   COLORES, TOOLTIP, EJE_BASE, LEYENDA, areaDegradado, sombra,
 } from './tema';
@@ -166,7 +167,7 @@ export default function BalanceDiario({ dias, alto = 360, umbralRssi = -70 }: Pr
   }
 
   return (
-    <ReactECharts
+    <Grafica
       option={option}
       style={{ height: alto, width: '100%' }}
       opts={{ renderer: 'canvas' }}

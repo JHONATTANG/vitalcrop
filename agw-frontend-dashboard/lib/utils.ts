@@ -64,3 +64,12 @@ export function severityBg(s: string): string {
     default:         return 'bg-white/5 border-white/10';
   }
 }
+
+/** «hace 3 min» a partir de segundos de silencio. null = nunca publicó. */
+export function antiguedad(s?: number | null): string {
+  if (s === null || s === undefined) return 'nunca';
+  if (s < 90) return `${Math.round(s)} s`;
+  if (s < 5400) return `${Math.round(s / 60)} min`;
+  if (s < 172800) return `${(s / 3600).toFixed(1)} h`;
+  return `${Math.round(s / 86400)} d`;
+}

@@ -13,7 +13,8 @@
  * horizontal, "pasó ese día entero".
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import type { CeldaHeatmap } from '@/hooks/useTelecom';
 
 interface Props {
@@ -95,5 +96,5 @@ export default function HeatmapHoraDia({
     return <p className="text-text-muted text-sm py-8 text-center">Sin datos en la ventana</p>;
   }
 
-  return <ReactECharts option={option} style={{ height: alto }} notMerge />;
+  return <Grafica option={option} style={{ height: alto }} notMerge />;
 }

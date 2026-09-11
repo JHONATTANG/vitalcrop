@@ -14,7 +14,8 @@
  * gráfico y no un detalle.
  */
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type ReactECharts from 'echarts-for-react';
+import Grafica from '@/components/charts/Grafica';
 import { COLORES, TOOLTIP, EJE_BASE, sombra } from '@/components/charts/tema';
 
 interface Props {
@@ -107,7 +108,7 @@ export default function Recuperaciones({ detalle, objetivoS, alto = 260 }: Props
   }
 
   return (
-    <ReactECharts option={option} style={{ height: alto, width: '100%' }}
+    <Grafica option={option} style={{ height: alto, width: '100%' }}
       opts={{ renderer: 'canvas' }} notMerge />
   );
 }
