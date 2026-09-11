@@ -27,9 +27,33 @@ const config: Config = {
           secondary: '#94A3B8',
           muted:     '#64748B',
         },
+        // Portada pública: papel hueso, verdes de campo y azules de agua.
+        // Separada del panel a propósito: el panel es oscuro y de
+        // operación; la portada es clara y de lectura.
+        campo: {
+          hueso:    '#F6F2E8',
+          papel:    '#FBF9F4',
+          linea:    '#E4DCCB',
+          tinta:    '#1B2A1F',
+          'tinta-2': '#4A5A4E',
+          'tinta-3': '#7C8A80',
+          verde:    '#1E7A46',
+          'verde-oscuro': '#0F5132',
+          'verde-claro':  '#CFE9D6',
+          'verde-suave':  '#EAF4EC',
+          azul:     '#1F5FA8',
+          'azul-claro':  '#D6E6F7',
+          'azul-suave':  '#EBF2FA',
+          // Pisos térmicos, en el orden en que suben
+          calido:   '#D98E32',
+          templado: '#2E9E5B',
+          frio:     '#2A6FBF',
+          paramo:   '#5B4E9E',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['var(--font-fraunces)', 'Georgia', 'serif'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
