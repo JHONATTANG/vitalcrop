@@ -33,6 +33,7 @@ interface Props {
 export default function MandoNodo({ nodo, compacto = false }: Props) {
   const enviar = useSendCommand();
   const [ultima, setUltima] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const grupos = ordenesPara(nodo.capacidades);
   const vivo = nodo.status === 'ONLINE';
 
@@ -48,12 +49,16 @@ export default function MandoNodo({ nodo, compacto = false }: Props) {
       + '\n\nSe encola y el gateway la entrega en unos segundos.',
     )) return;
     try {
+      let ultimoAviso: string | null = null;
       for (const c of o.cmd) {
-        await enviar.mutateAsync({ sensor_id: nodo.device_uid, comando: c, nota: o.etiqueta });
+        const r = await enviar.mutateAsync({ sensor_id: nodo.device_uid, comando: c, nota: o.etiqueta });
+        ultimoAviso = (r as { aviso?: string | null }).aviso ?? null;
       }
       setUltima(o.etiqueta);
+      setAviso(ultimoAviso);
     } catch {
       setUltima(null);
+      setAviso(null);
     }
   };
 
@@ -67,8 +72,11 @@ export default function MandoNodo({ nodo, compacto = false }: Props) {
           </span>
         </span>
         {ultima && (
-          <span className="text-text-secondary flex items-center gap-1">
-            <Send size={11} /> «{ultima}» encolada
+          <span className={`flex items-center gap-1 ${aviso === 'entregado' ? 'text-brand-green' : 'text-text-secondary'}`}>
+            <Send size={11} /> «{ultima}»{' '}
+            {aviso === 'entregado' ? 'avisada al gateway al instante'
+              : aviso === 'fallido' ? 'encolada · el gateway no contestó, la recogerá en ≤10 min'
+              : 'encolada · la recogerá el sondeo (≤10 min)'}
           </span>
         )}
         {enviar.isError && (

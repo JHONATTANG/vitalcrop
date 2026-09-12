@@ -17,6 +17,7 @@ from cloud.sync_commands import CommandPoller
 from cloud.sync_events import EventSyncer
 from cloud.node_sync import NodeSync
 from cloud.reconciler import Reconciler
+from cloud.webhook import Anunciador
 from rules.rules_engine import RulesEngine
 from storage.local_db import LocalDB
 from utils.ap_watcher import APWatcher
@@ -73,14 +74,27 @@ async def main() -> None:
 
     telemetry_syncer = TelemetrySyncer(config, local_db)
     mqtt_client = MQTTClient(config, rules_engine, local_db, telemetry_syncer)
-    command_poller = CommandPoller(config, mqtt_client)
+    # Las órdenes van al topic del cultivo de su nodo; la especie la
+    # aprende el handler de los topics por los que cada nodo publica.
+    command_poller = CommandPoller(config, mqtt_client, especie_de=mqtt_client.handler.especie_de)
     # Los eventos del borde no tenian ruta de salida: se quedaban
     # en SQLite y la nube mostraba cifras congeladas.
     event_syncer = EventSyncer(config, local_db)
     node_sync = NodeSync(config, mqtt_client, local_db)
     ap_watcher = APWatcher(config, node_sync)
     reconciler = Reconciler(config, node_sync, local_db)
-    health_server = HealthServer(config, mqtt_client, local_db)
+    # El servidor HTTP recibe los avisos de la nube y despierta al poller.
+    health_server = HealthServer(config, mqtt_client, local_db, command_poller)
+    # Y le dice a la nube dónde mandarlos.
+    anunciador = Anunciador(config)
+
+    # Una alerta que se abre o se cierra sube en el acto, no en el
+    # siguiente ciclo del remitente.
+    mqtt_client.set_event_syncer(event_syncer)
+    # Cuando la nube vuelve tras un corte: recoger lo encolado y
+    # repetir la URL del webhook, por si la nube se redesplegó.
+    telemetry_syncer.al_recuperar.append(lambda: command_poller.despertar("reconexion"))
+    telemetry_syncer.al_recuperar.append(anunciador.reanunciar)
 
     # Sin esto las reglas con acción mqtt_publish no llegan al ESP32: el
     # riego automático quedaría inerte y el fallo sería silencioso.
@@ -102,6 +116,8 @@ async def main() -> None:
         asyncio.create_task(ap_watcher.run(), name="ap-watcher"),
         asyncio.create_task(reconciler.run(), name="reconciler"),
         asyncio.create_task(health_server.run(), name="health-server"),
+        asyncio.create_task(anunciador.run(), name="webhook-anunciador"),
+        asyncio.create_task(mqtt_client.handler.vigilar_alertas(), name="alertas-vigilante"),
         asyncio.create_task(shutdown_event.wait(), name="shutdown-watcher"),
     ]
 
@@ -126,6 +142,8 @@ async def main() -> None:
 
     # Cleanup
     await telemetry_syncer.close()
+    await anunciador.close()
+    await command_poller.close()
     await local_db.close()
     log.info("AGW Edge Gateway stopped cleanly")
 

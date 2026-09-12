@@ -13,6 +13,7 @@ el período de telemetría, así que no se puede asumir orden ni cadencia.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from typing import Awaitable, Callable
@@ -37,6 +38,20 @@ HandlerFn = Callable[[str, dict], Awaitable[None]]
 # con 300 s solo pasa una notificación cada 5 min por (nodo,variable,nivel).
 ALERT_DEDUP_WINDOW_S = 300
 
+# CICLO DE VIDA DE UNA ALERTA
+#
+# El firmware no distingue «empezó» de «sigue»: mientras la condición
+# dure, reemite la misma alerta cada 5 s, y cuando deja de darse
+# simplemente calla. El gateway sí distingue, y es lo que la nube y el
+# panel necesitan: UN evento cuando se abre y UN evento cuando se
+# cierra, subidos en el acto, en vez de una lectura cada 5 min de una
+# tabla que casi nunca cambia.
+#
+# Una alerta se da por cerrada cuando el nodo lleva ALERTA_SILENCIO_S
+# sin reemitirla: el firmware reemite cada 5 s, así que 90 s son
+# dieciocho oportunidades perdidas, no una casualidad.
+ALERTA_SILENCIO_S = 90
+
 
 class MessageHandler:
     """Despacha mensajes MQTT por topic exacto."""
@@ -51,6 +66,12 @@ class MessageHandler:
 
         # Cache de deduplicación: clave → epoch del último envío
         self._alert_seen: dict[str, float] = {}
+        # Alertas abiertas ahora mismo: clave → {abierta_en, ultima, n, alert}
+        self._alertas_abiertas: dict[str, dict] = {}
+        # Especie de cada nodo, aprendida del topic por el que publica.
+        # Es lo que permite mandar cada orden al topic de su cultivo.
+        self.especie_por_nodo: dict[str, str] = {}
+        self.event_syncer = None   # lo inyecta MQTTClient.set_event_syncer()
 
         # Contadores para las métricas de la Fase 6 (MCD §9)
         self.stats = {
@@ -111,6 +132,10 @@ class MessageHandler:
             log.warning("Canal sin handler", topic=topic, canal=canal)
             return
 
+        nodo = raw.get("id")
+        if isinstance(nodo, str) and nodo:
+            self.especie_por_nodo[nodo] = Topics.especie_de(topic)
+
         try:
             await handler(topic, raw)
         except Exception as exc:
@@ -161,6 +186,8 @@ class MessageHandler:
 
         key = alert_dedup_key(alert)
         now = time.time()
+        await self._seguir_alerta(key, alert, now)
+
         last = self._alert_seen.get(key, 0.0)
 
         if now - last < ALERT_DEDUP_WINDOW_S:
@@ -196,6 +223,58 @@ class MessageHandler:
                 "sensor_data": alert,
             }
         )
+
+    def especie_de(self, sensor_id: str) -> str | None:
+        return self.especie_por_nodo.get(sensor_id)
+
+    async def _seguir_alerta(self, key: str, alert: dict, now: float) -> None:
+        """Abre la alerta la primera vez; después solo anota que sigue."""
+        abierta = self._alertas_abiertas.get(key)
+        if abierta:
+            abierta["ultima"] = now
+            abierta["n"] += 1
+            abierta["alert"] = alert
+            return
+        self._alertas_abiertas[key] = {"abierta_en": now, "ultima": now, "n": 1, "alert": alert}
+        await self._registrar_alerta(alert, "abierta", {
+            "nivel": alert["nivel"], "valor": alert["valor"],
+            "umbral_min": alert["umbral_min"], "umbral_max": alert["umbral_max"],
+            "duracion_previa_s": (alert.get("duracion_ms") or 0) // 1000,
+        })
+
+    async def vigilar_alertas(self) -> None:
+        """
+        Tarea periódica: cierra las alertas que el nodo dejó de reemitir.
+
+        Corre cada 15 s. No hay otra forma de saber que una condición
+        cesó: el firmware no lo anuncia, solo deja de repetirla.
+        """
+        while True:
+            await asyncio.sleep(15)
+            now = time.time()
+            for key, a in list(self._alertas_abiertas.items()):
+                if now - a["ultima"] < ALERTA_SILENCIO_S:
+                    continue
+                del self._alertas_abiertas[key]
+                await self._registrar_alerta(a["alert"], "resuelta", {
+                    "nivel": a["alert"]["nivel"],
+                    "duracion_s": int(a["ultima"] - a["abierta_en"]),
+                    "reemisiones": a["n"],
+                })
+
+    async def _registrar_alerta(self, alert: dict, fase: str, detalle: dict) -> None:
+        """Evento `alerta_<variable>_<fase>` en el SQLite, y a la nube en el acto."""
+        variable = (alert.get("variable") or "desconocida").lower()
+        node_id = alert.get("node_id") or "desconocido"
+        try:
+            await self.local_db.registrar_evento(node_id, f"alerta_{variable}_{fase}", detalle)
+        except Exception as exc:
+            log.warning("No se pudo registrar la alerta como evento", error=str(exc))
+            return
+        log.warning(f"Alerta {fase}", variable=variable, nivel=detalle.get("nivel"), node=node_id,
+                    **{k: v for k, v in detalle.items() if k != "nivel"})
+        if self.event_syncer is not None:
+            self.event_syncer.despertar()
 
     def _prune_alert_cache(self, now: float) -> None:
         """Evita que el cache de deduplicación crezca sin límite."""

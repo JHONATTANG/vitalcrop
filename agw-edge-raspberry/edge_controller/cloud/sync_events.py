@@ -58,9 +58,17 @@ class EventSyncer:
         self._enabled = getattr(config.cloud, "enabled", True)
         self.gateway_id = config.device.gateway_id
         self._endpoint = "/api/iot/eventos"
+        # Ciclo de respaldo. Lo normal es que quien registra un evento que
+        # importa —una alerta que se abre o se cierra— llame a
+        # `despertar()` y suba en el acto.
         self._intervalo = 60
+        self._despertador = asyncio.Event()
 
         self.stats = {"subidos": 0, "duplicados": 0, "lotes": 0, "fallos": 0}
+
+    def despertar(self) -> None:
+        """Sube lo pendiente ya, sin esperar al ciclo."""
+        self._despertador.set()
 
     async def run(self) -> None:
         if not self._enabled:
@@ -85,7 +93,11 @@ class EventSyncer:
             except Exception as exc:                           # noqa: BLE001
                 self.stats["fallos"] += 1
                 log.warning("Fallo subiendo eventos", error=str(exc))
-            await asyncio.sleep(self._intervalo)
+            try:
+                await asyncio.wait_for(self._despertador.wait(), timeout=self._intervalo)
+            except asyncio.TimeoutError:
+                pass
+            self._despertador.clear()
 
     # ─────────────────────────────────────────────────────────────
 

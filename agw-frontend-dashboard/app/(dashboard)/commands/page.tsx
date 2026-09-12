@@ -163,7 +163,14 @@ export default function CommandsPage() {
                             <span className="text-text-primary">{describirComando(c.comando)}</span>
                             <span className="block text-[10px] text-text-muted font-mono">{JSON.stringify(c.comando)}</span>
                           </td>
-                          <td className="text-text-secondary">{nombreDe(c.sensor_id)}</td>
+                          <td className="text-text-secondary">
+                            {nombreDe(c.sensor_id)}
+                            {c.aviso && (
+                              <span className={`block text-[10px] ${c.aviso === 'entregado' ? 'text-brand-green' : 'text-text-muted'}`}>
+                                {c.aviso === 'entregado' ? 'aviso al instante' : c.aviso === 'fallido' ? 'aviso fallido · sondeo' : 'sin webhook · sondeo'}
+                              </span>
+                            )}
+                          </td>
                           <td className="text-text-muted tabular-nums whitespace-nowrap">
                             {c.creado_en && new Date(c.creado_en).toLocaleString('es', {
                               day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}

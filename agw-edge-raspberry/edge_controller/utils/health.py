@@ -1,6 +1,11 @@
 """
-AGW Edge Gateway — Health Check HTTP Server
-FastAPI mini-app con endpoints de diagnóstico
+AGW Edge Gateway — Servidor HTTP: salud y webhook
+==================================================
+Diagnóstico (`/health*`) y el receptor de avisos de la nube
+(`POST /webhook/ordenes`). Es el mismo servidor y el mismo puerto: es
+el que Tailscale Funnel expone al exterior, así que todo lo que cuelga
+de aquí es público y se comporta como tal: los `/health` no revelan
+nada sensible, y el webhook no hace nada sin una firma válida.
 """
 from __future__ import annotations
 
@@ -9,8 +14,10 @@ from datetime import datetime, timezone
 
 import structlog
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+
+from cloud.webhook import verificar_firma
 
 log = structlog.get_logger()
 
@@ -29,10 +36,12 @@ class HealthServer:
       GET /health/info  → info detallada (buffer stats, nodos)
     """
 
-    def __init__(self, config, mqtt_client=None, local_db=None):
+    def __init__(self, config, mqtt_client=None, local_db=None, command_poller=None):
         self.config = config
         self.mqtt_client = mqtt_client
         self.local_db = local_db
+        self.command_poller = command_poller
+        self.stats = {"avisos_ok": 0, "avisos_rechazados": 0}
         self._app = self._build_app()
 
     def _build_app(self) -> FastAPI:
@@ -123,6 +132,36 @@ class HealthServer:
                     result["nodes"] = []
 
             return result
+
+        @app.post("/webhook/ordenes", tags=["webhook"])
+        async def aviso_de_ordenes(request: Request):
+            """
+            La nube avisa: hay órdenes encoladas para este gateway.
+
+            No trae la orden; trae el motivo de salir a buscarla. Se
+            responde en cuanto se verifica la firma y se despierta el
+            poller: la nube tiene 4 s de tope y no hay que hacerle
+            esperar la vuelta completa.
+            """
+            cuerpo = await request.body()
+            valida, motivo = verificar_firma(
+                self.config.cloud.webhook_secret,
+                request.headers.get("X-AGW-Timestamp", ""),
+                request.headers.get("X-AGW-Signature", ""),
+                cuerpo,
+            )
+            if not valida:
+                self.stats["avisos_rechazados"] += 1
+                log.warning("Aviso rechazado", motivo=motivo,
+                            origen=request.client.host if request.client else "?")
+                return JSONResponse(status_code=401, content={"detail": "firma inválida"})
+
+            self.stats["avisos_ok"] += 1
+            if self.command_poller is not None:
+                self.command_poller.despertar("aviso")
+                log.info("Aviso de la nube recibido: hay órdenes")
+                return {"status": "ok", "accion": "sondeo inmediato"}
+            return {"status": "ok", "accion": "sin poller"}
 
         return app
 

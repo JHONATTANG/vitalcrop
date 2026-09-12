@@ -43,7 +43,20 @@ class CloudConfig(BaseModel):
     telemetry_endpoint: str = "/api/telemetria"
     health_endpoint: str = "/api/health"
     commands_endpoint: str = "/api/commands/pending"
-    poll_interval_seconds: int = 5
+    # Sondeo de RESPALDO de órdenes. Lo normal es que la nube avise por
+    # webhook; esto solo recoge lo que un aviso perdido dejara atrás.
+    # 600 s y no 5: cada vuelta es una consulta a la base de la nube,
+    # y a 5 s eran 17.000 al día para responder «no hay nada».
+    poll_interval_seconds: int = Field(600, ge=5, le=3600)
+    # Webhook: la URL pública por la que la nube avisa (Tailscale Funnel)
+    # y el secreto con el que firma. Sin URL el gateway funciona solo con
+    # el sondeo; sin secreto no acepta ningún aviso.
+    webhook_url: str = ""
+    webhook_secret: str = ""
+    # Telemetría en lotes: 0 = cada trama sube al momento (lo que mide
+    # la latencia del §9). >0 = se acumulan y suben cada tantos segundos,
+    # que deja dormir la base de la nube a cambio de un panel con retraso.
+    telemetry_batch_seconds: int = Field(0, ge=0, le=3600)
     push_timeout_seconds: int = 10
     retry_max: int = 3
     batch_size: int = 50
@@ -202,6 +215,10 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
     _apply_env(raw, "AGW_CLOUD_BASE_URL",      "cloud",   "api_base_url")
     _apply_env(raw, "AGW_CLOUD_TELEMETRY_ENDPOINT", "cloud", "telemetry_endpoint")
     _apply_env(raw, "AGW_CLOUD_ENABLED",       "cloud",   "enabled", cast=_as_bool)
+    _apply_env(raw, "AGW_CLOUD_POLL_INTERVAL_S", "cloud", "poll_interval_seconds", cast=int)
+    _apply_env(raw, "AGW_WEBHOOK_URL",         "cloud",   "webhook_url")
+    _apply_env(raw, "AGW_WEBHOOK_SECRET",      "cloud",   "webhook_secret")
+    _apply_env(raw, "AGW_TELEMETRY_BATCH_S",   "cloud",   "telemetry_batch_seconds", cast=int)
     _apply_env(raw, "AGW_GATEWAY_ID",          "device",  "gateway_id")
     _apply_env(raw, "AGW_GATEWAY_LOCATION",    "device",  "location")
     _apply_env(raw, "AGW_MQTT_HOST",           "mqtt",    "broker_host")

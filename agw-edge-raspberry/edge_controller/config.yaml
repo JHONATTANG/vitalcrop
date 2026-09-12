@@ -28,7 +28,17 @@ cloud:
   telemetry_endpoint: "/api/telemetria"        # contrato real (MCD §4.2)
   health_endpoint: "/api/health"
   commands_endpoint: "/api/iot/commands/pending"   # router iot (migracion 004)
-  poll_interval_seconds: 5
+  # Sondeo de respaldo. Las órdenes llegan por webhook; esto solo recoge
+  # lo que un aviso perdido dejara atrás. A 5 s eran 17.000 consultas
+  # al día a la base de la nube para responder «no hay nada».
+  poll_interval_seconds: 600
+  # URL pública del gateway (Tailscale Funnel) y secreto de firma.
+  # Se ponen en .env: AGW_WEBHOOK_URL y AGW_WEBHOOK_SECRET.
+  webhook_url: ""
+  webhook_secret: ""
+  # 0 = cada trama sube al momento. >0 = lotes cada tantos segundos
+  # (deja dormir la base de la nube; el panel va con ese retraso).
+  telemetry_batch_seconds: 0
   push_timeout_seconds: 10
   retry_max: 3
   batch_size: 50

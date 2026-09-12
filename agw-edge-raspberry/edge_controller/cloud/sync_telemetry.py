@@ -47,8 +47,15 @@ class TelemetrySyncer:
         self._cloud = CloudClient(config)
         self._queue: asyncio.Queue[dict] = asyncio.Queue()
         self._batch_size = config.cloud.batch_size
-        self._poll_interval = config.cloud.poll_interval_seconds
+        # Espera máxima por la primera trama de un lote en caliente. No
+        # es el sondeo de órdenes (que ahora es de 10 min): aquí solo
+        # marca cada cuánto se vacía la cola si llega algo.
+        self._poll_interval = 5
+        self._batch_seconds = int(getattr(config.cloud, "telemetry_batch_seconds", 0) or 0)
         self._enabled = getattr(config.cloud, "enabled", True)
+        # A quién avisar cuando la nube vuelve tras un corte: el poller de
+        # órdenes sale a buscar lo encolado y el anunciador repite la URL.
+        self.al_recuperar: list = []
 
         # Métricas de telecomunicaciones (MCD §9)
         self.stats = {
@@ -96,7 +103,18 @@ class TelemetrySyncer:
 
     async def _live_sender_loop(self) -> None:
         while True:
-            batch = await self._drain_queue()
+            if self._batch_seconds > 0:
+                # Modo lote: se deja acumular y se sube todo junto. Deja
+                # dormir la base de la nube entre lotes; a cambio el panel
+                # va con este retraso y la latencia del §9 ya no mide la
+                # red sino la espera en cola.
+                await asyncio.sleep(self._batch_seconds)
+                batch: list[dict] = []
+                while not self._queue.empty():
+                    batch.append(self._queue.get_nowait())
+                    self._queue.task_done()
+            else:
+                batch = await self._drain_queue()
             for record in batch:
                 await self._send_one(record)
 
@@ -143,6 +161,13 @@ class TelemetrySyncer:
                 if enviados:
                     await self.local_db.mark_synced(enviados)
                     log.info("Buffer vaciado", registros=len(enviados))
+                    # Había cola y la nube la aceptó: la conectividad
+                    # volvió. Que el resto se entere.
+                    for cb in self.al_recuperar:
+                        try:
+                            cb()
+                        except Exception as exc:              # noqa: BLE001
+                            log.debug("Callback de recuperacion fallo", error=str(exc))
             except Exception as exc:
                 log.warning("Recuperacion offline fallida", error=str(exc))
 

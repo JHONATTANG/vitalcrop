@@ -46,6 +46,14 @@ class MQTTClient:
             payload = payload.encode()
         await self._publish_queue.put((topic, payload))
 
+    def set_event_syncer(self, event_syncer) -> None:
+        """Para que una alerta que se abre o se cierra suba en el acto."""
+        self._handler.event_syncer = event_syncer
+
+    @property
+    def handler(self):
+        return self._handler
+
     def set_node_sync(self, node_sync) -> None:
         """Inyecta el sincronizador para que el handler pueda avisarle."""
         self._handler.node_sync = node_sync

@@ -41,6 +41,13 @@ export interface Command {
   estado?: EstadoComando;
   entregado_en?: string | null;
   resultado?: string | null;
+  /**
+   * Cómo le fue al aviso al gateway al encolar. `entregado` = el
+   * gateway la recogió en el acto; `fallido` = no contestó y la
+   * recogerá el sondeo de respaldo (≤10 min); `sin_webhook` = el
+   * gateway no ha anunciado URL. null en órdenes anteriores a esto.
+   */
+  aviso?: 'entregado' | 'fallido' | 'sin_webhook' | null;
   nota?: string | null;
   creado_por?: string | null;
 }
