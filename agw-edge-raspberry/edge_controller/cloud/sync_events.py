@@ -34,6 +34,7 @@ confirmar no puede corromper el histórico — a lo sumo reenvía.
 from __future__ import annotations
 
 import asyncio
+import time
 import json
 
 import structlog
@@ -51,9 +52,10 @@ LOTE = 250
 class EventSyncer:
     """Vacía los eventos pendientes del archivo local hacia la nube."""
 
-    def __init__(self, config, local_db):
+    def __init__(self, config, local_db, ritmo=None):
         self.config = config
         self.local_db = local_db
+        self.ritmo = ritmo
         self._cloud = CloudClient(config)
         self._enabled = getattr(config.cloud, "enabled", True)
         self.gateway_id = config.device.gateway_id
@@ -63,6 +65,9 @@ class EventSyncer:
         # `despertar()` y suba en el acto.
         self._intervalo = 60
         self._despertador = asyncio.Event()
+        self._ultimo_envio = 0.0
+        if ritmo is not None:
+            ritmo.al_despertar(self.despertar)
 
         self.stats = {"subidos": 0, "duplicados": 0, "lotes": 0, "fallos": 0}
 
@@ -93,11 +98,18 @@ class EventSyncer:
             except Exception as exc:                           # noqa: BLE001
                 self.stats["fallos"] += 1
                 log.warning("Fallo subiendo eventos", error=str(exc))
-            try:
-                await asyncio.wait_for(self._despertador.wait(), timeout=self._intervalo)
-            except asyncio.TimeoutError:
-                pass
-            self._despertador.clear()
+            self._ultimo_envio = time.time()
+            if self.ritmo is not None:
+                # Mismo ritmo que la telemetría: los riegos se acumulan y
+                # suben en el mismo lote. Solo una alerta que se abre o se
+                # cierra dispara el despertador y sube en el acto.
+                await self.ritmo.esperar(self._despertador, self._ultimo_envio)
+            else:
+                try:
+                    await asyncio.wait_for(self._despertador.wait(), timeout=self._intervalo)
+                except asyncio.TimeoutError:
+                    pass
+                self._despertador.clear()
 
     # ─────────────────────────────────────────────────────────────
 

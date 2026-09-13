@@ -18,6 +18,7 @@ from cloud.sync_events import EventSyncer
 from cloud.node_sync import NodeSync
 from cloud.reconciler import Reconciler
 from cloud.webhook import Anunciador
+from cloud.ritmo import Ritmo
 from rules.rules_engine import RulesEngine
 from storage.local_db import LocalDB
 from utils.ap_watcher import APWatcher
@@ -72,19 +73,23 @@ async def main() -> None:
     rules_engine = RulesEngine(config)
     await rules_engine.load_rules()
 
-    telemetry_syncer = TelemetrySyncer(config, local_db)
+    # Un solo ritmo para todo lo que va a la nube: 30 min dormido,
+    # 2 min con alguien en el panel. Ver cloud/ritmo.py.
+    ritmo = Ritmo(config.cloud.batch_activo_s, config.cloud.batch_dormido_s)
+    telemetry_syncer = TelemetrySyncer(config, local_db, ritmo)
     mqtt_client = MQTTClient(config, rules_engine, local_db, telemetry_syncer)
     # Las órdenes van al topic del cultivo de su nodo; la especie la
     # aprende el handler de los topics por los que cada nodo publica.
-    command_poller = CommandPoller(config, mqtt_client, especie_de=mqtt_client.handler.especie_de)
+    command_poller = CommandPoller(config, mqtt_client,
+                                   especie_de=mqtt_client.handler.especie_de, ritmo=ritmo)
     # Los eventos del borde no tenian ruta de salida: se quedaban
     # en SQLite y la nube mostraba cifras congeladas.
-    event_syncer = EventSyncer(config, local_db)
+    event_syncer = EventSyncer(config, local_db, ritmo)
     node_sync = NodeSync(config, mqtt_client, local_db)
     ap_watcher = APWatcher(config, node_sync)
     reconciler = Reconciler(config, node_sync, local_db)
     # El servidor HTTP recibe los avisos de la nube y despierta al poller.
-    health_server = HealthServer(config, mqtt_client, local_db, command_poller)
+    health_server = HealthServer(config, mqtt_client, local_db, command_poller, ritmo)
     # Y le dice a la nube dónde mandarlos.
     anunciador = Anunciador(config)
 

@@ -3,6 +3,7 @@ import { Bell, LogOut, User } from 'lucide-react';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useUser } from '@/hooks/useUser';
 import { deleteCookie } from 'cookies-next';
+import Presencia from '@/components/layout/Presencia';
 
 interface Props { title: string }
 
@@ -23,6 +24,8 @@ export default function Header({ title }: Props) {
       <h1 className="text-base font-semibold text-text-primary">{title}</h1>
 
       <div className="flex items-center gap-3">
+        {/* Modo del gateway: en vivo mientras haya alguien, dormido si no */}
+        <Presencia />
         {/* Alerts bell */}
         <a href="/alerts" className="relative p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors">
           <Bell size={18} />

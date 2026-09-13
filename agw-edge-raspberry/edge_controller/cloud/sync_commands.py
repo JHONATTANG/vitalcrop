@@ -59,9 +59,11 @@ log = structlog.get_logger()
 class CommandPoller:
     """Órdenes pendientes en la Cloud API: por aviso y por sondeo de respaldo."""
 
-    def __init__(self, config, mqtt_client, especie_de: Callable[[str], str | None] | None = None):
+    def __init__(self, config, mqtt_client, especie_de: Callable[[str], str | None] | None = None,
+                 ritmo=None):
         self.config = config
         self.mqtt_client = mqtt_client
+        self.ritmo = ritmo
         self._cloud = CloudClient(config)
         self._poll_interval = config.cloud.poll_interval_seconds
         self._enabled = getattr(config.cloud, "enabled", True)
@@ -105,8 +107,13 @@ class CommandPoller:
             # llegue. El evento se limpia justo antes de la vuelta para no
             # perder un aviso que entre mientras se está sondeando: si
             # llega uno durante el sondeo, la siguiente espera sale sola.
+            # El respaldo va al ritmo común: 30 min dormido, 2 min con
+            # alguien en el panel. Así la base de la nube no recibe una
+            # visita suelta cada 10 min que le impida dormir. El aviso
+            # por webhook sigue despertando al instante.
+            timeout = self.ritmo.intervalo if self.ritmo is not None else self._poll_interval
             try:
-                await asyncio.wait_for(self._despertador.wait(), timeout=self._poll_interval)
+                await asyncio.wait_for(self._despertador.wait(), timeout=timeout)
                 por_aviso, motivo = True, self._motivo
             except asyncio.TimeoutError:
                 por_aviso, motivo = False, "respaldo"

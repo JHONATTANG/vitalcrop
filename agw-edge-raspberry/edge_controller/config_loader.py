@@ -53,10 +53,13 @@ class CloudConfig(BaseModel):
     # el sondeo; sin secreto no acepta ningún aviso.
     webhook_url: str = ""
     webhook_secret: str = ""
-    # Telemetría en lotes: 0 = cada trama sube al momento (lo que mide
-    # la latencia del §9). >0 = se acumulan y suben cada tantos segundos,
-    # que deja dormir la base de la nube a cambio de un panel con retraso.
-    telemetry_batch_seconds: int = Field(0, ge=0, le=3600)
+    # Ritmo de subida a la nube (telemetría, eventos y respaldo de
+    # órdenes, todos juntos). Dormido: nadie mira el panel; se acumula
+    # y sube cada tantos segundos, y la base de la nube duerme entre
+    # lotes. Despierto: hay un usuario con sesión mirando sus nodos y
+    # el panel manda latidos; se sube cada `batch_activo_s`.
+    batch_dormido_s: int = Field(1800, ge=60, le=7200)
+    batch_activo_s: int = Field(120, ge=30, le=1800)
     push_timeout_seconds: int = 10
     retry_max: int = 3
     batch_size: int = 50
@@ -218,7 +221,8 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
     _apply_env(raw, "AGW_CLOUD_POLL_INTERVAL_S", "cloud", "poll_interval_seconds", cast=int)
     _apply_env(raw, "AGW_WEBHOOK_URL",         "cloud",   "webhook_url")
     _apply_env(raw, "AGW_WEBHOOK_SECRET",      "cloud",   "webhook_secret")
-    _apply_env(raw, "AGW_TELEMETRY_BATCH_S",   "cloud",   "telemetry_batch_seconds", cast=int)
+    _apply_env(raw, "AGW_BATCH_DORMIDO_S",     "cloud",   "batch_dormido_s", cast=int)
+    _apply_env(raw, "AGW_BATCH_ACTIVO_S",      "cloud",   "batch_activo_s", cast=int)
     _apply_env(raw, "AGW_GATEWAY_ID",          "device",  "gateway_id")
     _apply_env(raw, "AGW_GATEWAY_LOCATION",    "device",  "location")
     _apply_env(raw, "AGW_MQTT_HOST",           "mqtt",    "broker_host")

@@ -9,6 +9,7 @@ nada sensible, y el webhook no hace nada sin una firma válida.
 """
 from __future__ import annotations
 
+import json
 import time
 from datetime import datetime, timezone
 
@@ -36,11 +37,12 @@ class HealthServer:
       GET /health/info  → info detallada (buffer stats, nodos)
     """
 
-    def __init__(self, config, mqtt_client=None, local_db=None, command_poller=None):
+    def __init__(self, config, mqtt_client=None, local_db=None, command_poller=None, ritmo=None):
         self.config = config
         self.mqtt_client = mqtt_client
         self.local_db = local_db
         self.command_poller = command_poller
+        self.ritmo = ritmo
         self.stats = {"avisos_ok": 0, "avisos_rechazados": 0}
         self._app = self._build_app()
 
@@ -162,6 +164,42 @@ class HealthServer:
                 log.info("Aviso de la nube recibido: hay órdenes")
                 return {"status": "ok", "accion": "sondeo inmediato"}
             return {"status": "ok", "accion": "sin poller"}
+
+        @app.post("/webhook/presencia", tags=["webhook"])
+        async def aviso_de_presencia(request: Request):
+            """
+            La nube avisa: hay un usuario con sesión mirando sus nodos.
+
+            Trae `segundos`: cuánto mantener el modo despierto. El panel
+            manda latidos mientras el usuario esté; cada uno prorroga.
+            Sin latidos, el vencimiento pasa y el gateway vuelve a
+            dormir solo.
+            """
+            cuerpo = await request.body()
+            valida, motivo = verificar_firma(
+                self.config.cloud.webhook_secret,
+                request.headers.get("X-AGW-Timestamp", ""),
+                request.headers.get("X-AGW-Signature", ""),
+                cuerpo,
+            )
+            if not valida:
+                self.stats["avisos_rechazados"] += 1
+                log.warning("Presencia rechazada", motivo=motivo)
+                return JSONResponse(status_code=401, content={"detail": "firma inválida"})
+            if self.ritmo is None:
+                return {"status": "ok", "accion": "sin ritmo"}
+            try:
+                segundos = int((json.loads(cuerpo or b"{}") or {}).get("segundos", 180))
+            except (ValueError, TypeError):
+                segundos = 180
+            segundos = max(30, min(segundos, 900))
+            desperto = self.ritmo.marcar_presencia(segundos)
+            return {"status": "ok", **self.ritmo.describir(), "desperto": desperto}
+
+        @app.get("/health/ritmo", tags=["health"])
+        async def ritmo():
+            """En qué modo está el gateway y cuánto le queda de presencia."""
+            return self.ritmo.describir() if self.ritmo is not None else {"modo": "sin ritmo"}
 
         return app
 
