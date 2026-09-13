@@ -72,6 +72,7 @@ class CommandPoller:
         # de la conectividad, o quien quiera.
         self._despertador = asyncio.Event()
         self._ultimo_aviso: float = 0.0
+        self._motivo = "arranque"
 
         self.stats = {"recibidos": 0, "despachados": 0, "no_traducibles": 0,
                       "avisos": 0, "sondeos": 0}
@@ -83,6 +84,7 @@ class CommandPoller:
         if motivo == "aviso":
             self.stats["avisos"] += 1
             self._ultimo_aviso = time.time()
+        self._motivo = motivo
         self._despertador.set()
 
     async def run(self) -> None:
@@ -91,8 +93,8 @@ class CommandPoller:
             while True:
                 await asyncio.sleep(3600)
 
-        log.info("Ordenes: escuchando avisos, sondeo de respaldo cada %ss",
-                 self._poll_interval, endpoint=self._endpoint)
+        log.info(f"Ordenes: escuchando avisos, sondeo de respaldo cada {self._poll_interval}s",
+                 endpoint=self._endpoint)
         consecutive_errors = 0
         # Primera vuelta nada más arrancar: lo encolado mientras el
         # gateway estaba apagado no debe esperar diez minutos.
@@ -105,9 +107,9 @@ class CommandPoller:
             # llega uno durante el sondeo, la siguiente espera sale sola.
             try:
                 await asyncio.wait_for(self._despertador.wait(), timeout=self._poll_interval)
-                por_aviso = True
+                por_aviso, motivo = True, self._motivo
             except asyncio.TimeoutError:
-                por_aviso = False
+                por_aviso, motivo = False, "respaldo"
             self._despertador.clear()
 
             try:
@@ -115,8 +117,7 @@ class CommandPoller:
                 consecutive_errors = 0
                 self.stats["sondeos"] += 1
                 if dispatched or por_aviso:
-                    log.info("Ordenes despachadas", count=dispatched,
-                             por="aviso" if por_aviso else "sondeo")
+                    log.info("Ordenes despachadas", count=dispatched, por=motivo)
             except asyncio.CancelledError:
                 raise
             except _EndpointMissing:
