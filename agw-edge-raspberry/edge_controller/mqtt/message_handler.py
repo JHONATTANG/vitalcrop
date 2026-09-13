@@ -134,7 +134,13 @@ class MessageHandler:
 
         nodo = raw.get("id")
         if isinstance(nodo, str) and nodo:
-            self.especie_por_nodo[nodo] = Topics.especie_de(topic)
+            especie = Topics.especie_de(topic)
+            if self.especie_por_nodo.get(nodo) != especie:
+                self.especie_por_nodo[nodo] = especie
+                try:
+                    await self.local_db.guardar_especie(nodo, especie)
+                except Exception as exc:                      # noqa: BLE001
+                    log.debug("No se pudo persistir la especie", error=str(exc))
 
         try:
             await handler(topic, raw)
@@ -226,6 +232,15 @@ class MessageHandler:
 
     def especie_de(self, sensor_id: str) -> str | None:
         return self.especie_por_nodo.get(sensor_id)
+
+    async def cargar_especies(self) -> None:
+        """Al arrancar: lo que se aprendió en vidas anteriores del proceso."""
+        try:
+            self.especie_por_nodo.update(await self.local_db.especies_conocidas())
+            if self.especie_por_nodo:
+                log.info("Especies conocidas", nodos=self.especie_por_nodo)
+        except Exception as exc:                              # noqa: BLE001
+            log.warning("No se pudieron cargar las especies", error=str(exc))
 
     async def _seguir_alerta(self, key: str, alert: dict, now: float) -> None:
         """Abre la alerta la primera vez; después solo anota que sigue."""

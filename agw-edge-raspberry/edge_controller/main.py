@@ -91,6 +91,9 @@ async def main() -> None:
     # Una alerta que se abre o se cierra sube en el acto, no en el
     # siguiente ciclo del remitente.
     mqtt_client.set_event_syncer(event_syncer)
+    # Especie de cada nodo, para enrutar órdenes aunque el nodo esté
+    # callado desde antes de este arranque.
+    await mqtt_client.handler.cargar_especies()
     # Cuando la nube vuelve tras un corte: recoger lo encolado y
     # repetir la URL del webhook, por si la nube se redesplegó.
     telemetry_syncer.al_recuperar.append(lambda: command_poller.despertar("reconexion"))

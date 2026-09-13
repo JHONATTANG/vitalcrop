@@ -46,6 +46,12 @@ class LocalDB:
         schema = _SCHEMA_PATH.read_text()
         await self._db.executescript(schema)
         await self._db.commit()
+        # Columna añadida después del schema inicial. `ALTER` no tiene
+        # IF NOT EXISTS en SQLite: se mira antes.
+        cols = [r[1] for r in await (await self._db.execute("PRAGMA table_info(node_status)")).fetchall()]
+        if "especie" not in cols:
+            await self._db.execute("ALTER TABLE node_status ADD COLUMN especie TEXT")
+            await self._db.commit()
 
         log.info("LocalDB initialized", path=self._db_path)
 
@@ -195,6 +201,28 @@ class LocalDB:
                 "sensor_data": detalle,
             }
         )
+
+    async def guardar_especie(self, node_id: str, especie: str) -> None:
+        """
+        La especie del cultivo de un nodo, aprendida del topic por el que
+        publica. Persistida para que el gateway la sepa al arrancar
+        aunque el nodo esté callado: sin esto, una orden para un nodo
+        que aún no había hablado iba al topic por defecto.
+        """
+        await self._db.execute(
+            """
+            INSERT INTO node_status (node_id, device_type, status, last_seen, especie)
+            VALUES (?, 'UNKNOWN', 'unknown', strftime('%s','now'), ?)
+            ON CONFLICT(node_id) DO UPDATE SET especie = excluded.especie
+            """,
+            (node_id, especie),
+        )
+        await self._db.commit()
+
+    async def especies_conocidas(self) -> dict[str, str]:
+        cur = await self._db.execute(
+            "SELECT node_id, especie FROM node_status WHERE especie IS NOT NULL")
+        return {r["node_id"]: r["especie"] for r in await cur.fetchall()}
 
     async def get_all_node_statuses(self) -> list[dict]:
         """Retorna todos los nodos registrados con su último estado."""
