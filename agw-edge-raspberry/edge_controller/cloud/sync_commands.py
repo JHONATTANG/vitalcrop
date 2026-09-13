@@ -95,8 +95,9 @@ class CommandPoller:
             while True:
                 await asyncio.sleep(3600)
 
-        log.info(f"Ordenes: escuchando avisos, sondeo de respaldo cada {self._poll_interval}s",
-                 endpoint=self._endpoint)
+        respaldo = (f"al ritmo comun ({self.ritmo.dormido_s}s dormido / {self.ritmo.activo_s}s despierto)"
+                    if self.ritmo is not None else f"cada {self._poll_interval}s")
+        log.info(f"Ordenes: escuchando avisos, sondeo de respaldo {respaldo}", endpoint=self._endpoint)
         consecutive_errors = 0
         # Primera vuelta nada más arrancar: lo encolado mientras el
         # gateway estaba apagado no debe esperar diez minutos.
